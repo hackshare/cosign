@@ -1,0 +1,50 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+*.xcarchive
+*.ipa
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+Package.resolved
+
+# Tuist
+.tuist-bin/
+Derived/
+
+# Generated demo screenshots
+screenshots/
+
+# Rust
+target/
+**/*.rs.bk
+
+# UniFFI generated
+core/src/cosign_core.uniffi.rs
+
+# Generated Swift bindings (regenerated each build)
+Modules/CosignCore/Sources/Generated/
+
+# XCFramework build output (regenerated)
+Modules/CosignCore/Frameworks/CosignCore.xcframework/
+
+# Secrets / local config
+.env
+.env.local
+.env.devnet
+.cosign-local/
+docs/local/
+
+# Hand-curated per release, read by scripts/deploy-testflight.sh (kept local)
+TESTFLIGHT_NOTES.md
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.devnet-fixtures/

@@ -1,0 +1,15 @@
+{
+  "originHash" : "fe0c9ebb21f3a98d6a8ad517bbd7fa2d7e1c3de473e79db647dcbe0d456b601d",
+  "pins" : [
+    {
+      "identity" : "yubikit-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Yubico/yubikit-swift.git",
+      "state" : {
+        "revision" : "f5a01653ec07530ffd300a02fc9818aa1298f13e",
+        "version" : "1.3.0"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -1,0 +1,13 @@
+--swiftversion 6.0
+--indent 4
+--maxwidth 120
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--commas inline
+--trimwhitespace always
+--ifdef no-indent
+--self remove
+--importgrouping testable-bottom
+--header strip
+--exclude Modules/CosignCore/Sources/Generated,Tuist/.build,Derived,build

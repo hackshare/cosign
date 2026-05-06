@@ -1,0 +1,28 @@
+# Cosign devnet relay. Deploy: `cd core && fly deploy`.
+# Required secret: fly secrets set COSIGN_RELAY_RPC_URL="https://devnet.helius-rpc.com/?api-key=..."
+# (The relay proxies + filters RPC and serves the cosign/v1 endpoints + Jupiter prices.)
+#
+# Topology: two machines spread across sjc + iad, one always warm.
+#   fly scale count 2 --region sjc,iad
+app = "cosign-relay-devnet"
+primary_region = "sjc"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/_health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

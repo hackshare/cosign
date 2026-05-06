@@ -1,0 +1,254 @@
+namespace cosign_core {
+    [Throws=CryptoError]
+    string generate_mnemonic(u8 word_count);
+
+    [Throws=CryptoError]
+    KeyPair keypair_from_mnemonic(string mnemonic, string passphrase);
+
+    bytes sign(bytes private_key, bytes message);
+
+    boolean verify(bytes public_key, bytes message, bytes signature);
+
+    string pubkey_to_base58(bytes public_key);
+
+    boolean is_valid_pubkey(string pubkey);
+
+    [Throws=SquadsFFIError]
+    string associated_token_account_address(
+        string owner_pubkey,
+        string mint_pubkey,
+        string token_program_id
+    );
+
+    [Throws=SquadsFFIError]
+    MultisigDetail squads_get_multisig(string rpc_url, string multisig_address);
+
+    [Throws=SquadsFFIError]
+    sequence<MultisigSummary> squads_get_membership(string rpc_url, string member_pubkey);
+
+    [Throws=SquadsFFIError]
+    sequence<ProposalSummary> squads_get_proposals_range(
+        string rpc_url,
+        string multisig_address,
+        u64 from_index,
+        u64 to_index
+    );
+
+    [Throws=SquadsFFIError]
+    ProposalDetail squads_get_proposal(
+        string rpc_url,
+        string multisig_address,
+        u64 transaction_index
+    );
+
+    [Throws=SquadsFFIError]
+    string squads_get_vault_pda(string multisig_address, u8 vault_index);
+
+    [Throws=SquadsFFIError]
+    sequence<ActivityItem> squads_get_activity(
+        string rpc_url,
+        string multisig_address,
+        string? before_signature,
+        u32 limit
+    );
+
+    [Throws=SquadsFFIError]
+    PreparedTransaction squads_build_vote_transaction(
+        string rpc_url,
+        string multisig_address,
+        u64 transaction_index,
+        string member_pubkey,
+        VoteType vote
+    );
+
+    [Throws=SquadsFFIError]
+    PreparedProposalCreation squads_build_sol_transfer_proposal_transaction(
+        string rpc_url,
+        string multisig_address,
+        u8 vault_index,
+        string member_pubkey,
+        string recipient_pubkey,
+        u64 lamports,
+        string? memo
+    );
+
+    [Throws=SquadsFFIError]
+    PreparedProposalCreation squads_build_token_transfer_proposal_transaction(
+        TokenTransferProposalParams params
+    );
+
+    [Throws=SquadsFFIError]
+    PreparedTransaction squads_build_execute_transaction(
+        string rpc_url,
+        string multisig_address,
+        u64 transaction_index,
+        string member_pubkey
+    );
+
+    [Throws=SquadsFFIError]
+    SimulationResult squads_simulate_signed_transaction(
+        string rpc_url,
+        bytes message_bytes,
+        bytes signature_bytes
+    );
+
+    [Throws=SquadsFFIError]
+    TransactionSubmission squads_send_signed_transaction(
+        string rpc_url,
+        bytes message_bytes,
+        bytes signature_bytes
+    );
+
+    [Throws=SquadsFFIError]
+    SignatureStatus squads_get_signature_status(string rpc_url, string signature);
+};
+
+dictionary KeyPair {
+    bytes public_key;
+    bytes private_key;
+};
+
+dictionary TokenTransferProposalParams {
+    string rpc_url;
+    string multisig_address;
+    u8 vault_index;
+    string member_pubkey;
+    string recipient_owner_pubkey;
+    string mint_pubkey;
+    u64 amount;
+    u8 decimals;
+    string token_program_id;
+    string? memo;
+};
+
+[Error]
+enum CryptoError {
+    "InvalidWordCount",
+    "InvalidMnemonic",
+    "DerivationFailed",
+    "InvalidKeyLength",
+    "InvalidSignatureLength",
+};
+
+dictionary MultisigSummary {
+    string address;
+    u16 threshold;
+    u32 member_count;
+    u64 transaction_index;
+    u64 stale_transaction_index;
+};
+
+dictionary MultisigDetail {
+    string address;
+    u16 threshold;
+    u32 time_lock_seconds;
+    u64 transaction_index;
+    u64 stale_transaction_index;
+    sequence<MemberInfo> members;
+    sequence<VaultRef> vaults;
+};
+
+dictionary MemberInfo {
+    string pubkey;
+    boolean can_initiate;
+    boolean can_vote;
+    boolean can_execute;
+};
+
+dictionary VaultRef {
+    u8 index;
+    string address;
+};
+
+dictionary ProposalSummary {
+    u64 transaction_index;
+    string status;
+    u32 votes_yes;
+    u32 votes_no;
+    u32 votes_cancelled;
+    u16 threshold;
+};
+
+dictionary ProposalDetail {
+    u64 transaction_index;
+    string status;
+    u32 votes_yes;
+    u32 votes_no;
+    u32 votes_cancelled;
+    u16 threshold;
+    string kind;
+    sequence<string> voters_yes;
+    sequence<string> voters_no;
+    sequence<string> voters_cancelled;
+    sequence<DecodedInstruction> instructions;
+    sequence<string> accounts_referenced;
+    string? transaction_address;
+    string? proposer;
+    i64? created_at_unix;
+};
+
+dictionary DecodedInstruction {
+    string program;
+    string kind;
+    string summary;
+    sequence<string> accounts;
+    string raw_data_hex;
+};
+
+dictionary ActivityItem {
+    string signature;
+    u64 slot;
+    i64 timestamp_unix;
+    string kind;
+    string? error;
+};
+
+enum VoteType {
+    "Approve",
+    "Reject",
+    "Cancel",
+};
+
+dictionary PreparedTransaction {
+    bytes message_bytes;
+    string fee_payer;
+    string recent_blockhash;
+    string action;
+    ProposalSummary refreshed_proposal;
+};
+
+dictionary PreparedProposalCreation {
+    bytes message_bytes;
+    string fee_payer;
+    string recent_blockhash;
+    string action;
+    u64 transaction_index;
+    string proposal_address;
+    string transaction_address;
+    string vault_address;
+};
+
+dictionary SimulationResult {
+    string? err;
+    sequence<string> logs;
+};
+
+dictionary TransactionSubmission {
+    string signature;
+};
+
+dictionary SignatureStatus {
+    u64? slot;
+    string status;
+    string? err;
+};
+
+[Error]
+enum SquadsFFIError {
+    "InvalidPubkey",
+    "InvalidSignature",
+    "Rpc",
+    "InvalidAccount",
+    "CompanionMissing",
+    "InvalidTransaction",
+};

@@ -1,0 +1,8 @@
+Cosign
+Copyright 2026 Cosign Contributors
+
+This product includes software developed by the Cosign Contributors.
+
+This product includes software from third-party sources licensed under the
+Apache License 2.0, MIT, or BSD licenses. See third-party licenses in the
+respective dependency manifests (Cargo.lock, Package.resolved).

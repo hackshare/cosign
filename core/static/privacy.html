@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cosign Privacy</title>
+<meta name="description" content="Cosign privacy policy. No accounts, keys stay on your device, and the relay stores no personal data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#08090B; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  * { box-sizing:border-box; }
+  a { color:inherit; }
+  ::selection { background:rgba(242,194,108,0.24); }
+</style>
+</head>
+<body>
+<div style="background:#08090B; color:#F4F5F3; font-family:'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; min-height:100vh; overflow-x:hidden;">
+
+  <header style="position:sticky; top:0; z-index:30; background:rgba(8,9,11,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div style="max-width:1200px; margin:0 auto; padding:15px clamp(20px,5vw,44px); display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <a href="/" style="display:inline-flex; align-items:center; gap:9px; text-decoration:none;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M19 6.2A8.5 8.5 0 1 0 19 17.8" stroke="#F4F5F3" stroke-width="2.6" stroke-linecap="round"></path><circle cx="18.4" cy="12" r="2.4" fill="#F2C26C"></circle></svg>
+        <span style="font-size:18px; font-weight:600; letter-spacing:-0.4px;">cosign</span>
+      </a>
+      <nav style="display:flex; align-items:center; gap:clamp(16px,3vw,30px);">
+        <a href="/#work" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6);">How it works</a>
+        <a href="/privacy" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6);">Privacy</a>
+        <span style="display:inline-flex; align-items:center; gap:8px; font-family:'Geist Mono', monospace; font-size:12px; font-weight:500; color:rgba(244,245,243,0.6); padding:7px 0; cursor:default;"><span style="width:6px; height:6px; border-radius:999px; background:#F2C26C;"></span>coming soon</span>
+      </nav>
+    </div>
+  </header>
+
+  <main style="max-width:760px; margin:0 auto; padding:clamp(48px,8vw,92px) clamp(20px,5vw,44px) 0;">
+    <div style="font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.5);">cosign / privacy</div>
+    <h1 style="margin:18px 0 0; font-size:clamp(34px,5.4vw,52px); font-weight:600; letter-spacing:-1.8px;">Privacy</h1>
+    <p style="margin:14px 0 0; font-size:13px; color:rgba(244,245,243,0.42); font-family:'Geist Mono', monospace;">Last updated June 2026</p>
+    <p style="margin:26px 0 0; font-size:17px; line-height:1.62; color:rgba(244,245,243,0.72); max-width:64ch;">Cosign is built so that we do not need your personal data to operate. There are no accounts, and your signing keys never leave your device. This page explains what that means in practice.</p>
+
+    <div style="margin-top:8px;">
+      <section style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:grid; grid-template-columns:52px 1fr; gap:8px 20px; align-items:baseline;">
+        <span style="font-size:26px; font-weight:600; letter-spacing:-1px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:1;">01</span>
+        <h2 style="margin:0; font-size:21px; font-weight:600; letter-spacing:-0.4px;">No accounts</h2>
+        <span></span>
+        <p style="margin:0; font-size:15.5px; line-height:1.62; color:rgba(244,245,243,0.62); max-width:60ch;">Cosign does not require an account, email, or password. You connect signers and squads directly, and nothing about you is registered with us.</p>
+      </section>
+      <section style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:grid; grid-template-columns:52px 1fr; gap:8px 20px; align-items:baseline;">
+        <span style="font-size:26px; font-weight:600; letter-spacing:-1px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:1;">02</span>
+        <h2 style="margin:0; font-size:21px; font-weight:600; letter-spacing:-0.4px;">Keys stay on your device</h2>
+        <span></span>
+        <p style="margin:0; font-size:15.5px; line-height:1.62; color:rgba(244,245,243,0.62); max-width:60ch;">Signing keys are generated and stored on your iPhone, in the iOS Keychain, or on a connected hardware signer. They never leave the device and we never receive them. Recovery phrases are shown only on your device, behind Face ID.</p>
+      </section>
+      <section style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:grid; grid-template-columns:52px 1fr; gap:8px 20px; align-items:baseline;">
+        <span style="font-size:26px; font-weight:600; letter-spacing:-1px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:1;">03</span>
+        <h2 style="margin:0; font-size:21px; font-weight:600; letter-spacing:-0.4px;">What the relay does</h2>
+        <span></span>
+        <p style="margin:0; font-size:15.5px; line-height:1.62; color:rgba(244,245,243,0.62); max-width:60ch;">The Cosign relay proxies Solana RPC requests and helps decode proposals into readable actions. It forwards requests to the Solana network and returns the results. It cannot sign transactions or move funds.</p>
+      </section>
+      <section style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:grid; grid-template-columns:52px 1fr; gap:8px 20px; align-items:baseline;">
+        <span style="font-size:26px; font-weight:600; letter-spacing:-1px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:1;">04</span>
+        <h2 style="margin:0; font-size:21px; font-weight:600; letter-spacing:-0.4px;">Rate limiting by IP</h2>
+        <span></span>
+        <p style="margin:0; font-size:15.5px; line-height:1.62; color:rgba(244,245,243,0.62); max-width:60ch;">To keep the relay healthy and prevent abuse, requests are rate-limited by IP address. IP addresses are used transiently for this purpose and are not used to build a profile of you.</p>
+      </section>
+      <section style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:grid; grid-template-columns:52px 1fr; gap:8px 20px; align-items:baseline;">
+        <span style="font-size:26px; font-weight:600; letter-spacing:-1px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:1;">05</span>
+        <h2 style="margin:0; font-size:21px; font-weight:600; letter-spacing:-0.4px;">No personal-data storage</h2>
+        <span></span>
+        <p style="margin:0; font-size:15.5px; line-height:1.62; color:rgba(244,245,243,0.62); max-width:60ch;">We do not store personal data. We do not sell or share data, because we do not collect it in the first place. Any operational logs are minimal and used only to keep the service running.</p>
+      </section>
+      <section style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:grid; grid-template-columns:52px 1fr; gap:8px 20px; align-items:baseline;">
+        <span style="font-size:26px; font-weight:600; letter-spacing:-1px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:1;">06</span>
+        <h2 style="margin:0; font-size:21px; font-weight:600; letter-spacing:-0.4px;">On-chain data is public</h2>
+        <span></span>
+        <p style="margin:0; font-size:15.5px; line-height:1.62; color:rgba(244,245,243,0.62); max-width:60ch;">Squads, vaults, proposals, and transactions live on the Solana blockchain and are public by design. Cosign reads this public data to show you proposals. It is visible to anyone using the network, independent of this app.</p>
+      </section>
+      <section style="margin-top:40px; border-top:1px solid rgba(255,255,255,0.1); padding-top:22px; display:grid; grid-template-columns:52px 1fr; gap:8px 20px; align-items:baseline;">
+        <span style="font-size:26px; font-weight:600; letter-spacing:-1px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:1;">07</span>
+        <h2 style="margin:0; font-size:21px; font-weight:600; letter-spacing:-0.4px;">Changes to this policy</h2>
+        <span></span>
+        <p style="margin:0; font-size:15.5px; line-height:1.62; color:rgba(244,245,243,0.62); max-width:60ch;">If this policy changes, we will update the date at the top of this page. Because Cosign does not have accounts, material changes will be reflected in the app and on this page rather than by direct notice.</p>
+      </section>
+    </div>
+
+    <div style="margin-top:52px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.1);">
+      <a href="/" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6); display:inline-flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" stroke="rgba(244,245,243,0.6)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>Back to home</a>
+    </div>
+  </main>
+
+  <footer style="max-width:1200px; margin:clamp(64px,9vw,120px) auto 0; padding:30px clamp(20px,5vw,44px) 48px; border-top:1px solid rgba(255,255,255,0.07);">
+    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
+      <a href="/" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19 6.2A8.5 8.5 0 1 0 19 17.8" stroke="#F4F5F3" stroke-width="2.6" stroke-linecap="round"></path><circle cx="18.4" cy="12" r="2.4" fill="#F2C26C"></circle></svg>
+        <span style="font-size:15px; font-weight:600; letter-spacing:-0.3px;">Cosign</span>
+      </a>
+      <div style="display:flex; align-items:center; gap:22px;">
+        <a href="/privacy" style="text-decoration:none; font-size:13.5px; font-weight:500; color:rgba(244,245,243,0.6);">Privacy</a>
+        <span style="font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.36);">Solana Squads multisig signer</span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

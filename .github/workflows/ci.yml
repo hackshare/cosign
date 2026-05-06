@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      ios: ${{ steps.filter.outputs.ios }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'core/**'
+              - '.github/workflows/ci.yml'
+            ios:
+              - 'App/**'
+              - 'Modules/**'
+              - 'Tuist/**'
+              - 'Project.swift'
+              - 'core/**'
+              - 'scripts/build-rust.sh'
+              - 'scripts/build-xcframework.sh'
+              - '.github/workflows/ci.yml'
+
+  rust:
+    name: Rust core
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          components: rustfmt, clippy
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: core
+
+      - name: rustfmt --check
+        working-directory: core
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        working-directory: core
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: core
+        run: cargo test
+
+  ios:
+    name: iOS app + tests
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: core
+
+      # The XCFramework + UniFFI bindings are derived purely from core/. Cache
+      # them keyed on the Rust sources so iOS-only changes skip the Rust rebuild.
+      - name: Cache XCFramework + bindings
+        id: xcframework
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            Modules/CosignCore/Frameworks/CosignCore.xcframework
+            Modules/CosignCore/Sources/Generated
+          key: xcframework-${{ runner.os }}-${{ hashFiles('core/src/**', 'core/Cargo.toml', 'core/Cargo.lock', 'core/build.rs', 'core/uniffi.toml', 'scripts/build-rust.sh', 'scripts/build-xcframework.sh') }}
+
+      - name: Build XCFramework
+        if: steps.xcframework.outputs.cache-hit != 'true'
+        run: ./scripts/build-xcframework.sh
+
+      - name: Install Tuist + Swift lint tooling
+        run: brew install tuist swiftformat swiftlint
+
+      - name: swiftformat --lint
+        run: swiftformat --lint App/ Modules/
+
+      - name: swiftlint
+        run: swiftlint lint --quiet --strict App Modules
+
+      - name: Generate Xcode project
+        run: tuist generate --no-open
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -workspace Cosign.xcworkspace \
+            -scheme Cosign \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            build
+
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          DEVICE=$(xcrun simctl list devices available | grep -E "    iPhone [0-9]+" | head -1 | sed 's/^[ \t]*//' | sed 's/ (.*//')
+          echo "Selected simulator: $DEVICE"
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        env:
+          SIMULATOR_NAME: ${{ steps.sim.outputs.device }}
+        run: |
+          xcodebuild test \
+            -workspace Cosign.xcworkspace \
+            -scheme Cosign-Workspace \
+            -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest"
+
+  # Aggregate gate so branch protection can require a single check even when the
+  # rust or ios job is skipped by the path filter. Require "CI passed".
+  ci-ok:
+    name: CI passed
+    needs: [rust, ios]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no required job failed
+        env:
+          RUST: ${{ needs.rust.result }}
+          IOS: ${{ needs.ios.result }}
+        run: |
+          echo "rust=$RUST ios=$IOS"
+          if [ "$RUST" = "failure" ] || [ "$IOS" = "failure" ]; then
+            echo "A required job failed."
+            exit 1
+          fi
+          echo "OK"
