@@ -1,0 +1,24 @@
+excluded:
+  - Modules/CosignCore/Sources/Generated
+  - Tuist/.build
+  - Derived
+  - build
+  - DerivedData
+  - .build
+
+disabled_rules:
+  - todo
+  - line_length
+  - sorted_imports
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - last_where
+  - reduce_into
+  - redundant_nil_coalescing
+  - toggle_bool
+
+reporter: emoji

@@ -1,0 +1,25 @@
+pre-commit:
+  parallel: true
+  commands:
+    rustfmt:
+      glob: "core/**/*.rs"
+      run: cd core && cargo fmt --all -- --check
+    clippy:
+      glob: "core/**/*.{rs,toml}"
+      run: cd core && cargo clippy --all-targets -- -D warnings
+    swiftformat:
+      glob: "{App,Modules}/**/*.swift"
+      run: swiftformat --lint {staged_files}
+    swiftlint:
+      glob: "{App,Modules}/**/*.swift"
+      run: swiftlint lint --quiet --strict {staged_files}
+    ui-copy:
+      glob: "{App,Modules}/**/*.swift"
+      run: ruby scripts/check-ui-copy.rb {staged_files}
+    gitleaks:
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks protect --staged --no-banner --redact
+        else
+          echo "gitleaks not installed; skipping local secret scan (brew install gitleaks). CI still scans."
+        fi

@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keep the pinned Action SHAs current, with review.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Rust dependencies for the core crate and relay.
+  - package-ecosystem: cargo
+    directory: /core
+    schedule:
+      interval: weekly
