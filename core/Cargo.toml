@@ -23,7 +23,7 @@ landing = []
 
 [dependencies]
 # 'cli' feature is required for the uniffi-bindgen binary in src/bin/.
-uniffi = { version = "0.31.1", features = ["build", "cli"] }
+uniffi = { version = "0.32.0", features = ["build", "cli"] }
 thiserror = "1"
 dotenvy = "0.15"
 serde_json = "1"
@@ -69,7 +69,7 @@ rustls = "0.21"
 serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
-uniffi = { version = "0.31.1", features = ["build"] }
+uniffi = { version = "0.32.0", features = ["build"] }
 
 [[bin]]
 name = "uniffi-bindgen"
