@@ -1223,7 +1223,7 @@ dependencies = [
  "spl-token",
  "spl-token-2022 1.0.0",
  "squads-multisig",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tungstenite 0.24.0",
  "uniffi",
  "ureq",
