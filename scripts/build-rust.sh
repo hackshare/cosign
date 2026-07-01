@@ -17,11 +17,17 @@ if [[ "$PROFILE" == "release" ]]; then
     PROFILE_DIR="release"
 fi
 
-TARGETS=(
-    "aarch64-apple-ios"
-    "aarch64-apple-ios-sim"
-    "x86_64-apple-ios"
-)
+# Release archives only use the device slice. DEVICE_ONLY=1 (set by CI) skips the
+# two simulator targets, cutting the Rust build to roughly a third.
+if [[ "${DEVICE_ONLY:-0}" == "1" ]]; then
+    TARGETS=( "aarch64-apple-ios" )
+else
+    TARGETS=(
+        "aarch64-apple-ios"
+        "aarch64-apple-ios-sim"
+        "x86_64-apple-ios"
+    )
+fi
 
 for TARGET in "${TARGETS[@]}"; do
     echo "==> building for $TARGET ($PROFILE)"

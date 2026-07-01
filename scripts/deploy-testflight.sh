@@ -51,10 +51,13 @@ GIT_SHA=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo "nogit")
 # without the caller having to export anything by hand.
 [ -f "$ROOT/docs/local/asc.env" ] && set -a && . "$ROOT/docs/local/asc.env" && set +a
 
-# App Store Connect API credentials (account-wide; shared across com.hackshare.* apps).
+# App Store Connect API credentials. The key id + issuer id are account
+# identifiers, kept out of the public repo: set them in docs/local/asc.env
+# (gitignored, sourced above) next to APP_APPLE_ID. The .p8 itself stays in the
+# login keychain under ASC_KEYCHAIN_SERVICE.
 ASC_KEYCHAIN_SERVICE="${ASC_KEYCHAIN_SERVICE:-mycelium-asc-api}"
-ASC_KEY_ID="${ASC_KEY_ID:-5ZH4Z7H96H}"
-ASC_ISSUER_ID="${ASC_ISSUER_ID:-69a6de6f-81a9-47e3-e053-5b8c7c11a4d1}"
+ASC_KEY_ID="${ASC_KEY_ID:?set ASC_KEY_ID in docs/local/asc.env}"
+ASC_ISSUER_ID="${ASC_ISSUER_ID:?set ASC_ISSUER_ID in docs/local/asc.env}"
 APP_APPLE_ID="${APP_APPLE_ID:-}"   # Cosign's ASC numeric id; unset → skip notes step
 
 # Stream the .p8 from the keychain (security -w returns hex for newline-containing values).

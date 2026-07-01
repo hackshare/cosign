@@ -1,0 +1,6 @@
+# Require review on the release + provenance surface. These paths control what
+# gets signed, embedded, and uploaded, so changes need an owner's approval.
+/.github/workflows/   @abhay
+/ci/                  @abhay
+/Tools/               @abhay
+/Modules/Provenance/  @abhay

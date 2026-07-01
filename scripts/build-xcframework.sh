@@ -26,13 +26,15 @@ PROFILE_DIR="debug"
 ./scripts/build-rust.sh
 
 # 2. Combine the two simulator slices into one fat library.
+#    Skipped in device-only builds (release archives use only the device slice).
 SIM_FAT_DIR="$CRATE_DIR/target/sim-fat/$PROFILE_DIR"
-mkdir -p "$SIM_FAT_DIR"
-
-lipo -create \
-    "$CRATE_DIR/target/aarch64-apple-ios-sim/$PROFILE_DIR/$LIB_NAME" \
-    "$CRATE_DIR/target/x86_64-apple-ios/$PROFILE_DIR/$LIB_NAME" \
-    -output "$SIM_FAT_DIR/$LIB_NAME"
+if [[ "${DEVICE_ONLY:-0}" != "1" ]]; then
+    mkdir -p "$SIM_FAT_DIR"
+    lipo -create \
+        "$CRATE_DIR/target/aarch64-apple-ios-sim/$PROFILE_DIR/$LIB_NAME" \
+        "$CRATE_DIR/target/x86_64-apple-ios/$PROFILE_DIR/$LIB_NAME" \
+        -output "$SIM_FAT_DIR/$LIB_NAME"
+fi
 
 # 3. Generate Swift bindings via UniFFI.
 GEN_DIR="Modules/CosignCore/Sources/Generated"
@@ -98,16 +100,22 @@ EOF
 }
 
 DEVICE_FW=$(build_framework "ios-arm64" "$CRATE_DIR/target/aarch64-apple-ios/$PROFILE_DIR/$LIB_NAME")
-SIM_FW=$(build_framework "ios-arm64_x86_64-simulator" "$SIM_FAT_DIR/$LIB_NAME")
 
 # 5. Combine into a framework-style XCFramework.
 XCF_OUT="Modules/CosignCore/Frameworks/CosignCore.xcframework"
 rm -rf "$XCF_OUT"
 mkdir -p "$(dirname "$XCF_OUT")"
 
-xcodebuild -create-xcframework \
-    -framework "$DEVICE_FW" \
-    -framework "$SIM_FW" \
-    -output "$XCF_OUT"
+if [[ "${DEVICE_ONLY:-0}" == "1" ]]; then
+    xcodebuild -create-xcframework \
+        -framework "$DEVICE_FW" \
+        -output "$XCF_OUT"
+else
+    SIM_FW=$(build_framework "ios-arm64_x86_64-simulator" "$SIM_FAT_DIR/$LIB_NAME")
+    xcodebuild -create-xcframework \
+        -framework "$DEVICE_FW" \
+        -framework "$SIM_FW" \
+        -output "$XCF_OUT"
+fi
 
 echo "==> XCFramework written to $XCF_OUT"
