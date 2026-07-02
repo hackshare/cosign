@@ -122,7 +122,6 @@ extension CosignCopy {
     }
 
     enum About {
-        static let screenEyebrow = "About"
         static let appName = "Cosign"
         static let tagline = "A verifiable signer for Squads v4 multisigs."
         static let versionLabel = "Version"

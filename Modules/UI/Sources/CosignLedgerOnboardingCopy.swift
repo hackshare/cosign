@@ -18,7 +18,6 @@ extension CosignCopy.Ledger {
     static let searchingTitle = "Searching for devices…"
     static let searchingSubtitle = "Keep the Ledger unlocked and nearby"
     static let connectButton = "Connect"
-    static let devicePresenceLabel = "Solana ready"
 
     static let verifyEyebrow = "Step 4 of 4"
     static let verifyTitle = "Confirm on your Ledger"

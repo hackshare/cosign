@@ -1,4 +1,3 @@
-import Signers
 import SwiftUI
 
 struct YubiKeyMark: View {

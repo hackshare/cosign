@@ -1,4 +1,3 @@
-import Core
 import CosignCore
 import Signers
 import SwiftUI

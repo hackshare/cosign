@@ -44,7 +44,6 @@ extension CosignCopy {
     enum RecoveryPhraseReveal {
         static let headerTitle = "Recovery phrase"
         static let sectionTitle = "Recovery phrase"
-        static let title = "Reveal"
         static let blurredMessage =
             "Tap reveal to show your recovery phrase. Make sure no one is watching."
         static let revealedMessage =
@@ -139,44 +138,14 @@ extension CosignCopy {
 extension CosignCopy {
     enum Ledger {
         static let defaultLabel = "My Ledger"
-        static let readyStatus = "Ready to scan."
-        static let addTitle = "Add Ledger"
-        static let hardwareSectionTitle = "Hardware signer"
-        static let errorTitle = "Ledger Error"
-        static let labelSectionTitle = "Label"
-        static let deviceSectionTitle = "Device"
-        static let scanningTitle = "Scanning..."
-        static let noDevicesTitle = "No Ledger Devices"
-        static let scanAgainTitle = "Scan Again"
-        static let statusSectionTitle = "Status"
-        static let ledgerAddedTitle = "Ledger Added"
-        static let ledgerAddedMessage = "This Ledger address is ready to use."
-        static let memberAddressTitle = "Member address"
-        static let copyLedgerAddress = "Copy Ledger Address"
         static let doneButtonTitle = "Done"
-        static let noDevicesStatus = "No Ledger devices found."
-        static let scanFailedStatus = "Scan failed."
-        static let checkingAppStatus = "Checking Solana app..."
-        static let confirmAddressStatus = "Confirm the address on your Ledger."
-        static let alreadyAddedError = "This Ledger address is already on this device."
-        static let alreadyAddedStatus = "Ledger already added."
-        static let addedStatus = "Ledger added."
-        static let pairingFailedStatus = "Pairing failed."
 
         static func scanningStatus() -> String {
             "Scanning for Ledger devices..."
         }
 
-        static func devicesFoundStatus(count: Int) -> String {
-            "\(count) Ledger device\(count == 1 ? "" : "s") found."
-        }
-
         static func connectingStatus(deviceName: String) -> String {
             "Connecting to \(deviceName)..."
-        }
-
-        static func rssi(_ value: Int) -> String {
-            "\(value) dBm"
         }
     }
 }

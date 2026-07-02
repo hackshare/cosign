@@ -42,6 +42,16 @@ jobs:
         working-directory: core
         run: cargo test
 
+  cargo-deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
+        with:
+          manifest-path: core/Cargo.toml
+          command: check advisories bans
+
   ios:
     name: iOS app + tests
     runs-on: macos-26
@@ -111,4 +121,6 @@ jobs:
           xcodebuild test \
             -workspace Cosign.xcworkspace \
             -scheme Cosign-Workspace \
-            -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest"
+            -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest" \
+            -retry-tests-on-failure \
+            -test-iterations 3

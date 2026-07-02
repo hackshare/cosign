@@ -1,4 +1,3 @@
-import Core
 import CosignCore
 import Persistence
 import Signers

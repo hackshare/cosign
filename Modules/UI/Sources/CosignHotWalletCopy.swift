@@ -1,5 +1,3 @@
-import Core
-
 extension CosignCopy {
     enum HotWallet {
         static let defaultLabel = "My Wallet"

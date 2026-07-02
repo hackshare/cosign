@@ -23,8 +23,6 @@ extension CosignCopy.YubiKey {
     static let touchTitle = "Touch your YubiKey"
     static let touchSubtitle = "Touch the gold disc to prove you are present and approve the address."
     static let waitingForTouch = "Waiting for touch…"
-    static let verifyingPIN = "Verifying PIN…"
-    static let addressFieldTitle = "Address"
 
     static let readyTitle = "YubiKey connected"
     static let readySubtitle = "This signer is ready to approve proposals."

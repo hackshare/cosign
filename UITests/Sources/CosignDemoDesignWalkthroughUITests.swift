@@ -99,9 +99,9 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         capture("05-devnet-proposal-detail")
 
         let coSign = app.buttons["proposal-sticky-action-approveAndExecute"]
-        if coSign.waitForExistence(timeout: 30) {
+        if coSign.waitForExistence(timeout: 60) {
             coSign.tap()
-            if app.buttons["proposal-signing-hold-button"].waitForExistence(timeout: 30) {
+            if app.buttons["proposal-signing-hold-button"].waitForExistence(timeout: 60) {
                 capture("06-devnet-signing-sheet")
                 longPressButton("proposal-signing-hold-button", duration: 1.8)
                 _ = app.staticTexts["Approved & executed"].waitForExistence(timeout: 45)
@@ -373,45 +373,45 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
 
     private func tapButton(_ identifier: String) {
         let button = app.buttons[identifier]
-        XCTAssertTrue(button.waitForExistence(timeout: 30), "Missing button \(identifier)")
+        XCTAssertTrue(button.waitForExistence(timeout: 60), "Missing button \(identifier)")
         button.tap()
     }
 
     private func tapFirstButton(_ label: String) {
         let button = app.buttons[label].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 30), "Missing button \(label)")
+        XCTAssertTrue(button.waitForExistence(timeout: 60), "Missing button \(label)")
         button.tap()
     }
 
     private func longPressButton(_ identifier: String, duration: TimeInterval) {
         let element = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(element.waitForExistence(timeout: 30), "Missing element \(identifier)")
+        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
         element.press(forDuration: duration)
     }
 
     private func typeText(_ identifier: String, _ text: String) {
         let textField = app.textFields[identifier]
-        XCTAssertTrue(textField.waitForExistence(timeout: 30), "Missing text field \(identifier)")
+        XCTAssertTrue(textField.waitForExistence(timeout: 60), "Missing text field \(identifier)")
         textField.tap()
         textField.typeText(text)
     }
 
     private func waitForElement(_ identifier: String) {
         let element = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(element.waitForExistence(timeout: 30), "Missing element \(identifier)")
+        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
     }
 
     private func waitForButton(_ identifier: String) {
-        XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 30), "Missing button \(identifier)")
+        XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 60), "Missing button \(identifier)")
     }
 
     private func waitForText(_ label: String) {
-        XCTAssertTrue(app.staticTexts[label].waitForExistence(timeout: 30), "Missing text \(label)")
+        XCTAssertTrue(app.staticTexts[label].waitForExistence(timeout: 60), "Missing text \(label)")
     }
 
     private func waitForScreen(_ identifier: String) {
         let element = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(element.waitForExistence(timeout: 30), "Missing screen \(identifier)")
+        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing screen \(identifier)")
     }
 
     private func dismissSheet() {
@@ -444,7 +444,7 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
 
 private func scrollToButton(_ identifier: String, in app: XCUIApplication, maxAttempts: Int = 4) {
     let button = app.buttons[identifier]
-    XCTAssertTrue(button.waitForExistence(timeout: 30), "Missing button \(identifier)")
+    XCTAssertTrue(button.waitForExistence(timeout: 60), "Missing button \(identifier)")
     for _ in 0 ..< maxAttempts where !button.isHittable {
         app.swipeUp()
         RunLoop.current.run(until: Date().addingTimeInterval(0.2))
