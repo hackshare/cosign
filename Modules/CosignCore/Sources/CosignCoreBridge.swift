@@ -12,6 +12,19 @@ public enum CosignCore {
         try keypairFromMnemonic(mnemonic: mnemonic, passphrase: passphrase)
     }
 
+    /// Derive a keypair from a raw 64-byte Solana secret key (32-byte seed
+    /// followed by the 32-byte public key, as written by `solana-cli`). Throws
+    /// `CryptoError.InvalidKeyLength` when the input is not 64 bytes and
+    /// `CryptoError.InvalidSecretKey` when the bytes are not a valid ed25519
+    /// keypair.
+    public static func keypairFromSecretBytes(secretBytes: Data) throws -> KeyPair {
+        // The module and this enum share the name `CosignCore`, so the
+        // UniFFI free function cannot be referenced through a qualifier, and a
+        // static method with the same name would recurse. Route through a
+        // module-scope shim where only the free function is in scope.
+        try keypairFromSecretBytesFFI(secretBytes)
+    }
+
     public static func signBytes(privateKey: Data, message: Data) -> Data {
         sign(privateKey: privateKey, message: message)
     }
@@ -131,6 +144,10 @@ public enum CosignCore {
     ) throws -> SignatureStatus {
         try squadsGetSignatureStatus(rpcUrl: rpcURL, signature: signature)
     }
+}
+
+private func keypairFromSecretBytesFFI(_ secretBytes: Data) throws -> KeyPair {
+    try keypairFromSecretBytes(secretBytes: secretBytes)
 }
 
 public struct SOLTransferProposalTransactionRequest: Sendable {

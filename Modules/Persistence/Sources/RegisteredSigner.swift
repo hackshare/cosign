@@ -13,6 +13,11 @@ public final class RegisteredSigner {
     public var backedUp: Bool = true
     public var backedUpAt: Date?
 
+    /// A hot wallet imported from a raw secret key holds no recovery phrase on
+    /// this device — the secret key is its only backup. This distinguishes such
+    /// keyless imports from phrase-backed hot wallets for the detail screen.
+    public var importedWithoutPhrase: Bool = false
+
     public init(
         id: UUID = UUID(),
         label: String,
@@ -21,7 +26,8 @@ public final class RegisteredSigner {
         keychainItemRef: String? = nil,
         createdAt: Date = .now,
         backedUp: Bool = true,
-        backedUpAt: Date? = nil
+        backedUpAt: Date? = nil,
+        importedWithoutPhrase: Bool = false
     ) {
         self.id = id
         self.label = label
@@ -31,6 +37,7 @@ public final class RegisteredSigner {
         self.createdAt = createdAt
         self.backedUp = backedUp
         self.backedUpAt = backedUpAt
+        self.importedWithoutPhrase = importedWithoutPhrase
     }
 
     public var type: SignerType {

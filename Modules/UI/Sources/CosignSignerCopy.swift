@@ -21,6 +21,22 @@ extension CosignCopy {
         static let revealRowTitle = "Reveal recovery phrase"
         static let revealRowDetail = "Requires Face ID · copy disabled"
 
+        static let keySourceSectionTitle = "Key source"
+        static let importedKeyRowTitle = "Imported key"
+        static let importedKeyRowDetail = "You hold this key · no recovery phrase"
+        static let revealSecretKeyRowTitle = "Reveal secret key"
+        static let removeImportedMessage =
+            "This removes the signer and deletes its key from the Keychain. " +
+            "It is only re-importable with the secret key — keep your copy safe."
+
+        static func revealSecretKeyPrompt(label: String) -> String {
+            "Reveal secret key for \(label)"
+        }
+
+        static func importedTypeValue(base: String) -> String {
+            "\(base) · Imported"
+        }
+
         static func backedUpRowDetail(date: Date) -> String {
             "Recovery phrase confirmed · \(date.formatted(.dateTime.month(.abbreviated).day()))"
         }
@@ -58,6 +74,23 @@ extension CosignCopy {
         static func wordOrdinal(_ index: Int) -> String {
             "\(index)."
         }
+    }
+}
+
+extension CosignCopy {
+    enum SecretKeyReveal {
+        static let headerTitle = "Secret key"
+        static let sectionTitle = "Secret key"
+        static let placeholder = "[ •••• ]"
+        static let blurredMessage =
+            "Tap reveal to show your secret key. Make sure no one is watching."
+        static let revealedMessage =
+            "Anyone with this key controls this wallet. Never share or screenshot it."
+        static let revealButtonTitle = "Reveal"
+        static let doneButtonTitle = "Done"
+        static let keychainNote = "Stored in the iOS Keychain · never leaves this device · copy disabled."
+        static let unavailableTitle = "No key stored"
+        static let unavailableMessage = "This signer's secret key is not available on this device."
     }
 }
 

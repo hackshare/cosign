@@ -65,6 +65,34 @@ pub fn pubkey_from_base58(s: &str) -> Option<Pubkey> {
     s.parse::<Pubkey>().ok()
 }
 
+/// Import a Solana keypair from the 64-byte array `solana-cli` writes to
+/// `keypair.json`: a 32-byte secret seed followed by the 32-byte public key.
+/// Errors if the length is wrong or the public key does not match the secret.
+pub fn from_secret_bytes(bytes: &[u8]) -> Result<KeyPair, KeyPairError> {
+    if bytes.len() != 64 {
+        return Err(KeyPairError::Construction(format!(
+            "expected 64 bytes, got {}",
+            bytes.len()
+        )));
+    }
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&bytes[..32]);
+    let kp = keypair_from_seed(&seed).map_err(|e| {
+        seed.zeroize();
+        KeyPairError::Construction(e.to_string())
+    })?;
+    if kp.pubkey().to_bytes()[..] != bytes[32..] {
+        seed.zeroize();
+        return Err(KeyPairError::Construction(
+            "public key does not match secret key".to_string(),
+        ));
+    }
+    Ok(KeyPair {
+        public_key: kp.pubkey(),
+        private_key: seed,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,5 +164,32 @@ mod tests {
             (32..=44).contains(&s.len()),
             "Solana base58 addresses are 32-44 chars"
         );
+    }
+
+    #[test]
+    fn from_secret_bytes_round_trips_a_keypair() {
+        let kp = from_mnemonic(ABANDON_MNEMONIC, "").unwrap();
+        let mut bytes = Vec::with_capacity(64);
+        bytes.extend_from_slice(&kp.private_key);
+        bytes.extend_from_slice(&kp.public_key.to_bytes());
+        let imported = from_secret_bytes(&bytes).unwrap();
+        assert_eq!(imported.public_key, kp.public_key);
+        assert_eq!(imported.private_key, kp.private_key);
+    }
+
+    #[test]
+    fn from_secret_bytes_rejects_wrong_length() {
+        assert!(from_secret_bytes(&[0u8; 32]).is_err());
+        assert!(from_secret_bytes(&[0u8; 65]).is_err());
+        assert!(from_secret_bytes(&[]).is_err());
+    }
+
+    #[test]
+    fn from_secret_bytes_rejects_mismatched_public_key() {
+        let kp = from_mnemonic(ABANDON_MNEMONIC, "").unwrap();
+        let mut bytes = Vec::with_capacity(64);
+        bytes.extend_from_slice(&kp.private_key);
+        bytes.extend_from_slice(&[0u8; 32]);
+        assert!(from_secret_bytes(&bytes).is_err());
     }
 }

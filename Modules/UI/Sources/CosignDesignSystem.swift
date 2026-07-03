@@ -314,11 +314,13 @@ struct CosignIconButton: View {
     var body: some View {
         Button(action: action) {
             CosignGlyphView(glyph: glyph, size: 16, color: CosignTheme.inkDim)
-                .frame(width: 34, height: 34)
+                .frame(width: 36, height: 36)
                 .background(CosignTheme.surface, in: .circle)
                 .overlay {
                     Circle().stroke(CosignTheme.line, lineWidth: 1)
                 }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

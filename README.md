@@ -18,9 +18,10 @@ Cosign is a thin, verifiable client for Solana Squads v4 multisig signing:
 
 - **Decoded, inspectable proposals.** Every instruction is decoded into plain language with a severity and a confidence read. Nothing is hidden behind a blind signature.
 - **Co-sign to a threshold.** See who has approved, add your signature, and watch the threshold close. Routine proposals hold-to-confirm; high-risk ones require typing a phrase.
-- **Self-custody.** Keys are generated and stored on the device, in the iOS Keychain or on a hardware signer, and never leave it.
+- **Self-custody.** Keys are generated on-device or imported — from a BIP-39 recovery phrase or a raw Solana secret key — stored in the iOS Keychain or on a hardware signer, and never leave the device.
 - **Hardware signers.** Ledger over Bluetooth, YubiKey over NFC or USB, with on-device address verification.
 - **Relay-only.** The app talks only to the Cosign relay, which proxies Solana RPC and helps decode proposals. It holds no keys and cannot move funds.
+- **Verifiable builds.** Each release embeds a signed provenance claim you can check on-device and against the published GitHub Release — see [docs/build-verification.md](docs/build-verification.md).
 
 ## Architecture
 

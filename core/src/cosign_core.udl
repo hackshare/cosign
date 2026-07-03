@@ -5,6 +5,9 @@ namespace cosign_core {
     [Throws=CryptoError]
     KeyPair keypair_from_mnemonic(string mnemonic, string passphrase);
 
+    [Throws=CryptoError]
+    KeyPair keypair_from_secret_bytes(bytes secret_bytes);
+
     bytes sign(bytes private_key, bytes message);
 
     boolean verify(bytes public_key, bytes message, bytes signature);
@@ -128,6 +131,7 @@ enum CryptoError {
     "DerivationFailed",
     "InvalidKeyLength",
     "InvalidSignatureLength",
+    "InvalidSecretKey",
 };
 
 dictionary MultisigSummary {

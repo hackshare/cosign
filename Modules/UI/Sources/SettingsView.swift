@@ -21,16 +21,6 @@ public struct SettingsView: View {
                     .foregroundStyle(CosignTheme.ink)
             }
 
-            section(CosignCopy.Settings.signersSection) {
-                navigationCard(value: Route.signers) {
-                    CosignNavigationRow(
-                        title: CosignCopy.Settings.signersTitle,
-                        subtitle: CosignCopy.Settings.signersSubtitle,
-                        systemImage: "key.horizontal"
-                    )
-                }
-            }
-
             section(CosignCopy.Settings.connectionSection) {
                 navigationCard(value: Route.networkSettings, identifier: "settings-network-row") {
                     CosignNavigationRow(

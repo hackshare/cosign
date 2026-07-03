@@ -67,6 +67,38 @@ public struct HotWalletSigner: Signer {
         )
     }
 
+    /// Restore a hot wallet from a raw 64-byte Solana secret key (32-byte seed
+    /// followed by the 32-byte public key, as written by `solana-cli` into
+    /// keypair.json). The derived seed is stored in the Keychain the same way a
+    /// mnemonic wallet stores its key, but no recovery phrase is stored — the
+    /// secret key is the only backup. The signer signs via the same Keychain
+    /// path as every other hot wallet.
+    public static func restore(label: String, secretBytes: Data) throws -> HotWalletSigner {
+        let keyPair = try CosignCore.keypairFromSecretBytes(secretBytes: secretBytes)
+        let account = try Keychain.storePrivateKey(keyPair.privateKey, label: label)
+        return HotWalletSigner(
+            label: label,
+            pubkey: keyPair.publicKey,
+            keychainAccount: account
+        )
+    }
+
+    /// Load this hot wallet's raw 64-byte secret key from the Keychain behind
+    /// the biometric ACL, reconstructed as the 32-byte stored seed followed by
+    /// this signer's 32-byte public key — the `[..]` form `solana-cli` writes.
+    /// `prompt` is the biometric reason and must be supplied by the UI layer.
+    public func revealSecretKeyBytes(prompt: String) throws -> [UInt8] {
+        let seed: Data
+        do {
+            seed = try Keychain.loadPrivateKey(account: keychainAccount, prompt: prompt)
+        } catch let KeychainError.osStatus(status) {
+            throw SignerError.keychainFailure(status)
+        } catch {
+            throw SignerError.underlying(error)
+        }
+        return [UInt8](seed) + [UInt8](pubkey)
+    }
+
     /// Load this hot wallet's recovery phrase from the Keychain behind the
     /// biometric ACL. Throws if no mnemonic is stored (e.g. signers seeded from
     /// a raw keypair via `importKeypair`). `prompt` is the biometric reason and

@@ -61,7 +61,9 @@ public struct SignerDetailView: View {
                 CosignKeyValueRow(label: CosignCopy.SignerDetail.labelRowTitle, value: signer.label)
                 CosignKeyValueRow(
                     label: CosignCopy.SignerDetail.typeRowTitle,
-                    value: CosignCopy.Signers.typeName(for: signer.type)
+                    value: signer.importedWithoutPhrase
+                        ? CosignCopy.SignerDetail.importedTypeValue(base: CosignCopy.Signers.typeName(for: signer.type))
+                        : CosignCopy.Signers.typeName(for: signer.type)
                 )
                 CosignKeyValueRow(
                     label: CosignCopy.SignerDetail.addedRowTitle,
@@ -121,11 +123,19 @@ public struct SignerDetailView: View {
             }
         }
         .sheet(isPresented: $showingReveal) {
-            if let account = signer.keychainItemRef {
-                RecoveryPhraseRevealView(
-                    label: signer.label,
-                    keychainAccount: account
-                ) {
+            revealSheet(for: signer)
+        }
+    }
+
+    @ViewBuilder
+    private func revealSheet(for signer: RegisteredSigner) -> some View {
+        if let account = signer.keychainItemRef {
+            if signer.importedWithoutPhrase {
+                SecretKeyRevealView(label: signer.label, keychainAccount: account) {
+                    showingReveal = false
+                }
+            } else {
+                RecoveryPhraseRevealView(label: signer.label, keychainAccount: account) {
                     showingReveal = false
                 }
             }
@@ -228,7 +238,10 @@ public struct SignerDetailView: View {
     }
 
     private func removeMessage(for signer: RegisteredSigner) -> String {
-        CosignCopy.Signers.removeMessage(for: signer.type)
+        if signer.importedWithoutPhrase {
+            return CosignCopy.SignerDetail.removeImportedMessage
+        }
+        return CosignCopy.Signers.removeMessage(for: signer.type)
     }
 
     private func signerHeaderTitle(for signer: RegisteredSigner) -> String {

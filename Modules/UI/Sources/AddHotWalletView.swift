@@ -12,6 +12,11 @@ struct AddHotWalletView: View {
     @State var label = CosignCopy.HotWallet.defaultLabel
     @State var selectedSegment = 0
     @State var importWords: [String] = Array(repeating: "", count: 12)
+    @State var secretKeyMode = false
+    @State var secretKeyNumbers: [Int]?
+    @State var secretKeyBytes: [UInt8] = []
+    @State var secretKeyDerivedAddress: String?
+    @State var secretKeyError: String?
     @State private var phase: Phase = .entry
     @State var generated: GeneratedWallet?
     @State var errorMessage: String?
@@ -224,7 +229,7 @@ extension AddHotWalletView {
         }
     }
 
-    func saveAndAdvance() {
+    func saveAndAdvance(importedWithoutPhrase: Bool = false) {
         guard let wallet = generated else { return }
         let registered = RegisteredSigner(
             label: wallet.signer.label,
@@ -232,7 +237,8 @@ extension AddHotWalletView {
             pubkey: wallet.signer.pubkey,
             keychainItemRef: wallet.signer.keychainAccount,
             backedUp: true,
-            backedUpAt: .now
+            backedUpAt: .now,
+            importedWithoutPhrase: importedWithoutPhrase
         )
         context.insert(registered)
         do {
