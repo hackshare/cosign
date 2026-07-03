@@ -21,6 +21,30 @@ extension CosignCopy {
             "Stored in the iOS Keychain · never leaves this device · clipboard cleared after paste."
         static let importValidationHint = "Import enabled once every word is valid."
         static let wordCountSeparator = "·"
+
+        // Secret-key import mode
+        static let secretKeySectionTitle = "Secret key"
+        static let secretKeyModeLabel = "[…]"
+        static let secretKeyPlaceholder = "[ paste your keypair.json array ]"
+        static let secretKeyNeverShown =
+            "Full key is never shown on screen — only the derived address is echoed back."
+        static let pasteSecretKeyTitle = "Paste from clipboard"
+        static let secretKeyNotArray = "Not a number array — expects [12, 34, …] from keypair.json"
+        static let secretKeyInvalid = "Invalid key — bytes are not a valid ed25519 keypair"
+        static let secretKeyCaution =
+            "A raw secret key is the whole wallet — anyone with it controls the funds. " +
+            "Pasted into the Keychain, then the clipboard is cleared."
+        static let secretKeyValidationHint = "Import enabled once a valid 64-byte key is pasted."
+
+        static func secretKeyValid(address: String) -> String {
+            let short = address.count > 8 ? "\(address.prefix(4))…\(address.suffix(4))" : address
+            return "64 bytes · valid key → \(short)"
+        }
+
+        static func secretKeyWrongLength(got: Int) -> String {
+            "Wrong length — need 64 bytes (32 secret + 32 public) · got \(got)"
+        }
+
         static let importButtonTitle = "Import Wallet"
         static let backupTitle = "Backup Mnemonic"
         static let backupSectionTitle = "Backup"

@@ -20,6 +20,8 @@ pub enum CryptoError {
     InvalidKeyLength,
     #[error("signature must be 64 bytes")]
     InvalidSignatureLength,
+    #[error("invalid secret key")]
+    InvalidSecretKey,
 }
 
 impl From<mnemonic::MnemonicError> for CryptoError {
@@ -71,6 +73,18 @@ pub fn generate_mnemonic(word_count: u8) -> Result<String, CryptoError> {
 
 pub fn keypair_from_mnemonic(mnemonic: String, passphrase: String) -> Result<KeyPair, CryptoError> {
     let kp = keypair::from_mnemonic(&mnemonic, &passphrase)?;
+    Ok(KeyPair {
+        public_key: kp.public_key.to_bytes().to_vec(),
+        private_key: kp.private_key.to_vec(),
+    })
+}
+
+pub fn keypair_from_secret_bytes(secret_bytes: Vec<u8>) -> Result<KeyPair, CryptoError> {
+    if secret_bytes.len() != 64 {
+        return Err(CryptoError::InvalidKeyLength);
+    }
+    let kp =
+        keypair::from_secret_bytes(&secret_bytes).map_err(|_| CryptoError::InvalidSecretKey)?;
     Ok(KeyPair {
         public_key: kp.public_key.to_bytes().to_vec(),
         private_key: kp.private_key.to_vec(),

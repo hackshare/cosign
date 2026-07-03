@@ -33,7 +33,7 @@ public struct SignersListView: View {
                     EnvBadge(label: env.label, tone: env.tone)
                 }
                 Spacer()
-                HStack(spacing: 8) {
+                HStack(spacing: 2) {
                     CosignIconButton(glyph: .search) {
                         withAnimation(.snappy(duration: 0.18)) {
                             isSearchVisible.toggle()
