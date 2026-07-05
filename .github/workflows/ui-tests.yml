@@ -1,65 +1,23 @@
-name: CI
+name: UI tests (full)
 
+# The design-screenshot UI walkthroughs each boot the app in the simulator and
+# are slow, so they run here instead of on every push: nightly, and on demand.
+# CI (ci.yml) runs the fast unit suite on push/PR and skips CosignDemoUITests.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  schedule:
+    - cron: "0 7 * * *" # ~07:00 UTC nightly
+  workflow_dispatch:
 
-# Cancel superseded runs on the same ref.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ui-tests-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 jobs:
-  rust:
-    name: Rust core
+  ui:
+    name: Full UI walkthroughs
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cache cargo registry and target
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          workspaces: core
-
-      - name: rustfmt --check
-        working-directory: core
-        run: cargo fmt --all -- --check
-
-      - name: clippy
-        working-directory: core
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: cargo test
-        working-directory: core
-        run: cargo test
-
-  cargo-deny:
-    name: cargo-deny
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
-        with:
-          manifest-path: core/Cargo.toml
-          command: check advisories bans
-
-  ios:
-    name: iOS app + tests
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Show Xcode version
-        run: xcodebuild -version
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
@@ -71,8 +29,6 @@ jobs:
         with:
           workspaces: core
 
-      # The XCFramework + UniFFI bindings are derived purely from core/. Cache
-      # them keyed on the Rust sources so iOS-only changes skip the Rust rebuild.
       - name: Cache XCFramework + bindings
         id: xcframework
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -86,14 +42,8 @@ jobs:
         if: steps.xcframework.outputs.cache-hit != 'true'
         run: ./scripts/build-xcframework.sh
 
-      - name: Install Tuist + Swift lint tooling
-        run: brew install tuist swiftformat swiftlint
-
-      - name: swiftformat --lint
-        run: swiftformat --lint App/ Modules/
-
-      - name: swiftlint
-        run: swiftlint lint --quiet --strict App Modules
+      - name: Install Tuist
+        run: brew install tuist
 
       - name: Generate Xcode project
         run: tuist generate --no-open
@@ -105,7 +55,6 @@ jobs:
           echo "Selected simulator: $DEVICE"
           echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
 
-      # Compile the app + all test bundles once, then run without rebuilding.
       - name: Build for testing
         env:
           SIMULATOR_NAME: ${{ steps.sim.outputs.device }}
@@ -116,10 +65,9 @@ jobs:
             -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest" \
             -configuration Debug
 
-      # PR/push runs the fast unit suite only. The design-screenshot UI
-      # walkthroughs (CosignDemoUITests) each boot the app and are slow; they run
-      # nightly and on demand via ui-tests.yml, off the hot path.
-      - name: Run unit tests
+      # The walkthroughs are split into several test classes; parallel testing
+      # runs them concurrently on cloned simulators.
+      - name: Run UI walkthroughs
         env:
           SIMULATOR_NAME: ${{ steps.sim.outputs.device }}
         run: |
@@ -127,6 +75,7 @@ jobs:
             -workspace Cosign.xcworkspace \
             -scheme Cosign-Workspace \
             -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest" \
-            -skip-testing:CosignDemoUITests \
+            -only-testing:CosignDemoUITests \
+            -parallel-testing-enabled YES \
             -retry-tests-on-failure \
             -test-iterations 2

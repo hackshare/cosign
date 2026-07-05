@@ -1,7 +1,9 @@
 import XCTest
 
-final class CosignDemoDesignWalkthroughUITests: XCTestCase {
-    private var app: XCUIApplication!
+// MARK: - Base class
+
+class DemoWalkthroughUITestCase: XCTestCase {
+    fileprivate var app: XCUIApplication!
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -12,6 +14,148 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         app = nil
     }
 
+    // MARK: Navigation helpers
+
+    fileprivate func launchDemo(profile: String) {
+        app.launchArguments = ["--cosign-demo=\(profile)", "--cosign-demo-reset", "--ui-testing"]
+        app.launch()
+    }
+
+    fileprivate func openFirstVault() {
+        waitForScreen("screen.signers")
+        tapButton("signer-row-0")
+        waitForScreen("screen.signer-home")
+        tapButton("signer-home-squad-row-0")
+        waitForScreen("screen.squad-detail")
+        tapButton("vault-row-0")
+        waitForScreen("screen.vault-detail")
+    }
+
+    fileprivate func openFirstSquadProposals() {
+        waitForScreen("screen.signers")
+        tapButton("signer-row-0")
+        waitForScreen("screen.signer-home")
+        tapButton("signer-home-squad-row-0")
+        waitForScreen("screen.squad-detail")
+        tapButton("tab-proposals")
+        waitForButton("proposal-preview-row-0")
+    }
+
+    fileprivate func captureProposalDetail(row: Int, name: String) {
+        tapButton("proposal-preview-row-\(row)")
+        waitForScreen("screen.proposal-detail")
+        capture(name)
+        navigateBack()
+        waitForScreen("screen.squad-detail")
+        waitForButton("proposal-preview-row-0")
+    }
+
+    fileprivate func captureFirstVaultSurfaces() {
+        tapButton("vault-row-0")
+        waitForScreen("screen.vault-detail")
+        capture("04-vault-tokens")
+        tapButton("vault-action-inspect")
+        waitForScreen("screen.vault-inspection")
+        capture("05-vault-inspection")
+        navigateBack()
+        waitForScreen("screen.vault-detail")
+        tapButton("tab-nfts")
+        capture("06-vault-nfts")
+        navigateBack()
+        waitForScreen("screen.squad-detail")
+    }
+
+    /// Hardware add-signer screens trigger "no device" error sheets in the
+    /// simulator that block in-place dismissal, so relaunch fresh per type.
+    fileprivate func captureAddSignerFresh(option: String, screen: String, chooserName: String?, name: String) {
+        launchDemo(profile: "appstore")
+        waitForScreen("screen.signers")
+        tapButton("signer-add-cta")
+        waitForScreen("screen.add-signer-chooser")
+        if let chooserName {
+            capture(chooserName)
+        }
+        tapButton("signer-option-\(option)")
+        waitForScreen(screen)
+        capture(name)
+    }
+
+    // MARK: Interaction helpers
+
+    fileprivate func tapButton(_ identifier: String) {
+        let button = app.buttons[identifier]
+        XCTAssertTrue(button.waitForExistence(timeout: 60), "Missing button \(identifier)")
+        button.tap()
+    }
+
+    fileprivate func tapFirstButton(_ label: String) {
+        let button = app.buttons[label].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 60), "Missing button \(label)")
+        button.tap()
+    }
+
+    fileprivate func longPressButton(_ identifier: String, duration: TimeInterval) {
+        let element = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
+        element.press(forDuration: duration)
+    }
+
+    fileprivate func typeText(_ identifier: String, _ text: String) {
+        let textField = app.textFields[identifier]
+        XCTAssertTrue(textField.waitForExistence(timeout: 60), "Missing text field \(identifier)")
+        textField.tap()
+        textField.typeText(text)
+    }
+
+    fileprivate func waitForElement(_ identifier: String) {
+        let element = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
+    }
+
+    fileprivate func waitForButton(_ identifier: String) {
+        XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 60), "Missing button \(identifier)")
+    }
+
+    fileprivate func waitForText(_ label: String) {
+        XCTAssertTrue(app.staticTexts[label].waitForExistence(timeout: 60), "Missing text \(label)")
+    }
+
+    fileprivate func waitForScreen(_ identifier: String) {
+        let element = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing screen \(identifier)")
+    }
+
+    fileprivate func dismissSheet() {
+        let closeButton = app.buttons[CosignUITestCopy.close]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 4), "Missing sheet close button")
+        closeButton.tap()
+    }
+
+    fileprivate func navigateBack() {
+        let customBackButton = app.buttons["nav-back"]
+        if customBackButton.waitForExistence(timeout: 2) {
+            customBackButton.tap()
+            return
+        }
+
+        let backButton = app.navigationBars.buttons.element(boundBy: 0)
+        XCTAssertTrue(backButton.waitForExistence(timeout: 4), "Missing navigation back button")
+        backButton.tap()
+    }
+
+    fileprivate func capture(_ name: String) {
+        dismissKeyboardIfPresent(in: app)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}
+
+// MARK: - Core surfaces + confidence states
+
+final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
     func testDemoDesignWalkthroughLoadsCoreSurfaces() {
         launchDemo(profile: "appstore")
         waitForScreen("screen.signers")
@@ -60,56 +204,32 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         capture("14-squad-members")
     }
 
-    /// Drives the real CosignDevnet build against the deployed relay + a live
-    /// devnet fixture. Seeded by the fixture member's keypair, passed in via
-    /// `TEST_RUNNER_COSIGN_DEVNET_SEED` (hex of a 64-byte keypair) so no secret
-    /// is committed. The on-chain co-sign at the end is best-effort.
-    func testDevnetWalkthroughAgainstLiveRelay() throws {
-        let seed = ProcessInfo.processInfo.environment["COSIGN_DEVNET_SEED"] ?? ""
-        try XCTSkipIf(seed.isEmpty, "set TEST_RUNNER_COSIGN_DEVNET_SEED to a 64-byte keypair hex")
-
-        app = XCUIApplication(bundleIdentifier: "com.hackshare.cosign.devnet")
-        app.launchArguments = ["--cosign-seed-signer=\(seed)", "--ui-testing"]
-        app.launch()
-
+    func testDemoConfidenceStates() {
+        launchDemo(profile: "appstore")
         waitForScreen("screen.signers")
-        waitForButton("signer-row-0")
-        capture("01-devnet-signers")
-
-        tapButton("signer-row-0")
+        tapButton("signer-row-1")
         waitForScreen("screen.signer-home")
-        waitForButton("signer-home-squad-row-0")
-        capture("02-devnet-signer-home")
-
         tapButton("signer-home-squad-row-0")
         waitForScreen("screen.squad-detail")
-        waitForButton("vault-row-0")
-        capture("03-devnet-squad")
-
-        tapButton("vault-row-0")
-        waitForScreen("screen.vault-detail")
-        capture("04-devnet-vault-usd")
-        navigateBack()
-        waitForScreen("screen.squad-detail")
-
         tapButton("tab-proposals")
         waitForButton("proposal-preview-row-0")
+
         tapButton("proposal-preview-row-0")
         waitForScreen("screen.proposal-detail")
-        capture("05-devnet-proposal-detail")
+        capture("38-proposal-idl-confidence")
+        navigateBack()
+        waitForScreen("screen.squad-detail")
+        waitForButton("proposal-preview-row-1")
 
-        let coSign = app.buttons["proposal-sticky-action-approveAndExecute"]
-        if coSign.waitForExistence(timeout: 60) {
-            coSign.tap()
-            if app.buttons["proposal-signing-hold-button"].waitForExistence(timeout: 60) {
-                capture("06-devnet-signing-sheet")
-                longPressButton("proposal-signing-hold-button", duration: 1.8)
-                _ = app.staticTexts["Approved & executed"].waitForExistence(timeout: 45)
-                capture("07-devnet-after-cosign")
-            }
-        }
+        tapButton("proposal-preview-row-1")
+        waitForScreen("screen.proposal-detail")
+        capture("39-proposal-partial-confidence")
     }
+}
 
+// MARK: - Proposal builder + status flows
+
+final class ProposalFlowUITests: DemoWalkthroughUITestCase {
     func testDemoProposalBuilderSelectorsLoadDesignSurfaces() {
         launchDemo(profile: "appstore")
         openFirstVault()
@@ -196,7 +316,11 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         waitForElement("proposal-signing-confirmation-field")
         capture("31-high-risk-type-to-confirm")
     }
+}
 
+// MARK: - Signer management + null states
+
+final class SignerFlowUITests: DemoWalkthroughUITestCase {
     func testDemoSignerManagementSurfaces() {
         launchDemo(profile: "appstore")
         waitForScreen("screen.signers")
@@ -224,21 +348,6 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         captureAddSignerFresh(option: "yubikey", screen: "screen.add-yubikey", chooserName: nil, name: "35-add-yubikey")
     }
 
-    /// Hardware add-signer screens trigger "no device" error sheets in the
-    /// simulator that block in-place dismissal, so relaunch fresh per type.
-    private func captureAddSignerFresh(option: String, screen: String, chooserName: String?, name: String) {
-        launchDemo(profile: "appstore")
-        waitForScreen("screen.signers")
-        tapButton("signer-add-cta")
-        waitForScreen("screen.add-signer-chooser")
-        if let chooserName {
-            capture(chooserName)
-        }
-        tapButton("signer-option-\(option)")
-        waitForScreen(screen)
-        capture(name)
-    }
-
     func testDemoImportWalletFlow() {
         launchDemo(profile: "appstore")
         waitForScreen("screen.signers")
@@ -252,28 +361,6 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         waitForElement("hot-wallet-recovery-grid")
         waitForButton("hot-wallet-paste-phrase")
         capture("41-import-recovery-phrase")
-    }
-
-    func testDemoConfidenceStates() {
-        launchDemo(profile: "appstore")
-        waitForScreen("screen.signers")
-        tapButton("signer-row-1")
-        waitForScreen("screen.signer-home")
-        tapButton("signer-home-squad-row-0")
-        waitForScreen("screen.squad-detail")
-        tapButton("tab-proposals")
-        waitForButton("proposal-preview-row-0")
-
-        tapButton("proposal-preview-row-0")
-        waitForScreen("screen.proposal-detail")
-        capture("38-proposal-idl-confidence")
-        navigateBack()
-        waitForScreen("screen.squad-detail")
-        waitForButton("proposal-preview-row-1")
-
-        tapButton("proposal-preview-row-1")
-        waitForScreen("screen.proposal-detail")
-        capture("39-proposal-partial-confidence")
     }
 
     func testDemoNullStatesWalkthroughLoadsEmptySurfaces() {
@@ -340,126 +427,63 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         waitForScreen("create-squad-step-review")
         capture("45-create-squad-review")
     }
+}
 
-    private func launchDemo(profile: String) {
-        app.launchArguments = ["--cosign-demo=\(profile)", "--cosign-demo-reset", "--ui-testing"]
+// MARK: - Devnet live-relay walkthrough
+
+final class DevnetWalkthroughUITests: DemoWalkthroughUITestCase {
+    /// Drives the real CosignDevnet build against the deployed relay + a live
+    /// devnet fixture. Seeded by the fixture member's keypair, passed in via
+    /// `TEST_RUNNER_COSIGN_DEVNET_SEED` (hex of a 64-byte keypair) so no secret
+    /// is committed. The on-chain co-sign at the end is best-effort.
+    func testDevnetWalkthroughAgainstLiveRelay() throws {
+        let seed = ProcessInfo.processInfo.environment["COSIGN_DEVNET_SEED"] ?? ""
+        try XCTSkipIf(seed.isEmpty, "set TEST_RUNNER_COSIGN_DEVNET_SEED to a 64-byte keypair hex")
+
+        app = XCUIApplication(bundleIdentifier: "com.hackshare.cosign.devnet")
+        app.launchArguments = ["--cosign-seed-signer=\(seed)", "--ui-testing"]
         app.launch()
-    }
 
-    private func openFirstVault() {
         waitForScreen("screen.signers")
+        waitForButton("signer-row-0")
+        capture("01-devnet-signers")
+
         tapButton("signer-row-0")
         waitForScreen("screen.signer-home")
+        waitForButton("signer-home-squad-row-0")
+        capture("02-devnet-signer-home")
+
         tapButton("signer-home-squad-row-0")
         waitForScreen("screen.squad-detail")
+        waitForButton("vault-row-0")
+        capture("03-devnet-squad")
+
         tapButton("vault-row-0")
         waitForScreen("screen.vault-detail")
-    }
-
-    private func openFirstSquadProposals() {
-        waitForScreen("screen.signers")
-        tapButton("signer-row-0")
-        waitForScreen("screen.signer-home")
-        tapButton("signer-home-squad-row-0")
+        capture("04-devnet-vault-usd")
+        navigateBack()
         waitForScreen("screen.squad-detail")
+
         tapButton("tab-proposals")
         waitForButton("proposal-preview-row-0")
-    }
-
-    private func captureProposalDetail(row: Int, name: String) {
-        tapButton("proposal-preview-row-\(row)")
+        tapButton("proposal-preview-row-0")
         waitForScreen("screen.proposal-detail")
-        capture(name)
-        navigateBack()
-        waitForScreen("screen.squad-detail")
-        waitForButton("proposal-preview-row-0")
-    }
+        capture("05-devnet-proposal-detail")
 
-    private func captureFirstVaultSurfaces() {
-        tapButton("vault-row-0")
-        waitForScreen("screen.vault-detail")
-        capture("04-vault-tokens")
-        tapButton("vault-action-inspect")
-        waitForScreen("screen.vault-inspection")
-        capture("05-vault-inspection")
-        navigateBack()
-        waitForScreen("screen.vault-detail")
-        tapButton("tab-nfts")
-        capture("06-vault-nfts")
-        navigateBack()
-        waitForScreen("screen.squad-detail")
-    }
-
-    private func tapButton(_ identifier: String) {
-        let button = app.buttons[identifier]
-        XCTAssertTrue(button.waitForExistence(timeout: 60), "Missing button \(identifier)")
-        button.tap()
-    }
-
-    private func tapFirstButton(_ label: String) {
-        let button = app.buttons[label].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 60), "Missing button \(label)")
-        button.tap()
-    }
-
-    private func longPressButton(_ identifier: String, duration: TimeInterval) {
-        let element = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
-        element.press(forDuration: duration)
-    }
-
-    private func typeText(_ identifier: String, _ text: String) {
-        let textField = app.textFields[identifier]
-        XCTAssertTrue(textField.waitForExistence(timeout: 60), "Missing text field \(identifier)")
-        textField.tap()
-        textField.typeText(text)
-    }
-
-    private func waitForElement(_ identifier: String) {
-        let element = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
-    }
-
-    private func waitForButton(_ identifier: String) {
-        XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 60), "Missing button \(identifier)")
-    }
-
-    private func waitForText(_ label: String) {
-        XCTAssertTrue(app.staticTexts[label].waitForExistence(timeout: 60), "Missing text \(label)")
-    }
-
-    private func waitForScreen(_ identifier: String) {
-        let element = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing screen \(identifier)")
-    }
-
-    private func dismissSheet() {
-        let closeButton = app.buttons[CosignUITestCopy.close]
-        XCTAssertTrue(closeButton.waitForExistence(timeout: 4), "Missing sheet close button")
-        closeButton.tap()
-    }
-
-    private func navigateBack() {
-        let customBackButton = app.buttons["nav-back"]
-        if customBackButton.waitForExistence(timeout: 2) {
-            customBackButton.tap()
-            return
+        let coSign = app.buttons["proposal-sticky-action-approveAndExecute"]
+        if coSign.waitForExistence(timeout: 60) {
+            coSign.tap()
+            if app.buttons["proposal-signing-hold-button"].waitForExistence(timeout: 60) {
+                capture("06-devnet-signing-sheet")
+                longPressButton("proposal-signing-hold-button", duration: 1.8)
+                _ = app.staticTexts["Approved & executed"].waitForExistence(timeout: 45)
+                capture("07-devnet-after-cosign")
+            }
         }
-
-        let backButton = app.navigationBars.buttons.element(boundBy: 0)
-        XCTAssertTrue(backButton.waitForExistence(timeout: 4), "Missing navigation back button")
-        backButton.tap()
-    }
-
-    private func capture(_ name: String) {
-        dismissKeyboardIfPresent(in: app)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
     }
 }
+
+// MARK: - File-scope utilities
 
 private func scrollToButton(_ identifier: String, in app: XCUIApplication, maxAttempts: Int = 4) {
     let button = app.buttons[identifier]
