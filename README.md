@@ -1,6 +1,6 @@
 # Cosign
 
-A native iOS signer for [Squads v4](https://squads.so) multisigs on Solana. Review a squad's vault and pending proposals, then co-sign to execute, with your keys held on your device.
+A native iOS signer for [Squads v4](https://squads.so) multisigs on Solana. Create a multisig, review its vault and pending proposals, then co-sign to execute, with your keys held on your device.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Platform: iOS](https://img.shields.io/badge/platform-iOS-lightgrey) ![Swift 6](https://img.shields.io/badge/swift-6-orange) ![Rust](https://img.shields.io/badge/rust-stable-b7410e)
 
@@ -16,6 +16,7 @@ A native iOS signer for [Squads v4](https://squads.so) multisigs on Solana. Revi
 
 Cosign is a thin, verifiable client for Solana Squads v4 multisig signing:
 
+- **Create a squad.** Bootstrap a new Squads v4 multisig on-chain by choosing members and a threshold, so a fresh signer can start without waiting to be added to someone else's. Creator-only is a valid 1-of-1.
 - **Decoded, inspectable proposals.** Every instruction is decoded into plain language with a severity and a confidence read. Nothing is hidden behind a blind signature.
 - **Co-sign to a threshold.** See who has approved, add your signature, and watch the threshold close. Routine proposals hold-to-confirm; high-risk ones require typing a phrase.
 - **Self-custody.** Keys are generated on-device or imported — from a BIP-39 recovery phrase or a raw Solana secret key — stored in the iOS Keychain or on a hardware signer, and never leave the device.

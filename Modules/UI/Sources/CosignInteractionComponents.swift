@@ -133,7 +133,7 @@ enum CosignBannerTone {
         case .red:
             CosignTheme.riskRed
         case .mint:
-            CosignTheme.accentDeep
+            CosignTheme.mint
         }
     }
 }

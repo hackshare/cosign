@@ -103,6 +103,37 @@ namespace cosign_core {
     );
 
     [Throws=SquadsFFIError]
+    PreparedMultisigCreation squads_build_create_multisig_transaction(
+        string rpc_url,
+        string creator_pubkey,
+        sequence<string> member_pubkeys,
+        u16 threshold
+    );
+
+    [Throws=SquadsFFIError]
+    CreateMultisigCost squads_estimate_create_multisig_cost(
+        string rpc_url,
+        string creator_pubkey,
+        sequence<string> member_pubkeys,
+        u16 threshold
+    );
+
+    [Throws=SquadsFFIError]
+    TransactionSubmission squads_send_multisig_create_transaction(
+        string rpc_url,
+        bytes message_bytes,
+        bytes creator_signature,
+        string create_key_pubkey,
+        bytes create_key_signature
+    );
+
+    [Throws=SquadsFFIError]
+    string request_devnet_airdrop(string rpc_url, string address, u64 lamports);
+
+    [Throws=SquadsFFIError]
+    u64 get_sol_balance(string rpc_url, string address);
+
+    [Throws=SquadsFFIError]
     SignatureStatus squads_get_signature_status(string rpc_url, string signature);
 };
 
@@ -230,6 +261,22 @@ dictionary PreparedProposalCreation {
     string proposal_address;
     string transaction_address;
     string vault_address;
+};
+
+dictionary PreparedMultisigCreation {
+    bytes message_bytes;
+    string fee_payer;
+    string recent_blockhash;
+    string multisig_address;
+    string create_key;
+    bytes create_key_signature;
+};
+
+dictionary CreateMultisigCost {
+    u64 network_fee;
+    u64 rent;
+    u64 creation_fee;
+    u64 total;
 };
 
 dictionary SimulationResult {

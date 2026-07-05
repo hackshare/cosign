@@ -1,3 +1,4 @@
+use solana_sdk::signer::{Signer as _, keypair::Keypair};
 use solana_sdk::{
     instruction::Instruction,
     message::Message,
@@ -11,20 +12,25 @@ use spl_associated_token_account::{
     instruction::create_associated_token_account_idempotent,
 };
 use squads_multisig::{
-    anchor_lang::{InstructionData, ToAccountMetas},
+    anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas},
     client::{
-        ConfigTransactionExecuteAccounts, ProposalCreateAccounts, ProposalCreateArgs,
-        ProposalVoteAccounts, ProposalVoteArgs, VaultTransactionCreateAccounts,
-        VaultTransactionExecuteAccounts, config_transaction_execute, proposal_approve,
-        proposal_cancel, proposal_create, vault_transaction_create, vault_transaction_execute,
+        ConfigTransactionExecuteAccounts, MultisigCreateAccountsV2, MultisigCreateArgsV2,
+        ProposalCreateAccounts, ProposalCreateArgs, ProposalVoteAccounts, ProposalVoteArgs,
+        VaultTransactionCreateAccounts, VaultTransactionExecuteAccounts,
+        config_transaction_execute, multisig_create_v2, proposal_approve, proposal_cancel,
+        proposal_create, vault_transaction_create, vault_transaction_execute,
     },
-    pda::{get_proposal_pda, get_spending_limit_pda, get_transaction_pda, get_vault_pda},
+    pda::{
+        get_multisig_pda, get_program_config_pda, get_proposal_pda, get_spending_limit_pda,
+        get_transaction_pda, get_vault_pda,
+    },
+    squads_multisig_program::state::{Multisig, ProgramConfig},
     squads_multisig_program::{
         CompiledInstruction, MessageAddressTableLookup, TransactionMessage,
         instruction::ProposalReject as ProposalRejectData,
         state::{ConfigAction, ProposalStatus},
     },
-    state::{Permission, Permissions},
+    state::{Member, Permission, Permissions},
     vault_transaction::VaultTransactionMessageExt,
 };
 
@@ -33,6 +39,56 @@ use crate::{
     squads::{ProposalCompanion, SquadsClient, SquadsError},
     types::{self, ProposalSummary},
 };
+
+pub(crate) fn build_members(creator: Pubkey, extra: &[Pubkey]) -> Vec<Member> {
+    let full = Permissions { mask: 7 }; // Initiate | Vote | Execute
+    let mut keys = vec![creator];
+    for key in extra {
+        if !keys.contains(key) {
+            keys.push(*key);
+        }
+    }
+    keys.into_iter()
+        .map(|key| Member {
+            key,
+            permissions: full,
+        })
+        .collect()
+}
+
+pub(crate) fn validate_threshold(
+    threshold: u16,
+    member_count: usize,
+) -> Result<(), TransactionBuildError> {
+    if threshold == 0 || usize::from(threshold) > member_count {
+        return Err(TransactionBuildError::InvalidTransaction(format!(
+            "threshold {threshold} must be between 1 and {member_count}"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn assemble_signatures(
+    message: &Message,
+    signers: &[(Pubkey, Signature)],
+) -> Result<Vec<Signature>, TransactionBuildError> {
+    let required = usize::from(message.header.num_required_signatures);
+    let mut ordered = vec![Signature::default(); required];
+    for (pubkey, signature) in signers {
+        let index = message
+            .account_keys
+            .iter()
+            .position(|k| k == pubkey)
+            .filter(|i| *i < required)
+            .ok_or_else(|| {
+                TransactionBuildError::InvalidTransaction(format!(
+                    "signer {pubkey} is not a required signer for this message"
+                ))
+            })?;
+        ordered[index] = *signature;
+    }
+    Ok(ordered)
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum VoteType {
@@ -104,6 +160,191 @@ pub enum TransactionBuildError {
     Serialization(String),
     #[error("invalid signature")]
     InvalidSignature,
+}
+
+#[derive(Debug, Clone)]
+pub struct PreparedMultisigCreation {
+    pub message_bytes: Vec<u8>,
+    pub fee_payer: String,
+    pub recent_blockhash: String,
+    pub multisig_address: String,
+    pub create_key: String,
+    pub create_key_signature: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CreateMultisigCost {
+    pub network_fee: u64,
+    pub rent: u64,
+    pub creation_fee: u64,
+    pub total: u64,
+}
+
+impl CreateMultisigCost {
+    pub fn new(network_fee: u64, rent: u64, creation_fee: u64) -> Self {
+        Self {
+            network_fee,
+            rent,
+            creation_fee,
+            total: network_fee
+                .saturating_add(rent)
+                .saturating_add(creation_fee),
+        }
+    }
+}
+
+pub fn estimate_create_multisig_cost(
+    rpc: RpcClient,
+    creator: Pubkey,
+    extra_members: Vec<Pubkey>,
+    threshold: u16,
+) -> Result<CreateMultisigCost, TransactionBuildError> {
+    let members = build_members(creator, &extra_members);
+    validate_threshold(threshold, members.len())?;
+    let member_count = members.len();
+
+    let client = SquadsClient::new(rpc);
+    let program_id = client.program_id();
+    let (treasury, creation_fee) = fetch_program_config(&client)?;
+
+    let create_key = Keypair::new();
+    let (program_config, _) = get_program_config_pda(Some(&program_id));
+    let (multisig, _) = get_multisig_pda(&create_key.pubkey(), Some(&program_id));
+    let instruction = build_create_multisig_instruction(
+        program_config,
+        treasury,
+        multisig,
+        create_key.pubkey(),
+        creator,
+        members,
+        threshold,
+        program_id,
+    );
+    let prepared = prepare_message(client.rpc(), &creator, vec![instruction])?;
+    let message = bincode::deserialize::<Message>(&prepared.message_bytes)
+        .map_err(|err| TransactionBuildError::Serialization(err.to_string()))?;
+
+    let network_fee = client.rpc().get_fee_for_message(&message)?;
+    let rent = client
+        .rpc()
+        .get_minimum_balance_for_rent_exemption(Multisig::size(member_count))?;
+    Ok(CreateMultisigCost::new(network_fee, rent, creation_fee))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn build_create_multisig_instruction(
+    program_config: Pubkey,
+    treasury: Pubkey,
+    multisig: Pubkey,
+    create_key: Pubkey,
+    creator: Pubkey,
+    members: Vec<Member>,
+    threshold: u16,
+    program_id: Pubkey,
+) -> Instruction {
+    multisig_create_v2(
+        MultisigCreateAccountsV2 {
+            program_config,
+            treasury,
+            multisig,
+            create_key,
+            creator,
+            system_program: system_program::id(),
+        },
+        MultisigCreateArgsV2 {
+            config_authority: None,
+            threshold,
+            members,
+            time_lock: 0,
+            rent_collector: None,
+            memo: None,
+        },
+        Some(program_id),
+    )
+}
+
+pub fn fetch_program_config(client: &SquadsClient) -> Result<(Pubkey, u64), TransactionBuildError> {
+    let program_id = client.program_id();
+    let (config_pda, _) = get_program_config_pda(Some(&program_id));
+    let account = client.rpc().get_account(&config_pda)?;
+    let config = ProgramConfig::try_deserialize(&mut account.data.as_slice())
+        .map_err(|e| TransactionBuildError::InvalidTransaction(e.to_string()))?;
+    Ok((config.treasury, config.multisig_creation_fee))
+}
+
+pub fn build_create_multisig_transaction(
+    rpc: RpcClient,
+    creator: Pubkey,
+    extra_members: Vec<Pubkey>,
+    threshold: u16,
+) -> Result<PreparedMultisigCreation, TransactionBuildError> {
+    let members = build_members(creator, &extra_members);
+    validate_threshold(threshold, members.len())?;
+
+    let client = SquadsClient::new(rpc);
+    let program_id = client.program_id();
+    let (treasury, _creation_fee) = fetch_program_config(&client)?;
+
+    let create_key = Keypair::new();
+    let (program_config, _) = get_program_config_pda(Some(&program_id));
+    let (multisig, _) = get_multisig_pda(&create_key.pubkey(), Some(&program_id));
+
+    let instruction = build_create_multisig_instruction(
+        program_config,
+        treasury,
+        multisig,
+        create_key.pubkey(),
+        creator,
+        members,
+        threshold,
+        program_id,
+    );
+    let prepared = prepare_message(client.rpc(), &creator, vec![instruction])?;
+    let create_key_signature: [u8; 64] = create_key.sign_message(&prepared.message_bytes).into();
+
+    Ok(PreparedMultisigCreation {
+        message_bytes: prepared.message_bytes,
+        fee_payer: prepared.fee_payer,
+        recent_blockhash: prepared.recent_blockhash,
+        multisig_address: multisig.to_string(),
+        create_key: create_key.pubkey().to_string(),
+        create_key_signature: create_key_signature.to_vec(),
+    })
+}
+
+pub fn send_multisig_create_transaction(
+    rpc: RpcClient,
+    message_bytes: Vec<u8>,
+    creator_signature: Vec<u8>,
+    create_key: Pubkey,
+    create_key_signature: Vec<u8>,
+) -> Result<TransactionSubmission, TransactionBuildError> {
+    let message = bincode::deserialize::<Message>(&message_bytes)
+        .map_err(|err| TransactionBuildError::Serialization(err.to_string()))?;
+    let creator_sig = Signature::try_from(creator_signature.as_slice())
+        .map_err(|_| TransactionBuildError::InvalidSignature)?;
+    let create_key_sig = Signature::try_from(create_key_signature.as_slice())
+        .map_err(|_| TransactionBuildError::InvalidSignature)?;
+    let fee_payer = *message
+        .account_keys
+        .first()
+        .ok_or_else(|| TransactionBuildError::InvalidTransaction("empty message".into()))?;
+    let signatures = assemble_signatures(
+        &message,
+        &[(fee_payer, creator_sig), (create_key, create_key_sig)],
+    )?;
+    let transaction = Transaction {
+        signatures,
+        message,
+    };
+    transaction.verify().map_err(|err| match err {
+        TransactionError::SignatureFailure => TransactionBuildError::InvalidSignature,
+        other => TransactionBuildError::InvalidTransaction(other.to_string()),
+    })?;
+    let signature = rpc.send_transaction(&transaction)?;
+    Ok(TransactionSubmission {
+        signature: signature.to_string(),
+    })
 }
 
 pub fn build_sol_transfer_proposal_transaction(
@@ -698,6 +939,7 @@ impl VoteType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use solana_sdk::signer::keypair::Keypair;
 
     #[test]
     fn supported_token_programs_have_distinct_action_labels() {
@@ -746,5 +988,117 @@ mod tests {
                 if message.contains("unsupported token program")
                     && message.contains(&program.to_string())
         ));
+    }
+
+    #[test]
+    fn build_members_puts_creator_first_with_full_permissions() {
+        let creator = Pubkey::new_unique();
+        let other = Pubkey::new_unique();
+        let members = build_members(creator, &[other]);
+        assert_eq!(members.len(), 2);
+        assert_eq!(members[0].key, creator);
+        assert_eq!(members[0].permissions.mask, 7);
+        assert_eq!(members[1].key, other);
+        assert_eq!(members[1].permissions.mask, 7);
+    }
+
+    #[test]
+    fn build_members_dedupes_and_keeps_creator_once() {
+        let creator = Pubkey::new_unique();
+        let dup = Pubkey::new_unique();
+        let members = build_members(creator, &[creator, dup, dup]);
+        assert_eq!(members.len(), 2);
+        assert_eq!(members[0].key, creator);
+        assert_eq!(members[1].key, dup);
+    }
+
+    #[test]
+    fn validate_threshold_rejects_zero_and_over_count() {
+        assert!(validate_threshold(0, 3).is_err());
+        assert!(validate_threshold(4, 3).is_err());
+        assert!(validate_threshold(1, 1).is_ok());
+        assert!(validate_threshold(3, 3).is_ok());
+    }
+
+    #[test]
+    fn assemble_signatures_orders_by_account_key_position() {
+        let payer = Keypair::new();
+        let cosigner = Keypair::new();
+        // A message where both payer and cosigner are required signers.
+        let ix = solana_sdk::system_instruction::transfer(&payer.pubkey(), &cosigner.pubkey(), 1);
+        let mut message = Message::new(&[ix], Some(&payer.pubkey()));
+        // Force cosigner to be a signer slot by marking it required.
+        message.header.num_required_signatures = 2;
+        if !message.account_keys.contains(&cosigner.pubkey()) {
+            message.account_keys.insert(1, cosigner.pubkey());
+        }
+        let msg_bytes = message.serialize();
+        let recovered = bincode::deserialize::<Message>(&msg_bytes).unwrap();
+        let payer_sig = Signature::from(keypair_sign(&payer, &msg_bytes));
+        let cosigner_sig = Signature::from(keypair_sign(&cosigner, &msg_bytes));
+        let ordered = assemble_signatures(
+            &recovered,
+            &[
+                (cosigner.pubkey(), cosigner_sig),
+                (payer.pubkey(), payer_sig),
+            ],
+        )
+        .unwrap();
+        // Position 0 is the fee payer (payer); position of cosigner matches its key index.
+        let payer_index = recovered
+            .account_keys
+            .iter()
+            .position(|k| *k == payer.pubkey())
+            .unwrap();
+        let cosigner_index = recovered
+            .account_keys
+            .iter()
+            .position(|k| *k == cosigner.pubkey())
+            .unwrap();
+        assert_eq!(ordered[payer_index], payer_sig);
+        assert_eq!(ordered[cosigner_index], cosigner_sig);
+    }
+
+    #[test]
+    fn create_multisig_instruction_has_expected_accounts() {
+        let program_config = Pubkey::new_unique();
+        let treasury = Pubkey::new_unique();
+        let multisig = Pubkey::new_unique();
+        let create_key = Pubkey::new_unique();
+        let creator = Pubkey::new_unique();
+        let members = build_members(creator, &[]);
+        let program_id = crate::squads::SquadsClient::default_program_id();
+        let ix = build_create_multisig_instruction(
+            program_config,
+            treasury,
+            multisig,
+            create_key,
+            creator,
+            members,
+            1,
+            program_id,
+        );
+        assert_eq!(ix.program_id, program_id);
+        // create_key and creator must be signers; multisig, treasury, creator writable.
+        let meta = |k: Pubkey| ix.accounts.iter().find(|m| m.pubkey == k).unwrap();
+        assert!(meta(create_key).is_signer);
+        assert!(meta(creator).is_signer && meta(creator).is_writable);
+        assert!(meta(multisig).is_writable);
+        assert!(meta(treasury).is_writable);
+        assert!(ix.data.len() > 8); // discriminator + args
+    }
+
+    #[test]
+    fn create_multisig_cost_total_is_sum_of_parts() {
+        let cost = CreateMultisigCost::new(5_000, 2_000_000, 100_000);
+        assert_eq!(cost.network_fee, 5_000);
+        assert_eq!(cost.rent, 2_000_000);
+        assert_eq!(cost.creation_fee, 100_000);
+        assert_eq!(cost.total, 2_105_000);
+    }
+
+    // Local test helper: sign raw bytes with a solana Keypair.
+    fn keypair_sign(kp: &Keypair, message: &[u8]) -> [u8; 64] {
+        kp.sign_message(message).into()
     }
 }

@@ -144,6 +144,58 @@ public enum CosignCore {
     ) throws -> SignatureStatus {
         try squadsGetSignatureStatus(rpcUrl: rpcURL, signature: signature)
     }
+
+    public static func buildSquadsCreateMultisig(
+        _ request: CreateMultisigTransactionRequest
+    ) throws -> PreparedMultisigCreation {
+        try squadsBuildCreateMultisigTransaction(
+            rpcUrl: request.rpcURL,
+            creatorPubkey: request.creatorPubkey,
+            memberPubkeys: request.memberPubkeys,
+            threshold: request.threshold
+        )
+    }
+
+    public static func estimateSquadsCreateMultisigCost(
+        _ request: CreateMultisigTransactionRequest
+    ) throws -> CreateMultisigCost {
+        try squadsEstimateCreateMultisigCost(
+            rpcUrl: request.rpcURL,
+            creatorPubkey: request.creatorPubkey,
+            memberPubkeys: request.memberPubkeys,
+            threshold: request.threshold
+        )
+    }
+
+    public static func sendSquadsMultisigCreate(
+        rpcURL: String,
+        messageBytes: Data,
+        creatorSignature: Data,
+        createKey: String,
+        createKeySignature: Data
+    ) throws -> TransactionSubmission {
+        try squadsSendMultisigCreateTransaction(
+            rpcUrl: rpcURL,
+            messageBytes: messageBytes,
+            creatorSignature: creatorSignature,
+            createKeyPubkey: createKey,
+            createKeySignature: createKeySignature
+        )
+    }
+
+    /// Wraps the generated `requestDevnetAirdrop` free function. Renamed to
+    /// avoid shadowing the free function with a same-named static method.
+    public static func airdropDevnet(
+        rpcURL: String,
+        address: String,
+        lamports: UInt64
+    ) throws -> String {
+        try requestDevnetAirdrop(rpcUrl: rpcURL, address: address, lamports: lamports)
+    }
+
+    public static func solBalance(rpcURL: String, address: String) throws -> UInt64 {
+        try getSolBalance(rpcUrl: rpcURL, address: address)
+    }
 }
 
 private func keypairFromSecretBytesFFI(_ secretBytes: Data) throws -> KeyPair {
@@ -173,6 +225,15 @@ public struct TokenTransferProposalTransactionRequest: Sendable {
     public var decimals: UInt8 = 0
     public var tokenProgramID = ""
     public var memo: String?
+
+    public init() {}
+}
+
+public struct CreateMultisigTransactionRequest: Sendable {
+    public var rpcURL = ""
+    public var creatorPubkey = ""
+    public var memberPubkeys: [String] = []
+    public var threshold: UInt16 = 1
 
     public init() {}
 }

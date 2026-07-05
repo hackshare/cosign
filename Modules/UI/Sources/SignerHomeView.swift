@@ -197,12 +197,7 @@ public struct SignerHomeView: View {
                     tone: .amber
                 )
             } else if squadRows.isEmpty {
-                CosignEmptyState(
-                    key: .emptySquads,
-                    primaryAction: {
-                        copyToPasteboard(memberAddress)
-                    }
-                )
+                emptySquadsState(memberAddress: memberAddress)
             } else {
                 CosignCard(padding: 0) {
                     VStack(spacing: 0) {
@@ -224,6 +219,21 @@ public struct SignerHomeView: View {
                 }
             }
         }
+    }
+
+    private func emptySquadsState(memberAddress: String) -> some View {
+        CosignEmptyState(
+            key: .emptySquads,
+            primaryActionTitle: CosignCopy.CreateSquad.entryTitle,
+            primaryActionIdentifier: "squads-empty-create-cta",
+            secondaryActionTitle: CosignCopy.CreateSquad.copyAddress,
+            primaryAction: {
+                coordinator.go(to: .createSquad(memberAddress: memberAddress))
+            },
+            secondaryAction: {
+                copyToPasteboard(memberAddress)
+            }
+        )
     }
 
     private var recentActivitySection: some View {

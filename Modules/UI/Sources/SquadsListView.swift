@@ -45,13 +45,27 @@ public struct SquadsListView: View {
             } else if squads.isEmpty {
                 CosignEmptyState(
                     key: .emptySquads,
+                    primaryActionTitle: CosignCopy.CreateSquad.entryTitle,
+                    primaryActionIdentifier: "squads-empty-create-cta",
+                    secondaryActionTitle: CosignCopy.CreateSquad.copyAddress,
                     primaryAction: {
+                        coordinator.go(to: .createSquad(memberAddress: memberAddress))
+                    },
+                    secondaryAction: {
                         copyToPasteboard(memberAddress)
                     }
                 )
             } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    CosignSectionTitle(title: CosignCopy.Squads.sectionTitle)
+                    HStack {
+                        CosignSectionTitle(title: CosignCopy.Squads.sectionTitle)
+                        Spacer()
+                        CosignIconButton(glyph: .plus) {
+                            coordinator.go(to: .createSquad(memberAddress: memberAddress))
+                        }
+                        .accessibilityIdentifier("squads-create-cta")
+                        .accessibilityLabel(CosignCopy.CreateSquad.entryTitle)
+                    }
                     ForEach(squads) { squad in
                         CosignObjectRowButton {
                             coordinator.go(to: .squadDetail(squad.address))

@@ -139,8 +139,8 @@ pub fn associated_token_account_address(
 // -- Squads read FFI surface --
 
 pub use transactions::{
-    PreparedProposalCreation, PreparedTransaction, SignatureStatus, SimulationResult,
-    TransactionSubmission, VoteType,
+    CreateMultisigCost, PreparedMultisigCreation, PreparedProposalCreation, PreparedTransaction,
+    SignatureStatus, SimulationResult, TransactionSubmission, VoteType,
 };
 pub use types::{
     ActivityItem, DecodedInstruction, MemberInfo, MultisigDetail, MultisigSummary, ProposalDetail,
@@ -405,6 +405,78 @@ pub fn squads_send_signed_transaction(
         message_bytes,
         signature_bytes,
     )?)
+}
+
+pub fn squads_build_create_multisig_transaction(
+    rpc_url: String,
+    creator_pubkey: String,
+    member_pubkeys: Vec<String>,
+    threshold: u16,
+) -> Result<PreparedMultisigCreation, SquadsFFIError> {
+    let creator = parse_pubkey(&creator_pubkey)?;
+    let members = member_pubkeys
+        .iter()
+        .map(|m| parse_pubkey(m))
+        .collect::<Result<Vec<_>, _>>()?;
+    let rpc = rpc::RpcClient::new(rpc_url);
+    Ok(transactions::build_create_multisig_transaction(
+        rpc, creator, members, threshold,
+    )?)
+}
+
+pub fn squads_estimate_create_multisig_cost(
+    rpc_url: String,
+    creator_pubkey: String,
+    member_pubkeys: Vec<String>,
+    threshold: u16,
+) -> Result<CreateMultisigCost, SquadsFFIError> {
+    let creator = parse_pubkey(&creator_pubkey)?;
+    let members = member_pubkeys
+        .iter()
+        .map(|m| parse_pubkey(m))
+        .collect::<Result<Vec<_>, _>>()?;
+    let rpc = rpc::RpcClient::new(rpc_url);
+    Ok(transactions::estimate_create_multisig_cost(
+        rpc, creator, members, threshold,
+    )?)
+}
+
+pub fn squads_send_multisig_create_transaction(
+    rpc_url: String,
+    message_bytes: Vec<u8>,
+    creator_signature: Vec<u8>,
+    create_key_pubkey: String,
+    create_key_signature: Vec<u8>,
+) -> Result<TransactionSubmission, SquadsFFIError> {
+    let create_key = parse_pubkey(&create_key_pubkey)?;
+    let rpc = rpc::RpcClient::new(rpc_url);
+    Ok(transactions::send_multisig_create_transaction(
+        rpc,
+        message_bytes,
+        creator_signature,
+        create_key,
+        create_key_signature,
+    )?)
+}
+
+pub fn request_devnet_airdrop(
+    rpc_url: String,
+    address: String,
+    lamports: u64,
+) -> Result<String, SquadsFFIError> {
+    let pubkey = parse_pubkey(&address)?;
+    let rpc = rpc::RpcClient::new(rpc_url);
+    let signature = rpc
+        .request_airdrop(&pubkey, lamports)
+        .map_err(|e| SquadsFFIError::Rpc(e.to_string()))?;
+    Ok(signature.to_string())
+}
+
+pub fn get_sol_balance(rpc_url: String, address: String) -> Result<u64, SquadsFFIError> {
+    let pubkey = parse_pubkey(&address)?;
+    let rpc = rpc::RpcClient::new(rpc_url);
+    rpc.get_balance(&pubkey)
+        .map_err(|e| SquadsFFIError::Rpc(e.to_string()))
 }
 
 pub fn squads_get_signature_status(

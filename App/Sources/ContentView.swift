@@ -108,6 +108,8 @@ struct ContentView: View {
             ActivityListView(squadAddress: squad)
         case let .transactionInspection(signature):
             TransactionInspectionView(signature: signature)
+        case let .createSquad(memberAddress):
+            CreateSquadView(memberAddress: memberAddress)
         default:
             EmptyView()
         }
