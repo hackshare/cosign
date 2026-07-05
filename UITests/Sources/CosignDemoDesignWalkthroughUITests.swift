@@ -320,6 +320,25 @@ final class CosignDemoDesignWalkthroughUITests: XCTestCase {
         tapButton("signer-row-2")
         waitForScreen("screen.signer-home")
         capture("09-null-no-squads")
+
+        let createCTA = app.buttons["squads-empty-create-cta"]
+        XCTAssertTrue(createCTA.waitForExistence(timeout: 60), "Missing create-squad CTA")
+        createCTA.tap()
+        waitForScreen("screen.create-squad")
+        waitForScreen("create-squad-step-funding")
+        capture("42-create-squad-funding")
+
+        tapFirstButton("Next")
+        waitForScreen("create-squad-step-members")
+        capture("43-create-squad-members")
+
+        tapFirstButton("Next")
+        waitForScreen("create-squad-step-threshold")
+        capture("44-create-squad-threshold")
+
+        tapFirstButton("Next")
+        waitForScreen("create-squad-step-review")
+        capture("45-create-squad-review")
     }
 
     private func launchDemo(profile: String) {

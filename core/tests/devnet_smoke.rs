@@ -1,6 +1,7 @@
 use std::{env, error::Error, path::PathBuf};
 
 use solana_client::rpc_filter::{Memcmp, RpcFilterType};
+use solana_sdk::signature::Signer;
 use squads_multisig::{anchor_lang::Discriminator, state::Multisig};
 
 use cosign_core::{
@@ -81,6 +82,106 @@ fn devnet_read_smoke() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+#[test]
+#[ignore = "creates a real multisig on devnet; run with \
+            `COSIGN_DEVNET_CREATE=1 cargo test --test devnet_smoke devnet_create_squad -- --ignored --nocapture`"]
+fn devnet_create_squad() -> Result<(), Box<dyn Error>> {
+    load_env_files();
+    if env_string("COSIGN_DEVNET_CREATE").as_deref() != Some("1") {
+        println!("COSIGN_DEVNET_CREATE is not 1; skipping (this test spends devnet SOL)");
+        return Ok(());
+    }
+    let rpc_url =
+        env::var("COSIGN_DEVNET_RPC_URL").unwrap_or_else(|_| DEFAULT_DEVNET_RPC_URL.to_string());
+    println!("RPC: {}", redact_rpc_url(&rpc_url));
+
+    let creator = load_creator_keypair()?;
+    let creator_pubkey = creator.pubkey().to_string();
+    let seed = creator.to_bytes()[..32].to_vec();
+    println!("creator={creator_pubkey}");
+
+    // Exact app path: build (generates ephemeral create_key, signs with it) -> sign
+    // with the creator seed -> submit both signatures -> read the multisig back.
+    let prepared = cosign_core::squads_build_create_multisig_transaction(
+        rpc_url.clone(),
+        creator_pubkey.clone(),
+        vec![],
+        1,
+    )?;
+    println!(
+        "multisig={} create_key={}",
+        prepared.multisig_address, prepared.create_key
+    );
+
+    let creator_signature = cosign_core::sign(seed, prepared.message_bytes.clone());
+    let submission = cosign_core::squads_send_multisig_create_transaction(
+        rpc_url.clone(),
+        prepared.message_bytes.clone(),
+        creator_signature,
+        prepared.create_key.clone(),
+        prepared.create_key_signature.clone(),
+    )?;
+    println!("submitted signature={}", submission.signature);
+    println!(
+        "explorer: https://explorer.solana.com/address/{}?cluster=devnet",
+        prepared.multisig_address
+    );
+
+    let detail = read_multisig_with_retries(&rpc_url, &prepared.multisig_address)?;
+    println!(
+        "read back: multisig={} threshold={} members={} tx_index={}",
+        detail.address,
+        detail.threshold,
+        detail.members.len(),
+        detail.transaction_index
+    );
+    assert_eq!(detail.threshold, 1, "1-of-1 threshold");
+    assert_eq!(detail.members.len(), 1, "creator-only membership");
+    assert_eq!(
+        detail.members[0].pubkey, creator_pubkey,
+        "creator is the sole member"
+    );
+    Ok(())
+}
+
+fn load_creator_keypair() -> Result<solana_sdk::signature::Keypair, Box<dyn Error>> {
+    let path = env_string("COSIGN_DEVNET_PAYER_KEYPAIR")
+        .ok_or("set COSIGN_DEVNET_PAYER_KEYPAIR to a funded devnet keypair.json")?;
+    let path = PathBuf::from(&path);
+    let resolved = if path.is_absolute() {
+        path
+    } else {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("core crate has repository parent")
+            .join(path)
+    };
+    solana_sdk::signature::read_keypair_file(&resolved)
+        .map_err(|e| format!("failed to read keypair {}: {e}", resolved.display()).into())
+}
+
+fn read_multisig_with_retries(
+    rpc_url: &str,
+    multisig: &str,
+) -> Result<cosign_core::MultisigDetail, Box<dyn Error>> {
+    let mut last_err: Option<String> = None;
+    for attempt in 0..15 {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        match squads_get_multisig(rpc_url.to_string(), multisig.to_string()) {
+            Ok(detail) => return Ok(detail),
+            Err(e) => {
+                last_err = Some(e.to_string());
+                println!("  attempt {attempt}: multisig not readable yet ({e})");
+            }
+        }
+    }
+    Err(format!(
+        "multisig {multisig} never became readable: {}",
+        last_err.unwrap_or_default()
+    )
+    .into())
 }
 
 fn load_env_files() {

@@ -10,17 +10,21 @@ public struct IndexerEnvironment: Sendable {
     /// (the demo build), leaving polling.
     public var webSocketURL: URL?
     public var explorerRPCURL: URL?
+    /// Whether this environment supports SOL airdrop (devnet only).
+    public var supportsAirdrop: Bool
 
     public init(
         rpcURL: URL,
         relay: any RelayClient = NoOpRelay(),
         webSocketURL: URL? = nil,
-        explorerRPCURL: URL? = nil
+        explorerRPCURL: URL? = nil,
+        supportsAirdrop: Bool = false
     ) {
         self.rpcURL = rpcURL
         self.relay = relay
         self.webSocketURL = webSocketURL
         self.explorerRPCURL = explorerRPCURL
+        self.supportsAirdrop = supportsAirdrop
     }
 }
 
@@ -29,7 +33,12 @@ public extension IndexerEnvironment {
     static let devnetRPCURL = URL(string: "https://api.devnet.solana.com")!
 
     static var devnet: IndexerEnvironment {
-        IndexerEnvironment(rpcURL: devnetRPCURL)
+        IndexerEnvironment(rpcURL: devnetRPCURL, supportsAirdrop: true)
+    }
+
+    /// Direct devnet RPC endpoint for airdrop requests (bypasses the relay).
+    var airdropRPCURL: URL {
+        IndexerEnvironment.devnetRPCURL
     }
 
     var effectiveRPCURL: URL {

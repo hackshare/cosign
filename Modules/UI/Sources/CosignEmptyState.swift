@@ -220,6 +220,7 @@ struct CosignEmptyState: View {
     var primaryAction: (() -> Void)?
     var secondaryAction: (() -> Void)?
     var primaryActionKind: CosignButtonKind
+    var primaryActionIdentifier: String?
     var tone: CosignEmptyStateTone
     var layout: CosignEmptyStateLayout
     var borderStyle: StrokeStyle
@@ -252,17 +253,21 @@ struct CosignEmptyState: View {
 
     init(
         key: CosignEmptyStateKey,
+        primaryActionTitle: String? = nil,
+        primaryActionIdentifier: String? = nil,
+        secondaryActionTitle: String? = nil,
         primaryAction: (() -> Void)? = nil,
         secondaryAction: (() -> Void)? = nil
     ) {
         title = key.title
         glyph = key.glyph
         message = key.message
-        primaryActionTitle = key.primaryActionTitle
-        secondaryActionTitle = key.secondaryActionTitle
+        self.primaryActionTitle = primaryActionTitle ?? key.primaryActionTitle
+        self.secondaryActionTitle = secondaryActionTitle ?? key.secondaryActionTitle
         self.primaryAction = primaryAction
         self.secondaryAction = secondaryAction
         primaryActionKind = key.primaryActionKind
+        self.primaryActionIdentifier = primaryActionIdentifier
         tone = key.tone
         layout = key.layout
         borderStyle = key.borderStyle
@@ -300,6 +305,7 @@ struct CosignEmptyState: View {
                             primaryAction?()
                         }
                         .buttonStyle(CosignButtonStyle(kind: primaryActionKind, fillsWidth: false))
+                        .accessibilityIdentifier(primaryActionIdentifier ?? "")
                     }
                     if let secondaryActionTitle = visibleSecondaryActionTitle {
                         Button(secondaryActionTitle) {

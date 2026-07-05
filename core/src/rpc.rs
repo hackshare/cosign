@@ -15,6 +15,7 @@ use solana_sdk::{
     account::Account,
     commitment_config::{CommitmentConfig, CommitmentLevel},
     hash::Hash,
+    message::Message,
     pubkey::Pubkey,
     signature::Signature,
     transaction::Transaction,
@@ -111,6 +112,24 @@ impl RpcClient {
 
     pub fn get_latest_blockhash(&self) -> Result<Hash, RpcError> {
         Ok(self.inner.get_latest_blockhash()?)
+    }
+
+    pub fn get_balance(&self, pubkey: &Pubkey) -> Result<u64, RpcError> {
+        Ok(self.inner.get_balance(pubkey)?)
+    }
+
+    pub fn request_airdrop(&self, pubkey: &Pubkey, lamports: u64) -> Result<Signature, RpcError> {
+        Ok(self.inner.request_airdrop(pubkey, lamports)?)
+    }
+
+    pub fn get_fee_for_message(&self, message: &Message) -> Result<u64, RpcError> {
+        Ok(self.inner.get_fee_for_message(message)?)
+    }
+
+    pub fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> Result<u64, RpcError> {
+        Ok(self
+            .inner
+            .get_minimum_balance_for_rent_exemption(data_len)?)
     }
 
     pub fn simulate_transaction(

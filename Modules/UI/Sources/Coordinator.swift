@@ -20,6 +20,7 @@ public enum Route: Hashable, Sendable {
     case proposalDetail(squad: String, txIndex: UInt64)
     case activity(squad: String)
     case transactionInspection(signature: String)
+    case createSquad(memberAddress: String)
 }
 
 @MainActor

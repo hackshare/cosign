@@ -48,9 +48,9 @@ extension CosignCopy {
         static let emptyNFTsMessage = "NFTs received by this vault will appear here."
         static let emptyProposalsTitle = "All clear"
         static let emptyProposalsMessage = "No pending proposals."
-        static let emptySquadsTitle = "This signer is a member of no Squads"
+        static let emptySquadsTitle = "No squads yet"
         static let emptySquadsMessage =
-            "Share this signer's address with a Squad admin to be added. Matching Squads will appear here."
+            "Create a Squad to hold funds and co-sign proposals, or share your address so an admin can add you to theirs."
         static let emptyTokensTitle = "No SPL tokens"
         static let emptyTokensMessage = "SPL and Token-2022 holdings will appear here when received."
         static let emptyVaultsTitle = "This Squad has no vaults"
