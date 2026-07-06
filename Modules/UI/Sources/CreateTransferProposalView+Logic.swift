@@ -282,7 +282,7 @@ extension CreateTransferProposalView {
                 txIndex: transactionIndex
             ))
         case let .inspectTransaction(signature):
-            coordinator.replaceCurrent(with: .transactionInspection(signature: signature))
+            coordinator.replaceCurrent(with: .transactionInspection(signature: signature, squad: squadAddress))
         }
     }
 

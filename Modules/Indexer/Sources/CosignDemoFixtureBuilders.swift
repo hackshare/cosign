@@ -159,23 +159,26 @@ func makeDemoExecutedInspection(
     signature: String,
     slot: UInt64,
     blockTime: Int64,
-    action: RelayInspectionAction
+    action: RelayInspectionAction,
+    status: String = "finalized",
+    error: String? = nil,
+    logs: [String] = [
+        "Program log: instruction decoded",
+        "Program log: execution finalized"
+    ]
 ) -> ExecutedTransactionInspectionReport {
     ExecutedTransactionInspectionReport(
         kind: "executed_transaction_inspection",
         signature: signature,
         cluster: "demo",
         status: ExecutedTransactionInspectionStatus(
-            status: "finalized",
+            status: status,
             slot: slot,
             blockTime: blockTime,
-            error: nil
+            error: error
         ),
         action: action,
-        logs: [
-            "Program log: instruction decoded",
-            "Program log: execution finalized"
-        ]
+        logs: logs
     )
 }
 
@@ -183,14 +186,15 @@ func makeDemoActivity(
     signature: String,
     slot: UInt64,
     kind: String,
-    action: RelayInspectionAction?
+    action: RelayInspectionAction?,
+    error: String? = nil
 ) -> RelayActivityItem {
     RelayActivityItem(
         signature: signature,
         slot: slot,
         timestampUnix: 1_779_230_000 + Int64(slot % 10000),
         kind: kind,
-        error: nil,
+        error: error,
         action: action
     )
 }

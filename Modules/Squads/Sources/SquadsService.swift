@@ -58,6 +58,12 @@ public final class SquadsService: @unchecked Sendable {
         }
     }
 
+    /// The addresses of a squad's own vaults, used to classify an inspected
+    /// transaction's effects as inflows or outflows relative to the squad.
+    public func ownVaultAddresses(of squadAddress: String) async throws -> Set<String> {
+        try await Set(detail(of: squadAddress).vaults.map(\.ref.address))
+    }
+
     public func members(of squadAddress: String) async throws -> [SquadMember] {
         if let demoFixture {
             return try demoFixture.squadDetail(for: SquadDetailRequest(squadAddress: squadAddress))

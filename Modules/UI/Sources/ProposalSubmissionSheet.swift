@@ -7,6 +7,7 @@ struct ProposalSubmissionSheet: View {
     @Environment(\.squadsService) private var squadsService
 
     let result: ProposalSubmissionResult
+    let squadAddress: String
     let onDone: () -> Void
     @State private var footerHeight = CosignLayout.estimatedSheetStickyFooterHeight
     @State private var executedStatus: ExecutedTransactionInspectionStatus?
@@ -18,7 +19,7 @@ struct ProposalSubmissionSheet: View {
 
             SignatureReceiptSection(result: result) { signature in
                 onDone()
-                coordinator.go(to: .transactionInspection(signature: signature))
+                coordinator.go(to: .transactionInspection(signature: signature, squad: squadAddress))
             }
 
             ReceiptFactsCard(
@@ -27,7 +28,7 @@ struct ProposalSubmissionSheet: View {
                 executedFee: executedFee
             ) { signature in
                 onDone()
-                coordinator.go(to: .transactionInspection(signature: signature))
+                coordinator.go(to: .transactionInspection(signature: signature, squad: squadAddress))
             }
         }
         .presentationDetents([.large])

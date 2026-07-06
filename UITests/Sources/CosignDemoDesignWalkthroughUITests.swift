@@ -179,6 +179,10 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         tapButton("proposal-preview-row-0")
         waitForScreen("screen.proposal-detail")
         capture("08-proposal-detail")
+        // The predicted asset-movement card sits below the decoded fields.
+        app.swipeUp()
+        app.swipeUp()
+        capture("61-predicted-movement")
         tapButton("proposal-sticky-action-more")
         waitForScreen("screen.proposal-secondary-actions")
         capture("09-proposal-more-actions")
@@ -205,6 +209,17 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         tapButton("tab-activity")
         capture("13-squad-activity")
         capture("62-activity-enriched")
+
+        // The top activity row is a failed execution: open it to capture the
+        // attempted asset-movement card and the FAILED execution status.
+        tapButton("activity-row-0")
+        waitForScreen("screen.transaction-inspection")
+        capture("63-failed-inspection")
+        app.swipeUp()
+        capture("64-failed-status")
+        navigateBack()
+        waitForScreen("screen.squad-detail")
+
         tapButton("tab-members")
         capture("14-squad-members")
 

@@ -249,7 +249,10 @@ public struct VaultInspectionView: View {
             showsChevron: canInspectTransaction(item)
         )
         if canInspectTransaction(item) {
-            CosignObjectNavigationLink(value: Route.transactionInspection(signature: item.signature)) {
+            CosignObjectNavigationLink(value: Route.transactionInspection(
+                signature: item.signature,
+                squad: squadAddress
+            )) {
                 row
             }
         } else {

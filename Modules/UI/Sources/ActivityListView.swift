@@ -121,8 +121,10 @@ public struct ActivityListView: View {
                                     rpcURL: indexerEnvironment.effectiveExplorerRPCURL
                                 ),
                                 canInspect: canInspectTransaction(item),
-                                ownVaultAccounts: ownVaultAccounts
+                                ownVaultAccounts: ownVaultAccounts,
+                                squadAddress: squadAddress
                             )
+                            .accessibilityIdentifier("activity-row-\(index)")
 
                             if index < displayedItems.count - 1 || canLoadMore {
                                 Divider()
@@ -262,8 +264,7 @@ public struct ActivityListView: View {
     }
 
     private func vaultAccountAddresses() async -> Set<String> {
-        guard let detail = try? await squadsService.detail(of: squadAddress) else { return [] }
-        return Set(detail.vaults.map(\.ref.address))
+        await (try? squadsService.ownVaultAddresses(of: squadAddress)) ?? []
     }
 
     private func canInspectTransaction(_ item: SquadActivityItem) -> Bool {

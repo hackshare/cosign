@@ -275,7 +275,7 @@ private extension SignerHomeView {
                         let visibleActivity = Array(recentActivity.prefix(3))
                         ForEach(Array(visibleActivity.enumerated()), id: \.element.id) { index, item in
                             CosignObjectRowButton {
-                                coordinator.go(to: .transactionInspection(signature: item.signature))
+                                coordinator.go(to: .transactionInspection(signature: item.signature, squad: nil))
                             } label: {
                                 SignerHomeRecentActivityRow(item: item)
                             }
