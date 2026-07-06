@@ -55,6 +55,8 @@ jobs:
   ios:
     name: iOS app + tests
     runs-on: macos-26
+    # Backstop against a hung simulator launch stalling the job for the 6h default.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 

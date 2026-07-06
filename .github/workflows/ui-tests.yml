@@ -16,6 +16,10 @@ jobs:
   ui:
     name: Full UI walkthroughs
     runs-on: macos-26
+    # Backstop: a hung simulator launch (DVTAssertions / IDELaunchiPhoneSimulator)
+    # once stalled xcodebuild for the full 6h default. Cap the whole job well below
+    # that; per-test timeouts below kill an individual hang so retries can proceed.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -78,4 +82,7 @@ jobs:
             -only-testing:CosignDemoUITests \
             -parallel-testing-enabled YES \
             -retry-tests-on-failure \
-            -test-iterations 2
+            -test-iterations 2 \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 180 \
+            -maximum-test-execution-time-allowance 300
