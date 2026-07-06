@@ -23,6 +23,20 @@ extension ProposalDetailView {
     }
 
     @ViewBuilder
+    func movementSection(for proposal: SquadProposalDetail) -> some View {
+        let effects = (proposal.isExecuted ? executedInspectionReport?.action : inspectionReport?.action)?.effects ?? []
+        let movement = AssetMovement.build(from: effects, ownAccounts: ownVaultAccounts)
+        if !movement.isEmpty {
+            AssetMovementCard(movement: movement, variant: movementVariant(for: proposal))
+        }
+    }
+
+    private func movementVariant(for proposal: SquadProposalDetail) -> AssetMovementCard.Variant {
+        guard proposal.isExecuted else { return .predicted }
+        return executionFailed ? .attempted : .executed
+    }
+
+    @ViewBuilder
     func decodedFieldsSection(_ proposal: SquadProposalDetail) -> some View {
         let action = proposalActionObject(for: proposal)
         let decodedInstructions = instructionDecoder.decode(proposal)

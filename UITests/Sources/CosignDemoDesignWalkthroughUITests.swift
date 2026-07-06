@@ -195,11 +195,16 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         capture("12-transaction-inspection")
         navigateBack()
         waitForScreen("screen.proposal-detail")
+        // The asset-movement card sits below the decoded fields; scroll it into view.
+        app.swipeUp()
+        app.swipeUp()
+        capture("60-exec-movement")
         navigateBack()
         waitForScreen("screen.squad-detail")
 
         tapButton("tab-activity")
         capture("13-squad-activity")
+        capture("62-activity-enriched")
         tapButton("tab-members")
         capture("14-squad-members")
 

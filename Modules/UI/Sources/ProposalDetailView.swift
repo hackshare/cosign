@@ -31,6 +31,7 @@ public struct ProposalDetailView: View {
     @State var executionSignature: String?
     @State var inspectionReport: ProposalInspectionReport?
     @State var executedInspectionReport: ExecutedTransactionInspectionReport?
+    @State var ownVaultAccounts = Set<String>()
     @State var isLoadingInspection = false
     @State var inspectionErrorMessage: String?
     @State var stickyFooterHeight = CosignLayout.estimatedStickyFooterHeight
@@ -123,6 +124,11 @@ public struct ProposalDetailView: View {
         .accessibilityIdentifier("screen.proposal-detail")
     }
 
+    var executionFailed: Bool {
+        guard let status = executedInspectionReport?.status else { return false }
+        return status.error != nil || status.status.lowercased() == "failed"
+    }
+
     private var watchedAccounts: [String] {
         guard let proposal else {
             return []
@@ -166,9 +172,11 @@ public struct ProposalDetailView: View {
                 squadsService.members(of: squadAddress)
             }
             let (newProposal, newMembers) = try await (loadedProposal, loadedMembers)
+            async let newVaultAccounts = vaultAccountAddresses()
             let newExecutionSignature = await latestExecutionSignature(for: newProposal, forceRefresh: forceRefresh)
             proposal = newProposal
             squadMembers = newMembers
+            ownVaultAccounts = await newVaultAccounts
             executionSignature = newExecutionSignature
             errorMessage = nil
         } catch {
@@ -179,6 +187,13 @@ public struct ProposalDetailView: View {
                 errorMessage = String(describing: error)
             }
         }
+    }
+
+    private func vaultAccountAddresses() async -> Set<String> {
+        guard let detail = try? await squadsService.detail(of: squadAddress) else {
+            return []
+        }
+        return Set(detail.vaults.map(\.ref.address))
     }
 
     private func latestExecutionSignature(for proposal: SquadProposalDetail, forceRefresh: Bool) async -> String? {

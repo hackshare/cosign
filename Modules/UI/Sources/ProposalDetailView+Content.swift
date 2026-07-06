@@ -6,9 +6,15 @@ extension ProposalDetailView {
         CosignScreen(bottomPadding: proposalBottomPadding(for: proposal)) {
             proposalNavigationHeader(proposal)
             proposalDecisionSection(proposal)
+            if proposal.isExecuted, executionFailed {
+                CosignInlineBanner(tone: .red) {
+                    Text(CosignCopy.ProposalDetail.executionFailed)
+                }
+            }
             votesSection(proposal)
             actionsSection(proposal)
             decodedFieldsSection(proposal)
+            movementSection(for: proposal)
             inspectionSection(proposal)
             linksSection(proposal)
             technicalDetailsSection(proposal)

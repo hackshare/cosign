@@ -11,6 +11,7 @@ public struct ActivityListView: View {
     private let pageSize: UInt32
 
     @State private var items = [SquadActivityItem]()
+    @State private var ownVaultAccounts = Set<String>()
     @State private var isLoading = false
     @State private var isLoadingMore = false
     @State private var canLoadMore = true
@@ -119,7 +120,8 @@ public struct ActivityListView: View {
                                     signature: item.signature,
                                     rpcURL: indexerEnvironment.effectiveExplorerRPCURL
                                 ),
-                                canInspect: canInspectTransaction(item)
+                                canInspect: canInspectTransaction(item),
+                                ownVaultAccounts: ownVaultAccounts
                             )
 
                             if index < displayedItems.count - 1 || canLoadMore {
@@ -221,11 +223,13 @@ public struct ActivityListView: View {
         }
 
         do {
+            async let newVaultAccounts = vaultAccountAddresses()
             let page = if forceRefresh {
                 try await squadsService.refreshActivity(in: squadAddress, before: nil, limit: pageSize)
             } else {
                 try await squadsService.activity(in: squadAddress, before: nil, limit: pageSize)
             }
+            ownVaultAccounts = await newVaultAccounts
             items = page
             canLoadMore = page.count == Int(pageSize)
             errorMessage = nil
@@ -255,6 +259,11 @@ public struct ActivityListView: View {
         } catch {
             errorMessage = String(describing: error)
         }
+    }
+
+    private func vaultAccountAddresses() async -> Set<String> {
+        guard let detail = try? await squadsService.detail(of: squadAddress) else { return [] }
+        return Set(detail.vaults.map(\.ref.address))
     }
 
     private func canInspectTransaction(_ item: SquadActivityItem) -> Bool {
