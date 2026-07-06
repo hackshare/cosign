@@ -45,6 +45,7 @@ private struct OperationsDemoSquad {
     let vault1 = "VaU1tTwo92hM4LxPbz9E4Qy7sT3RqKcW15mHc76KyxMW"
     let recipient = "7cNd8mYFmpVKw9X29zQz6w8h1z4Rb82JfP5MxK29"
     let executedSignature = "38Hz4sbUsu5u6wV7hFgGz7xyrRCMK3rQc6GFexyqPQW"
+    let failedSignature = "2Fk7pWq4DemoFailedOperations9nR5sMv3xY8cQ6bT"
 
     func make() -> DemoSquad {
         let proposalMap = Dictionary(uniqueKeysWithValues: proposals.map { ($0.transactionIndex, $0) })
@@ -52,6 +53,7 @@ private struct OperationsDemoSquad {
             ($0.transactionIndex, makeDemoProposalInspection(squad: squad, proposal: $0))
         })
         let executed = makeExecutedInspection()
+        let failed = makeFailedExecutedInspection()
 
         return DemoSquad(
             summary: summary,
@@ -60,9 +62,9 @@ private struct OperationsDemoSquad {
             assets: assets,
             proposals: proposalMap,
             inspections: inspectionMap,
-            executedInspections: [executedSignature: executed],
+            executedInspections: [executedSignature: executed, failedSignature: failed],
             executionSignatures: [10: executedSignature],
-            activity: activityItems(inspections: inspectionMap, executed: executed),
+            activity: activityItems(inspections: inspectionMap, executed: executed, failed: failed),
             accountOwners: [
                 "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
             ]
@@ -164,61 +166,7 @@ private struct OperationsDemoSquad {
     }
 
     private var assets: [String: [DASAsset]] {
-        [
-            vault0: [
-                makeDemoToken(DemoTokenAsset(
-                    id: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                    symbol: "USDC",
-                    name: "USD Coin",
-                    amount: "84300000000",
-                    display: "84,300",
-                    decimals: 6
-                )),
-                makeDemoToken(DemoTokenAsset(
-                    id: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
-                    symbol: "JTO",
-                    name: "JITO",
-                    amount: "1420000000000",
-                    display: "1,420",
-                    decimals: 9
-                )),
-                makeDemoToken(DemoTokenAsset(
-                    id: "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
-                    symbol: "HYPE",
-                    name: "HYPE",
-                    amount: "360000000000",
-                    display: "360",
-                    decimals: 9
-                ))
-            ],
-            vault1: [
-                makeDemoToken(DemoTokenAsset(
-                    id: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                    symbol: "USDC",
-                    name: "USD Coin",
-                    amount: "42600000000",
-                    display: "42,600",
-                    decimals: 6
-                )),
-                makeDemoToken(DemoTokenAsset(
-                    id: "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux",
-                    symbol: "HNT",
-                    name: "Helium Network Token",
-                    amount: "1240000000000",
-                    display: "12,400",
-                    decimals: 8
-                )),
-                makeDemoToken(DemoTokenAsset(
-                    id: "UnkNownMint9mPe7FgpJtvA3RF5RcjHqYwK8t",
-                    symbol: nil,
-                    name: "Unknown mint",
-                    amount: "1000000000",
-                    display: "1,000",
-                    decimals: 6,
-                    token2022: true
-                ))
-            ]
-        ]
+        operationsVaultAssets(vault0: vault0, vault1: vault1)
     }
 
     private func makeExecutedInspection() -> ExecutedTransactionInspectionReport {
@@ -243,11 +191,47 @@ private struct OperationsDemoSquad {
         )
     }
 
+    private func makeFailedExecutedInspection() -> ExecutedTransactionInspectionReport {
+        makeDemoExecutedInspection(
+            signature: failedSignature,
+            slot: 76580,
+            blockTime: 1_779_231_000,
+            action: makeDemoAction(
+                classification: "sol_transfer",
+                summary: "Sent 250 SOL",
+                confidence: "decoded",
+                effect: RelayInspectionEffect(
+                    kind: "transfer",
+                    summary: "Transfer 250 SOL to \(shortDemoAddress(recipient))",
+                    program: "System Program",
+                    asset: "SOL",
+                    amount: "250 SOL",
+                    source: vault0,
+                    destination: recipient
+                )
+            ),
+            status: "failed",
+            error: "Transaction simulation failed: insufficient funds for instruction",
+            logs: [
+                "Program log: instruction decoded",
+                "Program 11111111111111111111111111111111 failed: insufficient lamports"
+            ]
+        )
+    }
+
     private func activityItems(
         inspections: [UInt64: ProposalInspectionReport],
-        executed: ExecutedTransactionInspectionReport
+        executed: ExecutedTransactionInspectionReport,
+        failed: ExecutedTransactionInspectionReport
     ) -> [RelayActivityItem] {
         [
+            makeDemoActivity(
+                signature: failedSignature,
+                slot: 76580,
+                kind: "execute",
+                action: failed.action,
+                error: failed.status.error
+            ),
             makeDemoActivity(signature: executedSignature, slot: 76565, kind: "execute", action: executed.action),
             makeDemoActivity(
                 signature: "5wQp2xM5DemoApproveOperations13nF5s88pQs",
@@ -292,4 +276,67 @@ private struct OperationsDemoSquad {
             "Tx10ExecutedSolTransfer5LqMKv5kmgV7pS9wYudGx"
         }
     }
+}
+
+private func operationsVaultAssets(vault0: String, vault1: String) -> [String: [DASAsset]] {
+    [vault0: operationsVault0Assets(), vault1: operationsVault1Assets()]
+}
+
+private func operationsVault0Assets() -> [DASAsset] {
+    [
+        makeDemoToken(DemoTokenAsset(
+            id: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            symbol: "USDC",
+            name: "USD Coin",
+            amount: "84300000000",
+            display: "84,300",
+            decimals: 6
+        )),
+        makeDemoToken(DemoTokenAsset(
+            id: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+            symbol: "JTO",
+            name: "JITO",
+            amount: "1420000000000",
+            display: "1,420",
+            decimals: 9
+        )),
+        makeDemoToken(DemoTokenAsset(
+            id: "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+            symbol: "HYPE",
+            name: "HYPE",
+            amount: "360000000000",
+            display: "360",
+            decimals: 9
+        ))
+    ]
+}
+
+private func operationsVault1Assets() -> [DASAsset] {
+    [
+        makeDemoToken(DemoTokenAsset(
+            id: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            symbol: "USDC",
+            name: "USD Coin",
+            amount: "42600000000",
+            display: "42,600",
+            decimals: 6
+        )),
+        makeDemoToken(DemoTokenAsset(
+            id: "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux",
+            symbol: "HNT",
+            name: "Helium Network Token",
+            amount: "1240000000000",
+            display: "12,400",
+            decimals: 8
+        )),
+        makeDemoToken(DemoTokenAsset(
+            id: "UnkNownMint9mPe7FgpJtvA3RF5RcjHqYwK8t",
+            symbol: nil,
+            name: "Unknown mint",
+            amount: "1000000000",
+            display: "1,000",
+            decimals: 6,
+            token2022: true
+        ))
+    ]
 }

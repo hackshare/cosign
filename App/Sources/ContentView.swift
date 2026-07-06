@@ -118,8 +118,8 @@ struct ContentView: View {
             ProposalDetailView(squadAddress: squad, transactionIndex: txIndex)
         case let .activity(squad):
             ActivityListView(squadAddress: squad)
-        case let .transactionInspection(signature):
-            TransactionInspectionView(signature: signature)
+        case let .transactionInspection(signature, squad):
+            TransactionInspectionView(signature: signature, squad: squad)
         default:
             EmptyView()
         }

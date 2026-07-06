@@ -112,6 +112,7 @@ public struct ProposalDetailView: View {
         .sheet(item: $submittedResult) { result in
             ProposalSubmissionSheet(
                 result: result,
+                squadAddress: squadAddress,
                 onDone: { submittedResult = nil }
             )
         }
@@ -190,10 +191,7 @@ public struct ProposalDetailView: View {
     }
 
     private func vaultAccountAddresses() async -> Set<String> {
-        guard let detail = try? await squadsService.detail(of: squadAddress) else {
-            return []
-        }
-        return Set(detail.vaults.map(\.ref.address))
+        await (try? squadsService.ownVaultAddresses(of: squadAddress)) ?? []
     }
 
     private func latestExecutionSignature(for proposal: SquadProposalDetail, forceRefresh: Bool) async -> String? {

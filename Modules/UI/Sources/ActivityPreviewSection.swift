@@ -43,7 +43,7 @@ struct ActivityPreviewSection: View {
                 )
                 CosignCard(padding: 0) {
                     VStack(spacing: 0) {
-                        ForEach(Array(displayedItems.enumerated()), id: \.element.id) { _, item in
+                        ForEach(Array(displayedItems.enumerated()), id: \.element.id) { index, item in
                             ActivityNavigationRow(
                                 item: item,
                                 explorerURL: SolanaExplorer.transactionURL(
@@ -51,8 +51,10 @@ struct ActivityPreviewSection: View {
                                     rpcURL: indexerEnvironment.effectiveExplorerRPCURL
                                 ),
                                 canInspect: canInspectTransaction(item),
-                                ownVaultAccounts: ownVaultAccounts
+                                ownVaultAccounts: ownVaultAccounts,
+                                squadAddress: squadAddress
                             )
+                            .accessibilityIdentifier("activity-row-\(index)")
 
                             Divider()
                                 .overlay(CosignTheme.line)
@@ -140,10 +142,7 @@ struct ActivityPreviewSection: View {
     }
 
     private func vaultAccountAddresses() async -> Set<String> {
-        guard let detail = try? await squadsService.detail(of: squadAddress) else {
-            return []
-        }
-        return Set(detail.vaults.map(\.ref.address))
+        await (try? squadsService.ownVaultAddresses(of: squadAddress)) ?? []
     }
 
     private func canInspectTransaction(_ item: SquadActivityItem) -> Bool {

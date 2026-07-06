@@ -7,10 +7,14 @@ struct ActivityNavigationRow: View {
     let explorerURL: URL?
     let canInspect: Bool
     let ownVaultAccounts: Set<String>
+    let squadAddress: String
 
     var body: some View {
         if canInspect {
-            CosignObjectNavigationLink(value: Route.transactionInspection(signature: item.signature)) {
+            CosignObjectNavigationLink(value: Route.transactionInspection(
+                signature: item.signature,
+                squad: squadAddress
+            )) {
                 ActivityRow(item: item, explorerURL: nil, showsInspectionHint: true, ownVaultAccounts: ownVaultAccounts)
             }
         } else {

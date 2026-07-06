@@ -1,18 +1,23 @@
 import Indexer
+import Squads
 import SwiftUI
 
 public struct TransactionInspectionView: View {
     @Environment(Coordinator.self) private var coordinator
     @Environment(\.indexerEnvironment) private var indexerEnvironment
+    @Environment(\.squadsService) private var squadsService
 
     private let signature: String
+    private let squadAddress: String?
 
     @State private var report: ExecutedTransactionInspectionReport?
+    @State private var ownVaultAccounts: Set<String> = []
     @State private var isLoading = false
     @State private var errorMessage: String?
 
-    public init(signature: String) {
+    public init(signature: String, squad: String? = nil) {
         self.signature = signature
+        squadAddress = squad
     }
 
     public var body: some View {
@@ -33,6 +38,9 @@ public struct TransactionInspectionView: View {
         }
         .task(id: taskID) {
             await load()
+        }
+        .task(id: squadAddress) {
+            await loadOwnVaultAccounts()
         }
         .pollingRefresh(
             id: "transaction-inspection-\(taskID)",
@@ -71,14 +79,14 @@ public struct TransactionInspectionView: View {
         }
     }
 
-    /// Intentionally inert until squad context is threaded here: this view is
-    /// reached by signature alone, so ownAccounts is empty and the movement card
-    /// stays hidden. Wiring the squad's vault addresses through the inspection
-    /// route enables it (tracked follow-up).
+    /// Classifies the transaction's effects against the squad's own vault
+    /// addresses to render the asset-movement card. When reached without squad
+    /// context (a cross-squad feed), ownVaultAccounts stays empty and the card
+    /// is hidden.
     @ViewBuilder
     private var movementSection: some View {
         if let report {
-            let movement = AssetMovement.build(from: report.action.effects, ownAccounts: [])
+            let movement = AssetMovement.build(from: report.action.effects, ownAccounts: ownVaultAccounts)
             if !movement.isEmpty {
                 AssetMovementCard(movement: movement, variant: report.status.error != nil ? .attempted : .executed)
             }
@@ -173,6 +181,15 @@ public struct TransactionInspectionView: View {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    @MainActor
+    private func loadOwnVaultAccounts() async {
+        guard let squadAddress else {
+            ownVaultAccounts = []
+            return
+        }
+        ownVaultAccounts = await (try? squadsService.ownVaultAddresses(of: squadAddress)) ?? []
     }
 }
 
