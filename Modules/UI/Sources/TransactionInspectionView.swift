@@ -22,6 +22,7 @@ public struct TransactionInspectionView: View {
             }
 
             transactionHero
+            movementSection
             transactionSection
             inspectionSection
         }
@@ -66,6 +67,20 @@ public struct TransactionInspectionView: View {
                 Text(CosignCopy.TransactionInspection.transactionTitle)
                     .font(CosignTheme.FontStyle.display)
                     .foregroundStyle(CosignTheme.ink)
+            }
+        }
+    }
+
+    /// Intentionally inert until squad context is threaded here: this view is
+    /// reached by signature alone, so ownAccounts is empty and the movement card
+    /// stays hidden. Wiring the squad's vault addresses through the inspection
+    /// route enables it (tracked follow-up).
+    @ViewBuilder
+    private var movementSection: some View {
+        if let report {
+            let movement = AssetMovement.build(from: report.action.effects, ownAccounts: [])
+            if !movement.isEmpty {
+                AssetMovementCard(movement: movement, variant: report.status.error != nil ? .attempted : .executed)
             }
         }
     }

@@ -9,6 +9,7 @@ struct ActivityPreviewSection: View {
     let squadAddress: String
 
     @State private var items = [SquadActivityItem]()
+    @State private var ownVaultAccounts = Set<String>()
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var selectedFilter: ActivityFilter = .all
@@ -49,7 +50,8 @@ struct ActivityPreviewSection: View {
                                     signature: item.signature,
                                     rpcURL: indexerEnvironment.effectiveExplorerRPCURL
                                 ),
-                                canInspect: canInspectTransaction(item)
+                                canInspect: canInspectTransaction(item),
+                                ownVaultAccounts: ownVaultAccounts
                             )
 
                             Divider()
@@ -117,11 +119,14 @@ struct ActivityPreviewSection: View {
         }
 
         do {
-            items = if forceRefresh {
+            async let newVaultAccounts = vaultAccountAddresses()
+            let page = if forceRefresh {
                 try await squadsService.refreshActivity(in: squadAddress, before: nil, limit: 5)
             } else {
                 try await squadsService.activity(in: squadAddress, before: nil, limit: 5)
             }
+            ownVaultAccounts = await newVaultAccounts
+            items = page
             errorMessage = nil
         } catch {
             if items.isEmpty {
@@ -132,6 +137,13 @@ struct ActivityPreviewSection: View {
 
     private var emptyActivityPreview: some View {
         CosignEmptyState(key: .emptyActivity)
+    }
+
+    private func vaultAccountAddresses() async -> Set<String> {
+        guard let detail = try? await squadsService.detail(of: squadAddress) else {
+            return []
+        }
+        return Set(detail.vaults.map(\.ref.address))
     }
 
     private func canInspectTransaction(_ item: SquadActivityItem) -> Bool {

@@ -54,6 +54,7 @@ extension CosignCopy {
         static let unknownActionWarning =
             "Cosign could not identify a well-known action. Review the decoded fields and raw details before signing."
         static let firstTimeRecipientWarningTitle = "First-time recipient"
+        static let executionFailed = "This execution failed on-chain and did not settle."
 
         static func proposalSectionTitle(index: UInt64) -> String {
             "Proposal #\(index)"
