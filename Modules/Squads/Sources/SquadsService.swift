@@ -166,6 +166,7 @@ private extension SquadsService {
             timeLockSeconds: record.timeLockSeconds,
             transactionIndex: record.transactionIndex,
             staleTransactionIndex: record.staleTransactionIndex,
+            isAutonomous: record.isAutonomous,
             members: record.members.map(SquadMember.init(record:)),
             vaultRefs: record.vaults.map(SquadVaultRef.init(record:))
         ))
@@ -188,6 +189,7 @@ private extension SquadsService {
             timeLockSeconds: record.timeLockSeconds,
             transactionIndex: record.transactionIndex,
             staleTransactionIndex: record.staleTransactionIndex,
+            isAutonomous: record.isAutonomous,
             members: record.members.map(SquadMember.init(record:)),
             vaults: vaults
         )
@@ -214,6 +216,7 @@ private extension SquadsService {
             timeLockSeconds: fields.timeLockSeconds,
             transactionIndex: fields.transactionIndex,
             staleTransactionIndex: fields.staleTransactionIndex,
+            isAutonomous: fields.isAutonomous,
             members: fields.members,
             vaults: vaults
         )
@@ -235,6 +238,7 @@ private struct SquadDetailFields {
     let timeLockSeconds: UInt32
     let transactionIndex: UInt64
     let staleTransactionIndex: UInt64
+    let isAutonomous: Bool
     let members: [SquadMember]
     let vaultRefs: [SquadVaultRef]
 }

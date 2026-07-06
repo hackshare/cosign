@@ -100,6 +100,18 @@ struct ContentView: View {
             VaultInspectionView(squadAddress: squad, vaultIndex: vaultIndex)
         case let .createTransferProposal(squad, vaultIndex):
             CreateTransferProposalView(squadAddress: squad, initialVaultIndex: vaultIndex)
+        case let .createSquad(memberAddress):
+            CreateSquadView(memberAddress: memberAddress)
+        case let .manageSquadConfig(squad):
+            ManageSquadConfigView(squadAddress: squad)
+        default:
+            squadProposalDestination(for: route)
+        }
+    }
+
+    @ViewBuilder
+    private func squadProposalDestination(for route: Route) -> some View {
+        switch route {
         case let .proposals(squad, latestIndex):
             ProposalsListView(squadAddress: squad, latestTransactionIndex: latestIndex)
         case let .proposalDetail(squad, txIndex):
@@ -108,8 +120,6 @@ struct ContentView: View {
             ActivityListView(squadAddress: squad)
         case let .transactionInspection(signature):
             TransactionInspectionView(signature: signature)
-        case let .createSquad(memberAddress):
-            CreateSquadView(memberAddress: memberAddress)
         default:
             EmptyView()
         }

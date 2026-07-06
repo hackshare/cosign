@@ -21,6 +21,7 @@ public enum Route: Hashable, Sendable {
     case activity(squad: String)
     case transactionInspection(signature: String)
     case createSquad(memberAddress: String)
+    case manageSquadConfig(squad: String)
 }
 
 @MainActor

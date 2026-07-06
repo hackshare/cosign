@@ -158,6 +158,7 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
     public let timeLockSeconds: UInt32
     public let transactionIndex: UInt64
     public let staleTransactionIndex: UInt64
+    public let isAutonomous: Bool
     public let members: [RelaySquadMember]
     public let vaults: [RelaySquadVaultRef]
 
@@ -168,6 +169,7 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
         timeLockSeconds: UInt32,
         transactionIndex: UInt64,
         staleTransactionIndex: UInt64,
+        isAutonomous: Bool = true,
         members: [RelaySquadMember],
         vaults: [RelaySquadVaultRef]
     ) {
@@ -177,8 +179,27 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
         self.timeLockSeconds = timeLockSeconds
         self.transactionIndex = transactionIndex
         self.staleTransactionIndex = staleTransactionIndex
+        self.isAutonomous = isAutonomous
         self.members = members
         self.vaults = vaults
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        address = try container.decode(String.self, forKey: .address)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        threshold = try container.decode(UInt16.self, forKey: .threshold)
+        timeLockSeconds = try container.decode(UInt32.self, forKey: .timeLockSeconds)
+        transactionIndex = try container.decode(UInt64.self, forKey: .transactionIndex)
+        staleTransactionIndex = try container.decode(UInt64.self, forKey: .staleTransactionIndex)
+        isAutonomous = try container.decodeIfPresent(Bool.self, forKey: .isAutonomous) ?? true
+        members = try container.decode([RelaySquadMember].self, forKey: .members)
+        vaults = try container.decode([RelaySquadVaultRef].self, forKey: .vaults)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case address, displayName, threshold, timeLockSeconds, transactionIndex,
+             staleTransactionIndex, isAutonomous, members, vaults
     }
 }
 
@@ -371,24 +392,4 @@ public struct ProposalInspectionProposal: Decodable, Equatable, Sendable {
     public let instructions: [ProposalInspectionInstruction]
     public var proposer: String?
     public var createdAtUnix: Int64?
-}
-
-public struct ProposalInspectionVotes: Decodable, Equatable, Sendable {
-    public let approve: UInt32
-    public let reject: UInt32
-    public let cancel: UInt32
-}
-
-public struct ProposalInspectionVoters: Decodable, Equatable, Sendable {
-    public let approve: [String]
-    public let reject: [String]
-    public let cancel: [String]
-}
-
-public struct ProposalInspectionInstruction: Decodable, Equatable, Sendable {
-    public let program: String
-    public let kind: String
-    public let summary: String
-    public let accounts: [String]
-    public let rawDataHex: String
 }

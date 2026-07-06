@@ -105,7 +105,7 @@ public extension SquadsService {
         }
     }
 
-    private func simulateProposalCreation(
+    func simulateProposalCreation(
         _ prepared: PreparedProposalCreation,
         signatureBytes: Data
     ) throws {
@@ -129,7 +129,7 @@ public extension SquadsService {
         }
     }
 
-    private func submitPreparedProposalCreation(
+    func submitPreparedProposalCreation(
         _ prepared: PreparedProposalCreation,
         signatureBytes: Data,
         squadAddress: String

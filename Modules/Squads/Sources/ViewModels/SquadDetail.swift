@@ -12,6 +12,7 @@ public struct SquadDetail: Equatable, Sendable, Identifiable {
     public let timeLockSeconds: UInt32
     public let transactionIndex: UInt64
     public let staleTransactionIndex: UInt64
+    public let isAutonomous: Bool
     public let members: [SquadMember]
     public let vaults: [VaultDetail]
 
@@ -22,6 +23,7 @@ public struct SquadDetail: Equatable, Sendable, Identifiable {
         timeLockSeconds: UInt32,
         transactionIndex: UInt64,
         staleTransactionIndex: UInt64,
+        isAutonomous: Bool = true,
         members: [SquadMember],
         vaults: [VaultDetail]
     ) {
@@ -31,6 +33,7 @@ public struct SquadDetail: Equatable, Sendable, Identifiable {
         self.timeLockSeconds = timeLockSeconds
         self.transactionIndex = transactionIndex
         self.staleTransactionIndex = staleTransactionIndex
+        self.isAutonomous = isAutonomous
         self.members = members
         self.vaults = vaults
     }

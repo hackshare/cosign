@@ -123,8 +123,8 @@ struct SingleVaultDetailSection: View {
 
 extension SquadDetailView {
     @ViewBuilder
-    func membersSection(_ members: [SquadMember]) -> some View {
-        if members.isEmpty {
+    func membersSection(_ detail: SquadDetail) -> some View {
+        if detail.members.isEmpty {
             CosignEmptyState(
                 title: CosignCopy.SquadDetail.noMembersTitle,
                 systemImage: "person.slash",
@@ -132,17 +132,31 @@ extension SquadDetailView {
             )
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                CosignSectionTitle(title: CosignCopy.SquadDetail.membersSection)
+                if detail.isAutonomous {
+                    HStack {
+                        CosignSectionTitle(title: CosignCopy.SquadDetail.membersSection)
+                        CosignIconButton(glyph: .settings) {
+                            coordinator.go(to: .manageSquadConfig(squad: detail.address))
+                        }
+                        .accessibilityIdentifier("squad-manage-cta")
+                        .accessibilityLabel(CosignCopy.ManageSquad.entryTitle)
+                    }
+                } else {
+                    CosignSectionTitle(title: CosignCopy.SquadDetail.membersSection)
+                    Text(CosignCopy.ManageSquad.controlledNote)
+                        .font(CosignTheme.FontStyle.caption)
+                        .foregroundStyle(CosignTheme.inkDim)
+                }
                 CosignCard(padding: 0) {
                     VStack(spacing: 0) {
-                        ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
+                        ForEach(Array(detail.members.enumerated()), id: \.element.id) { index, member in
                             CosignObjectNavigationLink(value: Route.signerSquads(member.pubkey)) {
                                 MemberRow(member: member)
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 10)
                             }
 
-                            if index < members.count - 1 {
+                            if index < detail.members.count - 1 {
                                 Divider()
                                     .overlay(CosignTheme.line)
                                     .padding(.leading, 14)

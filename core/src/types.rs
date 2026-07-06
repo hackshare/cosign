@@ -30,6 +30,7 @@ pub struct MultisigDetail {
     pub time_lock_seconds: u32,
     pub transaction_index: u64,
     pub stale_transaction_index: u64,
+    pub is_autonomous: bool,
     pub members: Vec<MemberInfo>,
     pub vaults: Vec<VaultRef>,
 }
@@ -123,6 +124,7 @@ pub fn multisig_detail(
         time_lock_seconds: ms.time_lock,
         transaction_index: ms.transaction_index,
         stale_transaction_index: ms.stale_transaction_index,
+        is_autonomous: ms.config_authority == Pubkey::default(),
         members: ms.members.iter().map(member_info).collect(),
         vaults: vault_indices
             .into_iter()

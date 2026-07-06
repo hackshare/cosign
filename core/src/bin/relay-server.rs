@@ -5150,6 +5150,7 @@ fn squad_detail_json(detail: &types::MultisigDetail) -> Value {
         "timeLockSeconds": detail.time_lock_seconds,
         "transactionIndex": detail.transaction_index,
         "staleTransactionIndex": detail.stale_transaction_index,
+        "isAutonomous": detail.is_autonomous,
         "members": detail.members.iter().map(member_info_json).collect::<Vec<_>>(),
         "vaults": detail.vaults.iter().map(vault_ref_json).collect::<Vec<_>>()
     })
@@ -5999,6 +6000,7 @@ mod tests {
             time_lock_seconds: 30,
             transaction_index: 7,
             stale_transaction_index: 1,
+            is_autonomous: true,
             members: vec![types::MemberInfo {
                 pubkey: "member111".into(),
                 can_initiate: true,

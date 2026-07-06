@@ -202,6 +202,10 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         capture("13-squad-activity")
         tapButton("tab-members")
         capture("14-squad-members")
+
+        tapButton("squad-manage-cta")
+        waitForScreen("screen.manage-squad")
+        capture("50-manage-squad")
     }
 
     func testDemoConfidenceStates() {
