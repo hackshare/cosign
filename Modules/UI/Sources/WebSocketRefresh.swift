@@ -44,7 +44,23 @@ private struct WebSocketRefreshModifier: ViewModifier {
             else {
                 return
             }
+            await runWithReconnect(webSocketURL: webSocketURL, accounts: accounts)
+        }
+    }
 
+    /// Keep the live subscription up across drops. `SolanaWebSocketAccountWatcher`
+    /// finishes its stream on any socket error, so without this the subscription
+    /// would end on the first blip and the app would sit on polling forever while
+    /// the banner claims it is reconnecting. Re-subscribe with exponential backoff
+    /// (reset once a connection has held long enough to count as healthy) until the
+    /// enclosing task is cancelled. A successful re-subscribe reports webSocket
+    /// health, which clears the paused banner.
+    private func runWithReconnect(webSocketURL: URL, accounts: [String]) async {
+        var backoff = WebSocketReconnectBackoff()
+        let clock = ContinuousClock()
+
+        while !Task.isCancelled {
+            let connectedAt = clock.now
             let notifications = SolanaWebSocketAccountWatcher.notifications(
                 webSocketURL: webSocketURL,
                 accounts: accounts,
@@ -56,11 +72,20 @@ private struct WebSocketRefreshModifier: ViewModifier {
                 } catch {
                     return
                 }
-
                 guard !Task.isCancelled else {
                     return
                 }
                 await action()
+            }
+
+            if Task.isCancelled {
+                return
+            }
+            let delay = backoff.nextDelay(connectedFor: connectedAt.duration(to: clock.now))
+            do {
+                try await Task.sleep(for: delay)
+            } catch {
+                return
             }
         }
     }

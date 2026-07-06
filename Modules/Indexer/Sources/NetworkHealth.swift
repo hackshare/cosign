@@ -38,10 +38,18 @@ public final class NetworkHealth: @unchecked Sendable {
     @ObservationIgnored private var rpcFailures = 0
     @ObservationIgnored private var relayFailures = 0
     @ObservationIgnored private var webSocketHealthy = true
+    @ObservationIgnored private var webSocketDownConfirmed = false
+    @ObservationIgnored private var webSocketGraceTask: Task<Void, Never>?
 
     private let failureThreshold = 2
+    private let webSocketGrace: Duration
 
-    public init() {}
+    /// - Parameter webSocketGrace: how long the websocket must stay down before
+    ///   the paused banner appears. Debounces transient drops that the reconnect
+    ///   loop clears almost immediately.
+    public init(webSocketGrace: Duration = .seconds(4)) {
+        self.webSocketGrace = webSocketGrace
+    }
 
     /// A reporter safe to hand to clients on background actors; it marshals each
     /// outcome back to the main actor before touching observable state.
@@ -60,6 +68,9 @@ public final class NetworkHealth: @unchecked Sendable {
         rpcFailures = 0
         relayFailures = 0
         webSocketHealthy = true
+        webSocketGraceTask?.cancel()
+        webSocketGraceTask = nil
+        webSocketDownConfirmed = false
         recomputeStatus()
     }
 
@@ -71,7 +82,7 @@ public final class NetworkHealth: @unchecked Sendable {
         case .relay:
             relayFailures = success ? 0 : relayFailures + 1
         case .webSocket:
-            webSocketHealthy = success
+            updateWebSocketHealth(success)
         }
         if success {
             lastSuccess = Date()
@@ -79,11 +90,40 @@ public final class NetworkHealth: @unchecked Sendable {
         recomputeStatus()
     }
 
+    /// A websocket failure only surfaces as `.webSocketDown` if it persists
+    /// through the grace window. A success clears any pending or confirmed
+    /// down state immediately.
+    @MainActor
+    private func updateWebSocketHealth(_ healthy: Bool) {
+        webSocketHealthy = healthy
+        if healthy {
+            webSocketGraceTask?.cancel()
+            webSocketGraceTask = nil
+            webSocketDownConfirmed = false
+            return
+        }
+        guard !webSocketDownConfirmed, webSocketGraceTask == nil else {
+            return
+        }
+        let grace = webSocketGrace
+        webSocketGraceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: grace)
+            guard let self, !Task.isCancelled else {
+                return
+            }
+            webSocketGraceTask = nil
+            if !webSocketHealthy {
+                webSocketDownConfirmed = true
+                recomputeStatus()
+            }
+        }
+    }
+
     @MainActor
     private func recomputeStatus() {
         if rpcFailures >= failureThreshold || relayFailures >= failureThreshold {
             status = .offline
-        } else if !webSocketHealthy {
+        } else if webSocketDownConfirmed {
             status = .webSocketDown
         } else {
             status = .healthy
