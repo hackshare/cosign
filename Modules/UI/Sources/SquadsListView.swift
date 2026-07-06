@@ -10,6 +10,7 @@ public struct SquadsListView: View {
     private let memberAddress: String
 
     @State private var squads = [SquadSummary]()
+    @State private var pendingCounts = [String: Int]()
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -70,7 +71,7 @@ public struct SquadsListView: View {
                         CosignObjectRowButton {
                             coordinator.go(to: .squadDetail(squad.address))
                         } label: {
-                            SquadSummaryRow(squad: squad)
+                            SquadSummaryRow(squad: squad, pendingCount: pendingCounts[squad.address] ?? 0)
                         }
                     }
                 }
@@ -78,6 +79,7 @@ public struct SquadsListView: View {
         }
         .navigationTitle(CosignCopy.Squads.screenTitle)
         .cosignPage()
+        .accessibilityIdentifier("screen.squads-list")
         .refreshable {
             await load(forceRefresh: true)
         }
@@ -128,16 +130,40 @@ public struct SquadsListView: View {
                 try await squadsService.squads(forMember: memberAddress)
             }
             errorMessage = nil
+            pendingCounts = await loadPendingCounts(for: squads, forceRefresh: forceRefresh)
         } catch {
             if squads.isEmpty {
                 errorMessage = String(describing: error)
             }
         }
     }
+
+    private func loadPendingCounts(for squads: [SquadSummary], forceRefresh: Bool) async -> [String: Int] {
+        var counts = [String: Int]()
+        for squad in squads {
+            counts[squad.address] = await openProposalCount(for: squad, forceRefresh: forceRefresh)
+        }
+        return counts
+    }
+
+    private func openProposalCount(for squad: SquadSummary, forceRefresh: Bool) async -> Int {
+        guard let range = ProposalRange.recent(through: squad.transactionIndex, limit: 12) else {
+            return 0
+        }
+        do {
+            let proposals = forceRefresh
+                ? try await squadsService.refreshProposals(in: squad.address, range: range)
+                : try await squadsService.proposals(in: squad.address, range: range)
+            return proposals.filter(\.isOpen).count
+        } catch {
+            return 0
+        }
+    }
 }
 
 private struct SquadSummaryRow: View {
     let squad: SquadSummary
+    let pendingCount: Int
 
     var body: some View {
         CosignObjectRow(
@@ -150,12 +176,31 @@ private struct SquadSummaryRow: View {
             copyValue: squad.address,
             copyAccessibilityLabel: CosignCopy.Squads.copySquadAddress,
             accessory: {
-                Text(CosignCopy.Squads.threshold(squad.threshold, memberCount: squad.memberCount))
-                    .font(CosignTheme.FontStyle.body)
-                    .foregroundStyle(CosignTheme.inkDim)
-                    .monospacedDigit()
+                HStack(spacing: 10) {
+                    if pendingCount > 0 {
+                        pendingPill
+                    }
+                    Text(CosignCopy.Squads.threshold(squad.threshold, memberCount: squad.memberCount))
+                        .font(CosignTheme.FontStyle.body)
+                        .foregroundStyle(CosignTheme.inkDim)
+                        .monospacedDigit()
+                }
             }
         )
+    }
+
+    private var pendingPill: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(CosignTheme.accent)
+                .frame(width: 6, height: 6)
+            Text(CosignCopy.Squads.pendingCount(pendingCount))
+                .font(CosignTheme.FontStyle.eyebrow)
+                .foregroundStyle(CosignTheme.accentDeep)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(CosignTheme.accentWash, in: .capsule)
     }
 }
 

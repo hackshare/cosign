@@ -9,6 +9,10 @@ extension CosignCopy {
         static let copySquadAddress = "Copy Squad Address"
         static let noTransactions = "No proposals"
 
+        static func pendingCount(_ count: Int) -> String {
+            count == 1 ? "1 pending" : "\(count) pending"
+        }
+
         static func transactionSummary(transactionIndex: UInt64, staleTransactionIndex: UInt64) -> String {
             guard transactionIndex > 0 || staleTransactionIndex > 0 else {
                 return noTransactions
