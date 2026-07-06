@@ -15,6 +15,7 @@ public extension CosignCopy {
         public static let addMember = "Add"
         public static let removeMember = "Remove"
         public static let youBadge = "You"
+        public static let addedBadge = "New"
 
         // Self-removal warnings
         public static let selfRemovalSoloWarning = "You will lose access to this squad."

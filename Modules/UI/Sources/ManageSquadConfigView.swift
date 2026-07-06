@@ -58,6 +58,7 @@ public struct ManageSquadConfigView: View {
                 }
             } else {
                 membersSection(detail)
+                editConsequenceBanner(for: detail)
                 addMemberSection
                 thresholdSection(detail)
                 if let err = createError {
@@ -90,19 +91,18 @@ public struct ManageSquadConfigView: View {
             )
             CosignCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(detail.members) { member in
-                        existingMemberRow(member)
+                    ForEach(Array(detail.members.enumerated()), id: \.element.id) { index, member in
+                        existingMemberRow(member, index: index)
                     }
-                    ForEach(stagedAdditions, id: \.self) { address in
-                        addedMemberRow(address)
+                    ForEach(Array(stagedAdditions.enumerated()), id: \.element) { index, address in
+                        addedMemberRow(address, index: index)
                     }
                 }
             }
-            selfRemovalWarning(for: detail)
         }
     }
 
-    private func existingMemberRow(_ member: SquadMember) -> some View {
+    private func existingMemberRow(_ member: SquadMember, index: Int) -> some View {
         let staged = stagedRemovals.contains(member.pubkey)
         let isYou = currentSignerAddresses.contains(member.pubkey)
         return HStack(spacing: 10) {
@@ -136,15 +136,24 @@ public struct ManageSquadConfigView: View {
                 )
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(isYou ? "manage-squad-remove-you" : "manage-squad-remove-\(index)")
         }
     }
 
-    private func addedMemberRow(_ address: String) -> some View {
+    private func addedMemberRow(_ address: String, index: Int) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(cosignShortAddress(address))
-                    .font(CosignTheme.FontStyle.titleM)
-                    .foregroundStyle(CosignTheme.ink)
+                HStack(spacing: 6) {
+                    Text(cosignShortAddress(address))
+                        .font(CosignTheme.FontStyle.titleM)
+                        .foregroundStyle(CosignTheme.mint)
+                    Text(CosignCopy.ManageSquad.addedBadge)
+                        .font(CosignTheme.FontStyle.eyebrow)
+                        .foregroundStyle(CosignTheme.mint)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(CosignTheme.mintWash, in: .capsule)
+                }
                 Text(cosignShortAddress(address, prefix: 6, suffix: 6))
                     .font(CosignTheme.FontStyle.monoSmall)
                     .foregroundStyle(CosignTheme.inkDim)
@@ -156,18 +165,28 @@ public struct ManageSquadConfigView: View {
                 CosignGlyphView(glyph: .xmark, size: 14, color: CosignTheme.inkDim)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("manage-squad-remove-added-\(index)")
         }
     }
 
+    /// One consequence banner at a time, escalated to the worst active state:
+    /// a projected-invariant block (danger) supersedes the self-removal advisory
+    /// (caution). The design system's banners never stack.
     @ViewBuilder
-    private func selfRemovalWarning(for detail: SquadDetail) -> some View {
-        if hasSelfRemoval {
+    private func editConsequenceBanner(for detail: SquadDetail) -> some View {
+        if hasChanges, let validation = validationError {
+            CosignInlineBanner(tone: .red) {
+                Text(validation)
+            }
+            .accessibilityIdentifier("manage-squad-validation-banner")
+        } else if hasSelfRemoval {
             let message = detail.threshold == 1
                 ? CosignCopy.ManageSquad.selfRemovalSoloWarning
                 : CosignCopy.ManageSquad.selfRemovalQuorumWarning
             CosignInlineBanner(tone: .amber) {
                 Text(message)
             }
+            .accessibilityIdentifier("manage-squad-self-removal-banner")
         }
     }
 
@@ -179,7 +198,10 @@ public struct ManageSquadConfigView: View {
             TextField(CosignCopy.ManageSquad.addMemberPlaceholder, text: $newMember)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .submitLabel(.done)
+                .onSubmit { addMember() }
                 .cosignField()
+                .accessibilityIdentifier("manage-squad-new-member")
             if let err = memberError {
                 CosignInlineBanner(tone: .red) {
                     Text(err)
@@ -191,6 +213,7 @@ public struct ManageSquadConfigView: View {
                 Text(CosignCopy.ManageSquad.addMember)
             }
             .buttonStyle(CosignButtonStyle(kind: .secondary))
+            .accessibilityIdentifier("manage-squad-add-member")
         }
     }
 
