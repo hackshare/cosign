@@ -55,6 +55,18 @@ public struct SquadProposalSummary: Equatable, Sendable, Identifiable {
     }
 }
 
+public extension SquadProposalSummary {
+    /// A proposal still awaiting quorum or execution (counts toward "pending").
+    var isOpen: Bool {
+        switch status.lowercased() {
+        case "active", "approved":
+            true
+        default:
+            false
+        }
+    }
+}
+
 public struct SquadProposalDetail: Equatable, Sendable, Identifiable {
     public var id: UInt64 {
         transactionIndex

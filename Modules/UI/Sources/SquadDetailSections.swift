@@ -155,6 +155,7 @@ extension SquadDetailView {
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 10)
                             }
+                            .accessibilityIdentifier("member-row-\(index)")
 
                             if index < detail.members.count - 1 {
                                 Divider()

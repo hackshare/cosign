@@ -203,6 +203,15 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         tapButton("tab-members")
         capture("14-squad-members")
 
+        // A member row opens that member's squads list, where each squad with
+        // open proposals shows a pending pill.
+        tapButton("member-row-0")
+        waitForScreen("screen.squads-list")
+        capture("55-squads-list")
+        navigateBack()
+        waitForScreen("screen.squad-detail")
+        tapButton("tab-members")
+
         tapButton("squad-manage-cta")
         waitForScreen("screen.manage-squad")
         capture("50-manage-squad")

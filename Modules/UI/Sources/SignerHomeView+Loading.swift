@@ -131,14 +131,3 @@ extension SignerHomeView {
             .map(\.self)
     }
 }
-
-private extension SquadProposalSummary {
-    var isOpen: Bool {
-        switch status.lowercased() {
-        case "active", "approved":
-            true
-        default:
-            false
-        }
-    }
-}
