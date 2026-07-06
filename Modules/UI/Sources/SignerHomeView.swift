@@ -177,10 +177,19 @@ public struct SignerHomeView: View {
 
     private func squadsSection(memberAddress: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            CosignSectionTitle(
-                title: CosignCopy.Signers.memberOfSquadsTitle(count: squadRows.count),
-                trailing: openProposalCount > 0 ? CosignCopy.Signers.pendingColumnTitle : nil
-            )
+            HStack(spacing: 10) {
+                CosignSectionTitle(
+                    title: CosignCopy.Signers.memberOfSquadsTitle(count: squadRows.count),
+                    trailing: openProposalCount > 0 ? CosignCopy.Signers.pendingColumnTitle : nil
+                )
+                if !squadRows.isEmpty {
+                    CosignIconButton(glyph: .plus) {
+                        coordinator.go(to: .createSquad(memberAddress: memberAddress))
+                    }
+                    .accessibilityIdentifier("squads-create-cta")
+                    .accessibilityLabel(CosignCopy.CreateSquad.entryTitle)
+                }
+            }
 
             if isLoading, squadRows.isEmpty {
                 CosignLoadingCard()
@@ -236,7 +245,25 @@ public struct SignerHomeView: View {
         )
     }
 
-    private var recentActivitySection: some View {
+    private var openProposalCount: Int {
+        squadRows.reduce(0) { $0 + $1.openProposalCount }
+    }
+
+    private var networkFooter: some View {
+        CosignNetworkFooter(text: networkFooterText)
+    }
+
+    private var networkFooterText: String {
+        if demoMode?.usesMarketingNetworkFooter == true {
+            return CosignCopy.Network.demoEnhancedFooter
+        }
+        let buildEnvironment = CosignBuildEnvironment.current().environmentName
+        return CosignCopy.Network.pinnedFooter(buildEnvironment.isEmpty ? "relay" : buildEnvironment)
+    }
+}
+
+private extension SignerHomeView {
+    var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             CosignSectionTitle(title: CosignCopy.Signers.recentSectionTitle)
 
@@ -263,22 +290,6 @@ public struct SignerHomeView: View {
                 }
             }
         }
-    }
-
-    private var openProposalCount: Int {
-        squadRows.reduce(0) { $0 + $1.openProposalCount }
-    }
-
-    private var networkFooter: some View {
-        CosignNetworkFooter(text: networkFooterText)
-    }
-
-    private var networkFooterText: String {
-        if demoMode?.usesMarketingNetworkFooter == true {
-            return CosignCopy.Network.demoEnhancedFooter
-        }
-        let buildEnvironment = CosignBuildEnvironment.current().environmentName
-        return CosignCopy.Network.pinnedFooter(buildEnvironment.isEmpty ? "relay" : buildEnvironment)
     }
 }
 
