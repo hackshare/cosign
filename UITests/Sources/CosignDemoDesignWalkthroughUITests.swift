@@ -206,6 +206,21 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         tapButton("squad-manage-cta")
         waitForScreen("screen.manage-squad")
         capture("50-manage-squad")
+
+        // Stage an addition: diff summary + pending member row. The trailing
+        // newline submits the field, adding the member and dismissing the keyboard.
+        typeText("manage-squad-new-member", "So11111111111111111111111111111111111111112\n")
+        capture("51-manage-squad-staged-add")
+        tapButton("manage-squad-remove-added-0")
+
+        // Remove the current signer: threshold-aware self-removal warning.
+        tapButton("manage-squad-remove-you")
+        capture("52-manage-squad-self-removal")
+
+        // Removing the other initiator leaves no proposer/executor: validation banner.
+        tapButton("manage-squad-remove-1")
+        waitForElement("manage-squad-validation-banner")
+        capture("53-manage-squad-validation")
     }
 
     func testDemoConfidenceStates() {
