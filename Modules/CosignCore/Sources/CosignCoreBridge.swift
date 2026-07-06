@@ -83,6 +83,20 @@ public enum CosignCore {
         )
     }
 
+    public static func buildSquadsConfigChangeProposal(
+        _ request: ConfigChangeProposalRequest
+    ) throws -> PreparedProposalCreation {
+        try squadsBuildConfigChangeProposalTransaction(
+            rpcUrl: request.rpcURL,
+            multisigAddress: request.multisigAddress,
+            memberPubkey: request.memberPubkey,
+            addedMembers: request.addedMembers,
+            removedMembers: request.removedMembers,
+            newThreshold: request.newThreshold,
+            memo: request.memo
+        )
+    }
+
     public static func buildSquadsTokenTransferProposalTransaction(
         _ request: TokenTransferProposalTransactionRequest
     ) throws -> PreparedProposalCreation {
@@ -209,6 +223,18 @@ public struct SOLTransferProposalTransactionRequest: Sendable {
     public var memberPubkey = ""
     public var recipientPubkey = ""
     public var lamports: UInt64 = 0
+    public var memo: String?
+
+    public init() {}
+}
+
+public struct ConfigChangeProposalRequest: Sendable {
+    public var rpcURL = ""
+    public var multisigAddress = ""
+    public var memberPubkey = ""
+    public var addedMembers: [String] = []
+    public var removedMembers: [String] = []
+    public var newThreshold: UInt16 = 1
     public var memo: String?
 
     public init() {}

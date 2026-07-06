@@ -76,6 +76,17 @@ namespace cosign_core {
     );
 
     [Throws=SquadsFFIError]
+    PreparedProposalCreation squads_build_config_change_proposal_transaction(
+        string rpc_url,
+        string multisig_address,
+        string member_pubkey,
+        sequence<string> added_members,
+        sequence<string> removed_members,
+        u16 new_threshold,
+        string? memo
+    );
+
+    [Throws=SquadsFFIError]
     PreparedProposalCreation squads_build_token_transfer_proposal_transaction(
         TokenTransferProposalParams params
     );
@@ -179,6 +190,7 @@ dictionary MultisigDetail {
     u32 time_lock_seconds;
     u64 transaction_index;
     u64 stale_transaction_index;
+    boolean is_autonomous;
     sequence<MemberInfo> members;
     sequence<VaultRef> vaults;
 };

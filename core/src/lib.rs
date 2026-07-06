@@ -339,6 +339,37 @@ pub fn squads_build_sol_transfer_proposal_transaction(
     )?)
 }
 
+pub fn squads_build_config_change_proposal_transaction(
+    rpc_url: String,
+    multisig_address: String,
+    member_pubkey: String,
+    added_members: Vec<String>,
+    removed_members: Vec<String>,
+    new_threshold: u16,
+    memo: Option<String>,
+) -> Result<PreparedProposalCreation, SquadsFFIError> {
+    let multisig = parse_pubkey(&multisig_address)?;
+    let member = parse_pubkey(&member_pubkey)?;
+    let added = added_members
+        .iter()
+        .map(|m| parse_pubkey(m))
+        .collect::<Result<Vec<_>, _>>()?;
+    let removed = removed_members
+        .iter()
+        .map(|m| parse_pubkey(m))
+        .collect::<Result<Vec<_>, _>>()?;
+    let rpc = rpc::RpcClient::new(rpc_url);
+    Ok(transactions::build_config_change_proposal_transaction(
+        rpc,
+        multisig,
+        member,
+        added,
+        removed,
+        new_threshold,
+        memo,
+    )?)
+}
+
 pub fn squads_build_token_transfer_proposal_transaction(
     params: TokenTransferProposalParams,
 ) -> Result<PreparedProposalCreation, SquadsFFIError> {

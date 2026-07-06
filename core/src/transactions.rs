@@ -14,9 +14,10 @@ use spl_associated_token_account::{
 use squads_multisig::{
     anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas},
     client::{
+        ConfigTransactionCreateAccounts, ConfigTransactionCreateArgs,
         ConfigTransactionExecuteAccounts, MultisigCreateAccountsV2, MultisigCreateArgsV2,
         ProposalCreateAccounts, ProposalCreateArgs, ProposalVoteAccounts, ProposalVoteArgs,
-        VaultTransactionCreateAccounts, VaultTransactionExecuteAccounts,
+        VaultTransactionCreateAccounts, VaultTransactionExecuteAccounts, config_transaction_create,
         config_transaction_execute, multisig_create_v2, proposal_approve, proposal_cancel,
         proposal_create, vault_transaction_create, vault_transaction_execute,
     },
@@ -66,6 +67,92 @@ pub(crate) fn validate_threshold(
         )));
     }
     Ok(())
+}
+
+pub(crate) fn project_config_members(
+    current: &[Member],
+    added: &[Pubkey],
+    removed: &[Pubkey],
+) -> Result<Vec<Member>, TransactionBuildError> {
+    let invalid = |m: String| TransactionBuildError::InvalidTransaction(m);
+    for key in added {
+        if removed.contains(key) {
+            return Err(invalid(format!("{key} is both added and removed")));
+        }
+        if current.iter().any(|m| &m.key == key) {
+            return Err(invalid(format!("{key} is already a member")));
+        }
+    }
+    for key in removed {
+        if !current.iter().any(|m| &m.key == key) {
+            return Err(invalid(format!("{key} is not a member")));
+        }
+    }
+    let full = Permissions { mask: 7 };
+    let mut projected: Vec<Member> = current
+        .iter()
+        .filter(|m| !removed.contains(&m.key))
+        .cloned()
+        .collect();
+    for key in added {
+        projected.push(Member {
+            key: *key,
+            permissions: full,
+        });
+    }
+    Ok(projected)
+}
+
+pub(crate) fn validate_config_projection(
+    projected: &[Member],
+    new_threshold: u16,
+) -> Result<(), TransactionBuildError> {
+    let invalid = |m: &str| TransactionBuildError::InvalidTransaction(m.to_string());
+    if new_threshold == 0 {
+        return Err(invalid("threshold must be at least 1"));
+    }
+    let voters = Multisig::num_voters(projected);
+    if usize::from(new_threshold) > voters {
+        return Err(TransactionBuildError::InvalidTransaction(format!(
+            "threshold {new_threshold} cannot exceed the {voters} voting members"
+        )));
+    }
+    if Multisig::num_proposers(projected) == 0 {
+        return Err(invalid(
+            "the squad must keep at least one member who can propose",
+        ));
+    }
+    if Multisig::num_executors(projected) == 0 {
+        return Err(invalid(
+            "the squad must keep at least one member who can execute",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn build_config_actions(
+    current_threshold: u16,
+    new_threshold: u16,
+    added: &[Pubkey],
+    removed: &[Pubkey],
+) -> Vec<ConfigAction> {
+    let full = Permissions { mask: 7 };
+    let mut actions: Vec<ConfigAction> = Vec::new();
+    for key in removed {
+        actions.push(ConfigAction::RemoveMember { old_member: *key });
+    }
+    for key in added {
+        actions.push(ConfigAction::AddMember {
+            new_member: Member {
+                key: *key,
+                permissions: full,
+            },
+        });
+    }
+    if new_threshold != current_threshold {
+        actions.push(ConfigAction::ChangeThreshold { new_threshold });
+    }
+    actions
 }
 
 pub(crate) fn assemble_signatures(
@@ -252,6 +339,10 @@ pub fn build_create_multisig_instruction(
             system_program: system_program::id(),
         },
         MultisigCreateArgsV2 {
+            // Autonomous by design: the squad governs itself through member-initiated
+            // config proposals. A set config_authority would let an external key rewrite
+            // membership unilaterally and would make the chain reject the in-app manage
+            // flow (NotSupportedForControlled). Do not wire this to a picker.
             config_authority: None,
             threshold,
             members,
@@ -531,6 +622,95 @@ pub fn build_token_transfer_proposal_transaction(
         proposal_address: proposal.to_string(),
         transaction_address: transaction.to_string(),
         vault_address: vault.to_string(),
+    })
+}
+
+pub fn build_config_change_proposal_transaction(
+    rpc: RpcClient,
+    multisig: Pubkey,
+    member: Pubkey,
+    added_members: Vec<Pubkey>,
+    removed_members: Vec<Pubkey>,
+    new_threshold: u16,
+    memo: Option<String>,
+) -> Result<PreparedProposalCreation, TransactionBuildError> {
+    let client = SquadsClient::new(rpc);
+    let multisig_account = client.get_multisig(&multisig)?;
+
+    if multisig_account.config_authority != Pubkey::default() {
+        return Err(TransactionBuildError::InvalidTransaction(
+            "this squad's configuration is managed by an external authority".into(),
+        ));
+    }
+    if !member_has_permission(&multisig_account.members, &member, Permission::Initiate) {
+        return Err(TransactionBuildError::InvalidTransaction(
+            "member does not have initiate permission".into(),
+        ));
+    }
+
+    let projected =
+        project_config_members(&multisig_account.members, &added_members, &removed_members)?;
+    validate_config_projection(&projected, new_threshold)?;
+    let actions = build_config_actions(
+        multisig_account.threshold,
+        new_threshold,
+        &added_members,
+        &removed_members,
+    );
+    if actions.is_empty() {
+        return Err(TransactionBuildError::InvalidTransaction(
+            "no configuration changes".into(),
+        ));
+    }
+
+    let transaction_index = multisig_account
+        .transaction_index
+        .checked_add(1)
+        .ok_or_else(|| {
+            TransactionBuildError::InvalidTransaction("transaction index overflow".into())
+        })?;
+    let program_id = client.program_id();
+    let (transaction, _) = get_transaction_pda(&multisig, transaction_index, Some(&program_id));
+    let (proposal, _) = get_proposal_pda(&multisig, transaction_index, Some(&program_id));
+
+    let instructions = vec![
+        config_transaction_create(
+            ConfigTransactionCreateAccounts {
+                multisig,
+                transaction,
+                creator: member,
+                rent_payer: member,
+                system_program: system_program::id(),
+            },
+            ConfigTransactionCreateArgs { actions, memo },
+            Some(program_id),
+        ),
+        proposal_create(
+            ProposalCreateAccounts {
+                multisig,
+                creator: member,
+                proposal,
+                rent_payer: member,
+                system_program: system_program::id(),
+            },
+            ProposalCreateArgs {
+                transaction_index,
+                draft: false,
+            },
+            Some(program_id),
+        ),
+    ];
+    let prepared = prepare_message(client.rpc(), &member, instructions)?;
+
+    Ok(PreparedProposalCreation {
+        message_bytes: prepared.message_bytes,
+        fee_payer: prepared.fee_payer,
+        recent_blockhash: prepared.recent_blockhash,
+        action: "Create config change proposal".into(),
+        transaction_index,
+        proposal_address: proposal.to_string(),
+        transaction_address: transaction.to_string(),
+        vault_address: String::new(),
     })
 }
 
@@ -1095,6 +1275,109 @@ mod tests {
         assert_eq!(cost.rent, 2_000_000);
         assert_eq!(cost.creation_fee, 100_000);
         assert_eq!(cost.total, 2_105_000);
+    }
+
+    fn member(mask: u8) -> Member {
+        Member {
+            key: Pubkey::new_unique(),
+            permissions: Permissions { mask },
+        }
+    }
+
+    #[test]
+    fn project_config_members_adds_full_perm_and_drops_removed() {
+        let a = member(7);
+        let b = member(7);
+        let current = vec![a.clone(), b.clone()];
+        let newk = Pubkey::new_unique();
+        let projected = project_config_members(&current, &[newk], &[b.key]).unwrap();
+        assert_eq!(projected.len(), 2);
+        assert!(projected.iter().any(|m| m.key == a.key));
+        assert!(
+            projected
+                .iter()
+                .any(|m| m.key == newk && m.permissions.mask == 7)
+        );
+        assert!(!projected.iter().any(|m| m.key == b.key));
+    }
+
+    #[test]
+    fn project_config_members_rejects_contradictions() {
+        let a = member(7);
+        let current = vec![a.clone()];
+        // remove a key that is not a member
+        assert!(project_config_members(&current, &[], &[Pubkey::new_unique()]).is_err());
+        // add a key that is already a member
+        assert!(project_config_members(&current, &[a.key], &[]).is_err());
+        // add and remove the same key
+        let k = Pubkey::new_unique();
+        assert!(project_config_members(&current, &[k], &[k]).is_err());
+    }
+
+    #[test]
+    fn validate_config_projection_enforces_threshold_and_voters() {
+        let projected = vec![member(7)]; // 1 voter/proposer/executor
+        assert!(validate_config_projection(&projected, 1).is_ok());
+        assert!(validate_config_projection(&projected, 0).is_err()); // threshold >= 1
+        assert!(validate_config_projection(&projected, 2).is_err()); // threshold <= voters
+        // no voters at all (mask 1 = Initiate only)
+        let no_voters = vec![member(1)];
+        assert!(validate_config_projection(&no_voters, 1).is_err());
+    }
+
+    #[test]
+    fn build_config_actions_orders_removes_adds_threshold() {
+        let add = Pubkey::new_unique();
+        let rem = Pubkey::new_unique();
+        let actions = build_config_actions(1, 2, &[add], &[rem]);
+        assert!(
+            matches!(actions[0], ConfigAction::RemoveMember { old_member } if old_member == rem)
+        );
+        assert!(
+            matches!(&actions[1], ConfigAction::AddMember { new_member } if new_member.key == add)
+        );
+        assert!(matches!(
+            actions[2],
+            ConfigAction::ChangeThreshold { new_threshold: 2 }
+        ));
+        // threshold unchanged -> no ChangeThreshold action
+        let actions2 = build_config_actions(1, 1, &[add], &[]);
+        assert_eq!(actions2.len(), 1);
+        assert!(matches!(&actions2[0], ConfigAction::AddMember { .. }));
+    }
+
+    #[test]
+    fn config_change_builds_actions_and_validates() {
+        let a = member(7);
+        let b = member(7);
+        let current = vec![a.clone(), b.clone()];
+        let add = Pubkey::new_unique();
+        let projected = project_config_members(&current, &[add], &[b.key]).unwrap();
+        validate_config_projection(&projected, 2).unwrap();
+        let actions = build_config_actions(2, 2, &[add], &[b.key]);
+        assert_eq!(actions.len(), 2); // remove + add, threshold unchanged
+    }
+
+    #[test]
+    fn no_proposers_after_projection_is_rejected() {
+        // mask 6 = Vote | Execute (no Initiate), so num_proposers == 0 after projection
+        let projected = vec![member(6)];
+        let result = validate_config_projection(&projected, 1);
+        assert!(
+            matches!(&result, Err(TransactionBuildError::InvalidTransaction(m)) if m.contains("propose")),
+            "expected proposer error, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn no_executors_after_projection_is_rejected() {
+        // mask 3 = Initiate | Vote (no Execute), so num_executors == 0 after projection
+        let projected = vec![member(3)];
+        let result = validate_config_projection(&projected, 1);
+        assert!(
+            matches!(&result, Err(TransactionBuildError::InvalidTransaction(m)) if m.contains("execute")),
+            "expected executor error, got {result:?}"
+        );
     }
 
     // Local test helper: sign raw bytes with a solana Keypair.

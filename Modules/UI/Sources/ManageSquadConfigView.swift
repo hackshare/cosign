@@ -1,0 +1,255 @@
+import Core
+import CosignCore
+import Indexer
+import Persistence
+import Squads
+import SwiftData
+import SwiftUI
+
+public struct ManageSquadConfigView: View {
+    @Environment(Coordinator.self) var coordinator
+    @Environment(\.cosignDemoMode) var demoMode
+    @Environment(\.squadsService) var squadsService
+    @Query(sort: \RegisteredSigner.createdAt, order: .forward) var registeredSigners: [RegisteredSigner]
+
+    let squadAddress: String
+
+    @State var detail: SquadDetail?
+    @State var loadError: Bool = false
+    @State var stagedRemovals: Set<String> = []
+    @State var stagedAdditions: [String] = []
+    @State var newMember: String = ""
+    @State var memberError: String?
+    @State var threshold: Int = 1
+    @State var isCreating = false
+    @State var createError: String?
+    @State private var footerHeight = CosignLayout.estimatedStickyFooterHeight
+
+    public init(squadAddress: String) {
+        self.squadAddress = squadAddress
+    }
+
+    public var body: some View {
+        CosignScreen(bottomPadding: CosignLayout.screenBottomPadding(stickyFooterHeight: footerHeight)) {
+            editorBody
+        }
+        .navigationTitle(CosignCopy.ManageSquad.screenTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await load()
+        }
+        .onChange(of: stagedRemovals) { clampThreshold() }
+        .onChange(of: stagedAdditions) { clampThreshold() }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            editorFooter
+                .cosignMeasureHeight($footerHeight)
+        }
+        .accessibilityIdentifier("screen.manage-squad")
+    }
+
+    // MARK: - Body
+
+    @ViewBuilder
+    private var editorBody: some View {
+        if let detail {
+            if !detail.isAutonomous {
+                CosignInlineBanner(tone: .neutral) {
+                    Text(CosignCopy.ManageSquad.controlledNote)
+                }
+            } else {
+                membersSection(detail)
+                addMemberSection
+                thresholdSection(detail)
+                if let err = createError {
+                    CosignInlineBanner(tone: .red) {
+                        Text(err)
+                    }
+                }
+            }
+        } else if loadError {
+            CosignEmptyState(
+                title: CosignCopy.ManageSquad.loadErrorTitle,
+                systemImage: "exclamationmark.triangle",
+                message: CosignCopy.ManageSquad.loadErrorMessage,
+                primaryActionTitle: CosignCopy.ManageSquad.loadErrorRetry,
+                primaryAction: { Task { await load() } }
+            )
+        } else {
+            CosignLoadingCard()
+        }
+    }
+
+    // MARK: - Members section
+
+    private func membersSection(_ detail: SquadDetail) -> some View {
+        let diffText = stagedChangeDiff
+        return VStack(alignment: .leading, spacing: 10) {
+            CosignSectionTitle(
+                title: CosignCopy.ManageSquad.membersSection,
+                trailing: diffText.isEmpty ? nil : diffText
+            )
+            CosignCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(detail.members) { member in
+                        existingMemberRow(member)
+                    }
+                    ForEach(stagedAdditions, id: \.self) { address in
+                        addedMemberRow(address)
+                    }
+                }
+            }
+            selfRemovalWarning(for: detail)
+        }
+    }
+
+    private func existingMemberRow(_ member: SquadMember) -> some View {
+        let staged = stagedRemovals.contains(member.pubkey)
+        let isYou = currentSignerAddresses.contains(member.pubkey)
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(cosignShortAddress(member.pubkey))
+                        .font(CosignTheme.FontStyle.titleM)
+                        .foregroundStyle(staged ? CosignTheme.inkFaint : CosignTheme.ink)
+                        .strikethrough(staged, color: CosignTheme.inkFaint)
+                    if isYou {
+                        Text(CosignCopy.ManageSquad.youBadge)
+                            .font(CosignTheme.FontStyle.eyebrow)
+                            .foregroundStyle(CosignTheme.accentDeep)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(CosignTheme.accentWash, in: .capsule)
+                    }
+                }
+                Text(cosignShortAddress(member.pubkey, prefix: 6, suffix: 6))
+                    .font(CosignTheme.FontStyle.monoSmall)
+                    .foregroundStyle(CosignTheme.inkDim)
+            }
+            Spacer()
+            Button {
+                toggleRemoval(member.pubkey)
+            } label: {
+                CosignGlyphView(
+                    glyph: .xmark,
+                    size: 14,
+                    color: staged ? CosignTheme.accentDeep : CosignTheme.inkDim
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func addedMemberRow(_ address: String) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(cosignShortAddress(address))
+                    .font(CosignTheme.FontStyle.titleM)
+                    .foregroundStyle(CosignTheme.ink)
+                Text(cosignShortAddress(address, prefix: 6, suffix: 6))
+                    .font(CosignTheme.FontStyle.monoSmall)
+                    .foregroundStyle(CosignTheme.inkDim)
+            }
+            Spacer()
+            Button {
+                removeStagedAddition(address)
+            } label: {
+                CosignGlyphView(glyph: .xmark, size: 14, color: CosignTheme.inkDim)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private func selfRemovalWarning(for detail: SquadDetail) -> some View {
+        if hasSelfRemoval {
+            let message = detail.threshold == 1
+                ? CosignCopy.ManageSquad.selfRemovalSoloWarning
+                : CosignCopy.ManageSquad.selfRemovalQuorumWarning
+            CosignInlineBanner(tone: .amber) {
+                Text(message)
+            }
+        }
+    }
+
+    // MARK: - Add member section
+
+    private var addMemberSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            CosignSectionTitle(title: CosignCopy.ManageSquad.addMemberSection)
+            TextField(CosignCopy.ManageSquad.addMemberPlaceholder, text: $newMember)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .cosignField()
+            if let err = memberError {
+                CosignInlineBanner(tone: .red) {
+                    Text(err)
+                }
+            }
+            Button {
+                addMember()
+            } label: {
+                Text(CosignCopy.ManageSquad.addMember)
+            }
+            .buttonStyle(CosignButtonStyle(kind: .secondary))
+        }
+    }
+
+    // MARK: - Threshold section
+
+    private func thresholdSection(_: SquadDetail) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CosignSectionTitle(title: CosignCopy.ManageSquad.thresholdSection)
+            CosignCard {
+                Stepper(
+                    value: $threshold,
+                    in: 1 ... max(1, projectedVoterCount),
+                    label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(CosignCopy.ManageSquad.thresholdSummary(threshold, of: projectedVoterCount))
+                                .font(CosignTheme.FontStyle.titleM)
+                                .foregroundStyle(CosignTheme.ink)
+                            Text(CosignCopy.ManageSquad.voterCount(projectedVoterCount))
+                                .font(CosignTheme.FontStyle.caption)
+                                .foregroundStyle(CosignTheme.inkDim)
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Footer
+
+    private var editorFooter: some View {
+        CosignStickyFooter {
+            if demoMode?.disablesNetworkWrites == true {
+                Button {} label: {
+                    HStack(spacing: 8) {
+                        CosignGlyphView(glyph: .lock, size: 14, color: CosignTheme.inkFaint)
+                        Text(CosignCopy.ManageSquad.createButton)
+                    }
+                }
+                .disabled(true)
+                .buttonStyle(CosignButtonStyle(kind: .secondary))
+                .accessibilityIdentifier("manage-squad-create")
+            } else if detail?.isAutonomous == true {
+                Button {
+                    Task { await create() }
+                } label: {
+                    if isCreating {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .tint(CosignTheme.accentInk)
+                            Text(CosignCopy.ManageSquad.creating)
+                        }
+                    } else {
+                        Text(CosignCopy.ManageSquad.createButton)
+                    }
+                }
+                .disabled(!canCreate || isCreating)
+                .buttonStyle(CosignButtonStyle(kind: canCreate ? .accent : .secondary))
+                .accessibilityIdentifier("manage-squad-create")
+            }
+        }
+    }
+}

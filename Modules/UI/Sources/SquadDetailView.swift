@@ -3,7 +3,7 @@ import Squads
 import SwiftUI
 
 public struct SquadDetailView: View {
-    @Environment(Coordinator.self) private var coordinator
+    @Environment(Coordinator.self) var coordinator
     @Environment(\.cosignDemoMode) var demoMode
     @Environment(\.indexerEnvironment) var indexerEnvironment
     @Environment(\.squadsService) private var squadsService
@@ -105,7 +105,7 @@ public struct SquadDetailView: View {
             case .activity:
                 activitySection(detail)
             case .members:
-                membersSection(detail.members)
+                membersSection(detail)
             }
         }
     }
