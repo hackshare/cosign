@@ -18,14 +18,15 @@ if [[ "$PROFILE" == "release" ]]; then
 fi
 
 # Release archives only use the device slice. DEVICE_ONLY=1 (set by CI) skips the
-# two simulator targets, cutting the Rust build to roughly a third.
+# simulator slice, roughly halving the Rust build. The simulator slice is arm64
+# only: all build/test hosts (CI runners and dev Macs) are Apple Silicon, so the
+# x86_64 simulator slice would never run.
 if [[ "${DEVICE_ONLY:-0}" == "1" ]]; then
     TARGETS=( "aarch64-apple-ios" )
 else
     TARGETS=(
         "aarch64-apple-ios"
         "aarch64-apple-ios-sim"
-        "x86_64-apple-ios"
     )
 fi
 
