@@ -55,7 +55,7 @@ spl-token-2022 = "1.0"
 # which uses the same curve25519-dalek 3 internally.
 bip39 = { version = "2", default-features = false, features = ["rand"] }
 hmac = "0.12"
-sha2 = "0.10"
+sha2 = "0.11"
 zeroize = "1"
 rand = "0.8"
 bs58 = "0.5"
