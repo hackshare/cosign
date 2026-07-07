@@ -55,32 +55,46 @@ jobs:
       - name: Pick an available iPhone simulator
         id: sim
         run: |
-          DEVICE=$(xcrun simctl list devices available | grep -E "    iPhone [0-9]+" | head -1 | sed 's/^[ \t]*//' | sed 's/ (.*//')
-          echo "Selected simulator: $DEVICE"
+          LINE=$(xcrun simctl list devices available | grep -E "    iPhone [0-9]+" | head -1)
+          DEVICE=$(echo "$LINE" | sed 's/^[ \t]*//' | sed 's/ (.*//')
+          UDID=$(echo "$LINE" | grep -oiE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
+          echo "Selected simulator: $DEVICE ($UDID)"
           echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      # Boot the target simulator explicitly and wait until it is fully booted
+      # before testing, so the test runner never races a cold launch. A stalled
+      # cold launch is what produces the intermittent "Failed to send signal 19
+      # to process" hangs on the hosted runners.
+      - name: Boot simulator
+        run: xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b
 
       - name: Build for testing
         env:
-          SIMULATOR_NAME: ${{ steps.sim.outputs.device }}
+          SIMULATOR_ID: ${{ steps.sim.outputs.udid }}
         run: |
           xcodebuild build-for-testing \
             -workspace Cosign.xcworkspace \
             -scheme Cosign-Workspace \
-            -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest" \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -configuration Debug
 
       # The walkthroughs are split into several test classes; parallel testing
-      # runs them concurrently on cloned simulators.
+      # runs them concurrently on clones of the booted simulator. Cap the worker
+      # count so we don't spawn more concurrent cold clone-launches than the
+      # runner can start reliably (excess simultaneous launches are the usual
+      # trigger for the launch stall).
       - name: Run UI walkthroughs
         env:
-          SIMULATOR_NAME: ${{ steps.sim.outputs.device }}
+          SIMULATOR_ID: ${{ steps.sim.outputs.udid }}
         run: |
           xcodebuild test-without-building \
             -workspace Cosign.xcworkspace \
             -scheme Cosign-Workspace \
-            -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest" \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -only-testing:CosignDemoUITests \
             -parallel-testing-enabled YES \
+            -parallel-testing-worker-count 2 \
             -retry-tests-on-failure \
             -test-iterations 2 \
             -test-timeouts-enabled YES \
