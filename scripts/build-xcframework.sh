@@ -25,16 +25,9 @@ PROFILE_DIR="debug"
 # 1. Build Rust for all Apple targets.
 ./scripts/build-rust.sh
 
-# 2. Combine the two simulator slices into one fat library.
-#    Skipped in device-only builds (release archives use only the device slice).
-SIM_FAT_DIR="$CRATE_DIR/target/sim-fat/$PROFILE_DIR"
-if [[ "${DEVICE_ONLY:-0}" != "1" ]]; then
-    mkdir -p "$SIM_FAT_DIR"
-    lipo -create \
-        "$CRATE_DIR/target/aarch64-apple-ios-sim/$PROFILE_DIR/$LIB_NAME" \
-        "$CRATE_DIR/target/x86_64-apple-ios/$PROFILE_DIR/$LIB_NAME" \
-        -output "$SIM_FAT_DIR/$LIB_NAME"
-fi
+# 2. The simulator slice is arm64 only (all hosts are Apple Silicon), so it is
+#    used directly with no lipo step.
+SIM_LIB="$CRATE_DIR/target/aarch64-apple-ios-sim/$PROFILE_DIR/$LIB_NAME"
 
 # 3. Generate Swift bindings via UniFFI.
 GEN_DIR="Modules/CosignCore/Sources/Generated"
@@ -111,7 +104,7 @@ if [[ "${DEVICE_ONLY:-0}" == "1" ]]; then
         -framework "$DEVICE_FW" \
         -output "$XCF_OUT"
 else
-    SIM_FW=$(build_framework "ios-arm64_x86_64-simulator" "$SIM_FAT_DIR/$LIB_NAME")
+    SIM_FW=$(build_framework "ios-arm64-simulator" "$SIM_LIB")
     xcodebuild -create-xcframework \
         -framework "$DEVICE_FW" \
         -framework "$SIM_FW" \
