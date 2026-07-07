@@ -79,11 +79,11 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -configuration Debug
 
-      # The walkthroughs are split into several test classes; parallel testing
-      # runs them concurrently on clones of the booted simulator. Cap the worker
-      # count so we don't spawn more concurrent cold clone-launches than the
-      # runner can start reliably (excess simultaneous launches are the usual
-      # trigger for the launch stall).
+      # Run the walkthroughs serially on the single booted simulator. These
+      # capture-heavy tests each run ~2-3 min; running clones concurrently made
+      # them contend for the runner's CPU and tip over the per-test timeout, so
+      # serial (full CPU per test, no clones) is both faster per test and more
+      # stable. The 50-minute job cap still bounds total runtime.
       - name: Run UI walkthroughs
         env:
           SIMULATOR_ID: ${{ steps.sim.outputs.udid }}
@@ -93,10 +93,9 @@ jobs:
             -scheme Cosign-Workspace \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -only-testing:CosignDemoUITests \
-            -parallel-testing-enabled YES \
-            -parallel-testing-worker-count 2 \
+            -parallel-testing-enabled NO \
             -retry-tests-on-failure \
             -test-iterations 2 \
             -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 180 \
-            -maximum-test-execution-time-allowance 300
+            -default-test-execution-time-allowance 300 \
+            -maximum-test-execution-time-allowance 600
