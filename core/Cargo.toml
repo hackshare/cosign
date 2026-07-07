@@ -41,7 +41,7 @@ tungstenite = { version = "0.24", features = ["native-tls"] }
 # iOS targets.
 solana-sdk = "1.18"
 solana-client = "1.18"
-solana-rpc-client = "1.18"
+solana-rpc-client = "2.2"
 solana-account-decoder = "1.18"
 squads-multisig = "2.1"
 spl-associated-token-account = "2.3"
