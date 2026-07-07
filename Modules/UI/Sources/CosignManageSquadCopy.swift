@@ -49,6 +49,26 @@ public extension CosignCopy {
             count == 1 ? "1 approval required" : "\(count) approvals required"
         }
 
+        // Time lock
+        public static let timeLockSection = "Time lock"
+        public static let timeLockSubtitle = "Delay between approval and execution."
+        public static let timeLockCustom = "Custom"
+        public static let timeLockOff = "Off"
+        public static let timeLockOutOfRange = "Time lock must be 90 days or less."
+        public static let timeLockUnitMinutes = "Minutes"
+        public static let timeLockUnitHours = "Hours"
+        public static let timeLockUnitDays = "Days"
+        public static let timeLockCustomPlaceholder = "0"
+        public static let timeLockCustomHint = "0 = off \u{00B7} max 90 days (Squads program limit)"
+
+        public static func timeLockCurrent(_ display: String) -> String {
+            "Currently: \(display)"
+        }
+
+        public static func timeLockDiff(old: String, new: String) -> String {
+            "Time lock: \(old) \u{2192} \(new)"
+        }
+
         // Proposal creation
         public static let createButton = "Create proposal"
         public static let creating = "Creating proposal"

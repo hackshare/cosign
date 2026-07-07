@@ -14,6 +14,25 @@ use squads_multisig::{
     },
 };
 
+pub(crate) fn format_time_lock(seconds: u32) -> String {
+    if seconds == 0 {
+        return "None".to_string();
+    }
+    let days = seconds / 86_400;
+    if days >= 2 && seconds.is_multiple_of(86_400) {
+        return format!("{days} days");
+    }
+    if seconds.is_multiple_of(3_600) {
+        let hours = seconds / 3_600;
+        return format!("{hours} hour{}", if hours == 1 { "" } else { "s" });
+    }
+    if seconds.is_multiple_of(60) {
+        let minutes = seconds / 60;
+        return format!("{minutes} minute{}", if minutes == 1 { "" } else { "s" });
+    }
+    format!("{seconds} second{}", if seconds == 1 { "" } else { "s" })
+}
+
 #[derive(Debug, Clone)]
 pub struct MultisigSummary {
     pub address: String,
@@ -317,7 +336,7 @@ fn config_action_instruction(
         ConfigAction::SetTimeLock { new_time_lock } => DecodedInstruction {
             program: "Squads".into(),
             kind: "set_time_lock".into(),
-            summary: format!("Set time lock to {new_time_lock} seconds"),
+            summary: format!("Set time lock to {}", format_time_lock(*new_time_lock)),
             accounts: Vec::new(),
             raw_data_hex: String::new(),
         },
@@ -512,6 +531,19 @@ mod tests {
 
         assert_eq!(instruction.kind, "set_rent_collector");
         assert_eq!(instruction.summary, "Clear rent collector");
+    }
+
+    #[test]
+    fn format_time_lock_matches_rule() {
+        assert_eq!(format_time_lock(0), "None");
+        assert_eq!(format_time_lock(30), "30 seconds");
+        assert_eq!(format_time_lock(60), "1 minute");
+        assert_eq!(format_time_lock(3600), "1 hour");
+        assert_eq!(format_time_lock(21600), "6 hours");
+        assert_eq!(format_time_lock(86400), "24 hours");
+        assert_eq!(format_time_lock(129600), "36 hours");
+        assert_eq!(format_time_lock(259200), "3 days");
+        assert_eq!(format_time_lock(7_776_000), "90 days");
     }
 
     fn activity_status(memo: Option<&str>) -> RpcConfirmedTransactionStatusWithSignature {

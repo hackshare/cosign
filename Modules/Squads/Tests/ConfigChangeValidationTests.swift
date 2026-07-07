@@ -29,7 +29,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [],
             removedMembers: [otherKey],
-            newThreshold: 1
+            newThreshold: 1,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.notAutonomous = error else {
                 return XCTFail("expected notAutonomous, got \(error)")
@@ -56,7 +57,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [],
             removedMembers: [],
-            newThreshold: 1
+            newThreshold: 1,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.signerNotMember = error else {
                 return XCTFail("expected signerNotMember, got \(error)")
@@ -83,7 +85,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [],
             removedMembers: [otherKey],
-            newThreshold: 1
+            newThreshold: 1,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.missingInitiatePermission = error else {
                 return XCTFail("expected missingInitiatePermission, got \(error)")
@@ -99,7 +102,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [],
             removedMembers: [otherKey],
-            newThreshold: 2
+            newThreshold: 2,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.thresholdOutOfRange = error else {
                 return XCTFail("expected thresholdOutOfRange, got \(error)")
@@ -114,7 +118,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [],
             removedMembers: [otherKey],
-            newThreshold: 1
+            newThreshold: 1,
+            newTimeLockSeconds: 0
         )
     }
 
@@ -125,7 +130,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [otherKey],
             removedMembers: [],
-            newThreshold: 2
+            newThreshold: 2,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.contradictoryEdit = error else {
                 return XCTFail("expected contradictoryEdit, got \(error)")
@@ -152,7 +158,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [],
             removedMembers: [otherKey],
-            newThreshold: 1
+            newThreshold: 1,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.contradictoryEdit = error else {
                 return XCTFail("expected contradictoryEdit, got \(error)")
@@ -180,7 +187,8 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [otherKey],
             removedMembers: [otherKey],
-            newThreshold: 1
+            newThreshold: 1,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.contradictoryEdit = error else {
                 return XCTFail("expected contradictoryEdit, got \(error)")
@@ -195,11 +203,38 @@ final class ConfigChangeValidationTests: XCTestCase {
             memberPubkey: signerKey,
             addedMembers: [],
             removedMembers: [],
-            newThreshold: 2
+            newThreshold: 2,
+            newTimeLockSeconds: 0
         )) { error in
             guard case ConfigChangeError.noChanges = error else {
                 return XCTFail("expected noChanges, got \(error)")
             }
         }
+    }
+
+    func testTimeLockOverMaxThrows() {
+        XCTAssertThrowsError(try SquadsService.validateConfigChange(
+            detail: makeTwoOfTwo(),
+            memberPubkey: signerKey,
+            addedMembers: [],
+            removedMembers: [],
+            newThreshold: 2,
+            newTimeLockSeconds: 7_776_001
+        )) { error in
+            guard case ConfigChangeError.timeLockOutOfRange = error else {
+                return XCTFail("expected timeLockOutOfRange, got \(error)")
+            }
+        }
+    }
+
+    func testTimeLockChangeAloneIsValid() {
+        XCTAssertNoThrow(try SquadsService.validateConfigChange(
+            detail: makeTwoOfTwo(),
+            memberPubkey: signerKey,
+            addedMembers: [],
+            removedMembers: [],
+            newThreshold: 2,
+            newTimeLockSeconds: 86400
+        ))
     }
 }

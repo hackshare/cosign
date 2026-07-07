@@ -86,6 +86,7 @@ fn config_change_proposal_round_trip() -> Result<(), Box<dyn Error>> {
         vec![new_member],
         vec![],
         2,
+        0,
         Some("add member and raise threshold".into()),
     )?;
     let proposal_sig: Vec<u8> = creator
