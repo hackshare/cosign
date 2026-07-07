@@ -339,6 +339,7 @@ pub fn squads_build_sol_transfer_proposal_transaction(
     )?)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn squads_build_config_change_proposal_transaction(
     rpc_url: String,
     multisig_address: String,
@@ -346,6 +347,7 @@ pub fn squads_build_config_change_proposal_transaction(
     added_members: Vec<String>,
     removed_members: Vec<String>,
     new_threshold: u16,
+    new_time_lock: u32,
     memo: Option<String>,
 ) -> Result<PreparedProposalCreation, SquadsFFIError> {
     let multisig = parse_pubkey(&multisig_address)?;
@@ -366,6 +368,7 @@ pub fn squads_build_config_change_proposal_transaction(
         added,
         removed,
         new_threshold,
+        new_time_lock,
         memo,
     )?)
 }

@@ -236,6 +236,16 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         waitForScreen("screen.manage-squad")
         capture("50-manage-squad")
 
+        // Time lock: default (Currently: None), then a staged 24h change with
+        // the mint chip and the "Time lock: None -> 24 hours" diff line.
+        app.swipeUp()
+        capture("70-timelock-default")
+        tapButton("manage-squad-timelock-preset-24h")
+        capture("71-timelock-staged")
+        tapButton("manage-squad-timelock-preset-off")
+        app.swipeDown()
+        app.swipeDown()
+
         // Stage an addition: diff summary + pending member row. The trailing
         // newline submits the field, adding the member and dismissing the keyboard.
         typeText("manage-squad-new-member", "So11111111111111111111111111111111111111112\n")

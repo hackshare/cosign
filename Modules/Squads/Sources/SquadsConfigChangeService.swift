@@ -10,6 +10,7 @@ public enum ConfigChangeError: Error, Sendable {
     case contradictoryEdit(String)
     case noChanges
     case thresholdOutOfRange(String)
+    case timeLockOutOfRange
 }
 
 extension ConfigChangeError: LocalizedError {
@@ -29,6 +30,8 @@ extension ConfigChangeError: LocalizedError {
             "No changes were specified."
         case let .thresholdOutOfRange(reason):
             "Invalid threshold: \(reason)."
+        case .timeLockOutOfRange:
+            "Time lock must be 90 days or less."
         }
     }
 }
@@ -38,15 +41,22 @@ public extension SquadsService {
     /// Mirrors the Rust projected-invariant logic: checks autonomous flag,
     /// signer membership + initiate permission, address validity, no
     /// contradictions, and threshold bounds against the projected member set.
+    static let maxTimeLockSeconds: UInt32 = 7_776_000
+
+    // swiftlint:disable:next function_parameter_count
     static func validateConfigChange(
         detail: SquadDetail,
         memberPubkey: String,
         addedMembers: [String],
         removedMembers: [String],
-        newThreshold: UInt16
+        newThreshold: UInt16,
+        newTimeLockSeconds: UInt32
     ) throws {
         guard detail.isAutonomous else {
             throw ConfigChangeError.notAutonomous
+        }
+        guard newTimeLockSeconds <= maxTimeLockSeconds else {
+            throw ConfigChangeError.timeLockOutOfRange
         }
         guard let signer = detail.members.first(where: { $0.pubkey == memberPubkey }) else {
             throw ConfigChangeError.signerNotMember(memberPubkey)
@@ -60,7 +70,9 @@ public extension SquadsService {
             removedMembers: removedMembers,
             currentPubkeys: currentPubkeys,
             newThreshold: newThreshold,
-            currentThreshold: detail.threshold
+            currentThreshold: detail.threshold,
+            newTimeLockSeconds: newTimeLockSeconds,
+            currentTimeLockSeconds: detail.timeLockSeconds
         )
         // Projected member set: (existing − removed) + added.
         // Added members are treated as full-permission (canVote, canInitiate, canExecute).
@@ -75,12 +87,15 @@ public extension SquadsService {
         )
     }
 
+    // swiftlint:disable:next function_parameter_count
     private static func validateConfigEdits(
         addedMembers: [String],
         removedMembers: [String],
         currentPubkeys: Set<String>,
         newThreshold: UInt16,
-        currentThreshold: UInt16
+        currentThreshold: UInt16,
+        newTimeLockSeconds: UInt32,
+        currentTimeLockSeconds: UInt32
     ) throws {
         for address in addedMembers where !CosignCore.isValidSolanaPubkey(address) {
             throw ConfigChangeError.invalidMemberAddress(address)
@@ -102,7 +117,10 @@ public extension SquadsService {
         for address in removedMembers where !currentPubkeys.contains(address) {
             throw ConfigChangeError.contradictoryEdit("\(address) is not a member")
         }
-        guard !(addedMembers.isEmpty && removedMembers.isEmpty && newThreshold == currentThreshold) else {
+        let isNoOp = addedMembers.isEmpty && removedMembers.isEmpty
+            && newThreshold == currentThreshold
+            && newTimeLockSeconds == currentTimeLockSeconds
+        guard !isNoOp else {
             throw ConfigChangeError.noChanges
         }
     }
@@ -129,10 +147,12 @@ public extension SquadsService {
         }
     }
 
+    // swiftlint:disable:next function_parameter_count
     func submitConfigChangeProposal(
         addedMembers: [String],
         removedMembers: [String],
         newThreshold: UInt16,
+        newTimeLockSeconds: UInt32,
         in squadAddress: String,
         signer: any Signer
     ) async throws -> ProposalCreationSubmission {
@@ -143,7 +163,8 @@ public extension SquadsService {
             memberPubkey: memberPubkey,
             addedMembers: addedMembers,
             removedMembers: removedMembers,
-            newThreshold: newThreshold
+            newThreshold: newThreshold,
+            newTimeLockSeconds: newTimeLockSeconds
         )
 
         var request = ConfigChangeProposalRequest()
@@ -153,6 +174,7 @@ public extension SquadsService {
         request.addedMembers = addedMembers
         request.removedMembers = removedMembers
         request.newThreshold = newThreshold
+        request.newTimeLockSeconds = newTimeLockSeconds
         let prepared = try CosignCore.buildSquadsConfigChangeProposal(request)
 
         let signatureBytes = try await signer.sign(message: prepared.messageBytes)

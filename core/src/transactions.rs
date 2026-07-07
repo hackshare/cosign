@@ -29,7 +29,7 @@ use squads_multisig::{
     squads_multisig_program::{
         CompiledInstruction, MessageAddressTableLookup, TransactionMessage,
         instruction::ProposalReject as ProposalRejectData,
-        state::{ConfigAction, ProposalStatus},
+        state::{ConfigAction, MAX_TIME_LOCK, ProposalStatus},
     },
     state::{Member, Permission, Permissions},
     vault_transaction::VaultTransactionMessageExt,
@@ -135,6 +135,8 @@ pub(crate) fn build_config_actions(
     new_threshold: u16,
     added: &[Pubkey],
     removed: &[Pubkey],
+    current_time_lock: u32,
+    new_time_lock: u32,
 ) -> Vec<ConfigAction> {
     let full = Permissions { mask: 7 };
     let mut actions: Vec<ConfigAction> = Vec::new();
@@ -152,7 +154,19 @@ pub(crate) fn build_config_actions(
     if new_threshold != current_threshold {
         actions.push(ConfigAction::ChangeThreshold { new_threshold });
     }
+    if new_time_lock != current_time_lock {
+        actions.push(ConfigAction::SetTimeLock { new_time_lock });
+    }
     actions
+}
+
+pub(crate) fn validate_time_lock(new_time_lock: u32) -> Result<(), TransactionBuildError> {
+    if new_time_lock > MAX_TIME_LOCK {
+        return Err(TransactionBuildError::InvalidTransaction(
+            "time lock exceeds the maximum of 90 days".into(),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn assemble_signatures(
@@ -625,6 +639,7 @@ pub fn build_token_transfer_proposal_transaction(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_config_change_proposal_transaction(
     rpc: RpcClient,
     multisig: Pubkey,
@@ -632,6 +647,7 @@ pub fn build_config_change_proposal_transaction(
     added_members: Vec<Pubkey>,
     removed_members: Vec<Pubkey>,
     new_threshold: u16,
+    new_time_lock: u32,
     memo: Option<String>,
 ) -> Result<PreparedProposalCreation, TransactionBuildError> {
     let client = SquadsClient::new(rpc);
@@ -647,6 +663,7 @@ pub fn build_config_change_proposal_transaction(
             "member does not have initiate permission".into(),
         ));
     }
+    validate_time_lock(new_time_lock)?;
 
     let projected =
         project_config_members(&multisig_account.members, &added_members, &removed_members)?;
@@ -656,6 +673,8 @@ pub fn build_config_change_proposal_transaction(
         new_threshold,
         &added_members,
         &removed_members,
+        multisig_account.time_lock,
+        new_time_lock,
     );
     if actions.is_empty() {
         return Err(TransactionBuildError::InvalidTransaction(
@@ -1329,7 +1348,7 @@ mod tests {
     fn build_config_actions_orders_removes_adds_threshold() {
         let add = Pubkey::new_unique();
         let rem = Pubkey::new_unique();
-        let actions = build_config_actions(1, 2, &[add], &[rem]);
+        let actions = build_config_actions(1, 2, &[add], &[rem], 0, 0);
         assert!(
             matches!(actions[0], ConfigAction::RemoveMember { old_member } if old_member == rem)
         );
@@ -1341,7 +1360,7 @@ mod tests {
             ConfigAction::ChangeThreshold { new_threshold: 2 }
         ));
         // threshold unchanged -> no ChangeThreshold action
-        let actions2 = build_config_actions(1, 1, &[add], &[]);
+        let actions2 = build_config_actions(1, 1, &[add], &[], 0, 0);
         assert_eq!(actions2.len(), 1);
         assert!(matches!(&actions2[0], ConfigAction::AddMember { .. }));
     }
@@ -1354,7 +1373,7 @@ mod tests {
         let add = Pubkey::new_unique();
         let projected = project_config_members(&current, &[add], &[b.key]).unwrap();
         validate_config_projection(&projected, 2).unwrap();
-        let actions = build_config_actions(2, 2, &[add], &[b.key]);
+        let actions = build_config_actions(2, 2, &[add], &[b.key], 0, 0);
         assert_eq!(actions.len(), 2); // remove + add, threshold unchanged
     }
 
@@ -1378,6 +1397,51 @@ mod tests {
             matches!(&result, Err(TransactionBuildError::InvalidTransaction(m)) if m.contains("execute")),
             "expected executor error, got {result:?}"
         );
+    }
+
+    #[test]
+    fn build_config_actions_appends_set_time_lock_when_changed() {
+        // time lock changed 0 -> 86400, no other changes
+        let actions = build_config_actions(2, 2, &[], &[], 0, 86_400);
+        assert_eq!(actions.len(), 1);
+        assert!(matches!(
+            actions[0],
+            ConfigAction::SetTimeLock {
+                new_time_lock: 86_400
+            }
+        ));
+        // time lock unchanged -> no SetTimeLock action
+        let unchanged = build_config_actions(2, 2, &[], &[], 86_400, 86_400);
+        assert!(unchanged.is_empty());
+        // ordering: members/threshold first, then time lock
+        let add = Pubkey::new_unique();
+        let mixed = build_config_actions(1, 2, &[add], &[], 0, 3_600);
+        assert!(matches!(&mixed[0], ConfigAction::AddMember { .. }));
+        assert!(matches!(
+            mixed[1],
+            ConfigAction::ChangeThreshold { new_threshold: 2 }
+        ));
+        assert!(matches!(
+            mixed[2],
+            ConfigAction::SetTimeLock {
+                new_time_lock: 3_600
+            }
+        ));
+    }
+
+    #[test]
+    fn max_time_lock_constant_is_stable() {
+        const { assert!(MAX_TIME_LOCK == 7_776_000, "squads program limit changed") };
+    }
+
+    #[test]
+    fn validate_time_lock_enforces_max() {
+        assert!(validate_time_lock(0).is_ok());
+        assert!(validate_time_lock(MAX_TIME_LOCK).is_ok());
+        assert!(matches!(
+            validate_time_lock(MAX_TIME_LOCK + 1),
+            Err(TransactionBuildError::InvalidTransaction(_))
+        ));
     }
 
     // Local test helper: sign raw bytes with a solana Keypair.

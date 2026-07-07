@@ -15,6 +15,7 @@ extension ManageSquadConfigView {
             let loaded = try await squadsService.detail(of: squadAddress)
             detail = loaded
             threshold = Int(loaded.threshold)
+            timeLockSeconds = loaded.timeLockSeconds
         } catch {
             loadError = true
         }
@@ -61,6 +62,23 @@ extension ManageSquadConfigView {
         if threshold > max { threshold = max }
     }
 
+    // MARK: - Time lock
+
+    @MainActor
+    func applyCustomTimeLock() {
+        // numberPad prevents typing "." but a paste can include non-digit characters
+        // (e.g. "1.5" parses as 15). That is a minor inaccuracy rather than data loss;
+        // the out-of-range validation banner catches any result over the 90-day limit.
+        let digits = timeLockCustomValue.filter(\.isNumber)
+        // Clamp to a UInt32-overflow-safe bound rather than the 90-day limit, so an
+        // over-limit entry still reaches `timeLockSeconds` and surfaces the range
+        // banner. A paste too large to parse falls back to that bound instead of
+        // silently resetting to Off.
+        let maxForUnit = UInt64(UInt32.max) / UInt64(timeLockCustomUnit.seconds)
+        let value = min(UInt64(digits) ?? maxForUnit, maxForUnit)
+        timeLockSeconds = UInt32(value * UInt64(timeLockCustomUnit.seconds))
+    }
+
     // MARK: - Create proposal
 
     @MainActor
@@ -91,6 +109,7 @@ extension ManageSquadConfigView {
                         addedMembers: stagedAdditions,
                         removedMembers: Array(stagedRemovals),
                         newThreshold: UInt16(threshold),
+                        newTimeLockSeconds: timeLockSeconds,
                         in: squadAddress,
                         signer: signer
                     )
@@ -122,6 +141,8 @@ extension ManageSquadConfigView {
             CosignCopy.ManageSquad.noChangesError
         case .thresholdOutOfRange:
             CosignCopy.ManageSquad.thresholdTooHigh
+        case .timeLockOutOfRange:
+            CosignCopy.ManageSquad.timeLockOutOfRange
         }
     }
 
@@ -140,6 +161,7 @@ extension ManageSquadConfigView {
         return !stagedAdditions.isEmpty
             || !stagedRemovals.isEmpty
             || threshold != Int(detail.threshold)
+            || timeLockSeconds != detail.timeLockSeconds
     }
 
     var validationError: String? {
@@ -163,6 +185,9 @@ extension ManageSquadConfigView {
             guard projectedExecutorCount >= 1 else {
                 return CosignCopy.ManageSquad.noExecutorsRemain
             }
+        }
+        guard timeLockSeconds <= SquadsService.maxTimeLockSeconds else {
+            return CosignCopy.ManageSquad.timeLockOutOfRange
         }
         return nil
     }

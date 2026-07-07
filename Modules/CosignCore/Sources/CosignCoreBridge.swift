@@ -93,6 +93,7 @@ public enum CosignCore {
             addedMembers: request.addedMembers,
             removedMembers: request.removedMembers,
             newThreshold: request.newThreshold,
+            newTimeLock: request.newTimeLockSeconds,
             memo: request.memo
         )
     }
@@ -235,6 +236,7 @@ public struct ConfigChangeProposalRequest: Sendable {
     public var addedMembers: [String] = []
     public var removedMembers: [String] = []
     public var newThreshold: UInt16 = 1
+    public var newTimeLockSeconds: UInt32 = 0
     public var memo: String?
 
     public init() {}

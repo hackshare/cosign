@@ -83,6 +83,7 @@ namespace cosign_core {
         sequence<string> added_members,
         sequence<string> removed_members,
         u16 new_threshold,
+        u32 new_time_lock,
         string? memo
     );
 

@@ -21,6 +21,10 @@ public struct ManageSquadConfigView: View {
     @State var newMember: String = ""
     @State var memberError: String?
     @State var threshold: Int = 1
+    @State var timeLockSeconds: UInt32 = 0
+    @State var timeLockCustomExpanded = false
+    @State var timeLockCustomValue: String = ""
+    @State var timeLockCustomUnit: TimeLockUnit = .hours
     @State var isCreating = false
     @State var createError: String?
     @State private var footerHeight = CosignLayout.estimatedStickyFooterHeight
@@ -46,7 +50,29 @@ public struct ManageSquadConfigView: View {
         }
         .accessibilityIdentifier("screen.manage-squad")
     }
+}
 
+enum TimeLockUnit: CaseIterable {
+    case minutes, hours, days
+
+    var seconds: UInt32 {
+        switch self {
+        case .minutes: 60
+        case .hours: 3600
+        case .days: 86400
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .minutes: CosignCopy.ManageSquad.timeLockUnitMinutes
+        case .hours: CosignCopy.ManageSquad.timeLockUnitHours
+        case .days: CosignCopy.ManageSquad.timeLockUnitDays
+        }
+    }
+}
+
+extension ManageSquadConfigView {
     // MARK: - Body
 
     @ViewBuilder
@@ -61,6 +87,7 @@ public struct ManageSquadConfigView: View {
                 editConsequenceBanner(for: detail)
                 addMemberSection
                 thresholdSection(detail)
+                timeLockSection(detail)
                 if let err = createError {
                     CosignInlineBanner(tone: .red) {
                         Text(err)
