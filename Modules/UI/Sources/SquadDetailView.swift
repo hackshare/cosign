@@ -129,7 +129,7 @@ public struct SquadDetailView: View {
                 threshold: detail.threshold,
                 memberCount: detail.members.count
             ))
-            Text(detail.displayName ?? cosignShortAddress(detail.address, prefix: 6, suffix: 6))
+            Text(detail.displayName ?? cosignMediumAddress(detail.address))
                 .font(CosignTheme.FontStyle.display)
                 .foregroundStyle(CosignTheme.ink)
 

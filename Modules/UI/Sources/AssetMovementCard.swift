@@ -57,8 +57,8 @@ struct AssetMovementCard: View {
             }
             if let counterparty = leg.counterparty {
                 Text(isOutflow
-                    ? CosignCopy.Movement.leg(destination: cosignShortAddress(counterparty, prefix: 6, suffix: 6))
-                    : CosignCopy.Movement.leg(source: cosignShortAddress(counterparty, prefix: 6, suffix: 6)))
+                    ? CosignCopy.Movement.leg(destination: cosignMediumAddress(counterparty))
+                    : CosignCopy.Movement.leg(source: cosignMediumAddress(counterparty)))
                     .font(CosignTheme.FontStyle.monoSmall)
                     .foregroundStyle(CosignTheme.inkDim)
             }

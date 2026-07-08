@@ -48,7 +48,7 @@ extension ManageSquadConfigView {
                         }
                     }
                 }
-                Text(cosignShortAddress(member.pubkey, prefix: 6, suffix: 6))
+                Text(cosignMediumAddress(member.pubkey))
                     .font(CosignTheme.FontStyle.monoSmall)
                     .foregroundStyle(CosignTheme.inkDim)
             }
@@ -83,7 +83,7 @@ extension ManageSquadConfigView {
                             background: CosignTheme.mintWash
                         )
                     }
-                    Text(cosignShortAddress(member.pubkey, prefix: 6, suffix: 6))
+                    Text(cosignMediumAddress(member.pubkey))
                         .font(CosignTheme.FontStyle.monoSmall)
                         .foregroundStyle(CosignTheme.inkDim)
                 }

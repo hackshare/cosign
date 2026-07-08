@@ -149,7 +149,7 @@ struct CosignPinnedTag: View {
     var body: some View {
         Text(CosignCopy.Network.pinnedTag)
             .font(.system(size: 10, weight: .semibold, design: .rounded))
-            .tracking(0.6)
+            .tracking(CosignTheme.Tracking.tag)
             .foregroundStyle(CosignTheme.mint)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

@@ -216,7 +216,7 @@ struct CosignSelectorSheet<ID: Hashable>: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
                             .background(
-                                option.id == selection ? CosignTheme.accentWash : Color.clear,
+                                option.id == selection ? CosignTheme.selectedWash : Color.clear,
                                 in: .rect(cornerRadius: CosignTheme.Radius.medium)
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
