@@ -12,8 +12,11 @@ extension ManageSquadConfigView {
     func load() async {
         loadError = false
         do {
-            let loaded = try await squadsService.detail(of: squadAddress)
+            let loaded = try await squadsService.refreshDetail(of: squadAddress)
             detail = loaded
+            desiredMembers = loaded.members
+            removedKeys = []
+            rentCollector = loaded.rentCollector
             threshold = Int(loaded.threshold)
             timeLockSeconds = loaded.timeLockSeconds
         } catch {
@@ -30,36 +33,81 @@ extension ManageSquadConfigView {
             memberError = CosignCopy.ManageSquad.invalidAddress
             return
         }
-        let alreadyMember = detail?.members.contains(where: { $0.pubkey == candidate }) == true
-        let alreadyStaged = stagedAdditions.contains(candidate)
-        guard !alreadyMember, !alreadyStaged else {
+        let alreadyPresent = desiredMembers.contains(where: { $0.pubkey == candidate })
+        let alreadyRemoved = removedKeys.contains(candidate)
+        guard !alreadyPresent, !alreadyRemoved else {
             memberError = CosignCopy.ManageSquad.duplicateAddress
             return
         }
-        stagedAdditions.append(candidate)
+        desiredMembers.append(SquadMember(pubkey: candidate, canInitiate: true, canVote: true, canExecute: true))
         newMember = ""
         memberError = nil
     }
 
     @MainActor
-    func removeStagedAddition(_ address: String) {
-        stagedAdditions.removeAll { $0 == address }
-        clampThreshold()
+    func removeAddedMember(_ pubkey: String) {
+        desiredMembers.removeAll { $0.pubkey == pubkey }
     }
 
     @MainActor
-    func toggleRemoval(_ pubkey: String) {
-        if stagedRemovals.contains(pubkey) {
-            stagedRemovals.remove(pubkey)
+    func toggleMemberRemoval(_ pubkey: String, original: SquadMember) {
+        if removedKeys.contains(pubkey) {
+            removedKeys.remove(pubkey)
+            // Restore in original sorted position relative to remaining desired members.
+            if let detail, let idx = detail.members.firstIndex(where: { $0.pubkey == pubkey }) {
+                let insertAt = desiredMembers.count(where: { mem in
+                    guard let pos = detail.members.firstIndex(where: { $0.pubkey == mem.pubkey }) else { return false }
+                    return pos < idx
+                })
+                desiredMembers.insert(original, at: min(insertAt, desiredMembers.count))
+            } else {
+                desiredMembers.append(original)
+            }
         } else {
-            stagedRemovals.insert(pubkey)
+            removedKeys.insert(pubkey)
+            desiredMembers.removeAll { $0.pubkey == pubkey }
         }
+    }
+
+    @MainActor
+    func flipPermission(at index: Int, propose: Bool = false, vote: Bool = false, execute: Bool = false) {
+        guard index < desiredMembers.count else { return }
+        let current = desiredMembers[index]
+        desiredMembers[index] = SquadMember(
+            pubkey: current.pubkey,
+            canInitiate: propose ? !current.canInitiate : current.canInitiate,
+            canVote: vote ? !current.canVote : current.canVote,
+            canExecute: execute ? !current.canExecute : current.canExecute
+        )
     }
 
     @MainActor
     func clampThreshold() {
         let max = max(1, projectedVoterCount)
         if threshold > max { threshold = max }
+    }
+
+    // MARK: - Rent collector
+
+    @MainActor
+    func setRentCollector() {
+        let candidate = rentCollectorInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !candidate.isEmpty else {
+            rentCollectorError = nil
+            return
+        }
+        guard CosignCore.isValidSolanaPubkey(candidate) else {
+            rentCollectorError = CosignCopy.ManageSquad.invalidAddress
+            return
+        }
+        rentCollector = candidate
+        rentCollectorInput = ""
+        rentCollectorError = nil
+    }
+
+    @MainActor
+    func clearRentCollector() {
+        rentCollector = nil
     }
 
     // MARK: - Time lock
@@ -101,15 +149,23 @@ extension ManageSquadConfigView {
         createError = nil
         defer { isCreating = false }
         do {
+            let submittedMembers = desiredMembers
+            let submittedThreshold = UInt16(threshold)
+            let submittedTimeLock = timeLockSeconds
+            let submittedRentCollector = rentCollector
             let submission = try await withResolvedProposalSigner(
                 actionSigner,
                 deviceStatus: { _ in },
                 operation: { signer in
                     try await squadsService.submitConfigChangeProposal(
-                        addedMembers: stagedAdditions,
-                        removedMembers: Array(stagedRemovals),
-                        newThreshold: UInt16(threshold),
-                        newTimeLockSeconds: timeLockSeconds,
+                        desiredMembers: submittedMembers,
+                        newThreshold: submittedThreshold,
+                        newTimeLockSeconds: submittedTimeLock,
+                        newRentCollector: submittedRentCollector,
+                        expectedMembers: detail.members,
+                        expectedThreshold: detail.threshold,
+                        expectedTimeLockSeconds: detail.timeLockSeconds,
+                        expectedRentCollector: detail.rentCollector,
                         in: squadAddress,
                         signer: signer
                     )
@@ -129,14 +185,12 @@ extension ManageSquadConfigView {
         switch error {
         case .notAutonomous:
             CosignCopy.ManageSquad.controlledNote
-        case .signerNotMember:
-            CosignCopy.ManageSquad.notAMemberError
-        case .missingInitiatePermission:
-            CosignCopy.ManageSquad.noEligibleSigner
         case .invalidMemberAddress:
             CosignCopy.ManageSquad.invalidAddress
         case .contradictoryEdit:
             CosignCopy.ManageSquad.contradictoryEditError
+        case .memberMissingPermission:
+            CosignCopy.ManageSquad.memberMissingPermission
         case .noChanges:
             CosignCopy.ManageSquad.noChangesError
         case .thresholdOutOfRange:
@@ -149,42 +203,43 @@ extension ManageSquadConfigView {
     // MARK: - Computed
 
     var projectedVoterCount: Int {
-        guard let detail else { return 1 }
-        let keptVoters = detail.members
-            .count(where: { !stagedRemovals.contains($0.pubkey) && $0.canVote })
-
-        return keptVoters + stagedAdditions.count
+        desiredMembers.count(where: \.canVote)
     }
 
     var hasChanges: Bool {
         guard let detail else { return false }
-        return !stagedAdditions.isEmpty
-            || !stagedRemovals.isEmpty
+        let memberKey = { (member: SquadMember) -> String in
+            "\(member.pubkey):\(member.canInitiate ? 1 : 0)\(member.canVote ? 1 : 0)\(member.canExecute ? 1 : 0)"
+        }
+        let desiredSet = Set(desiredMembers.map(memberKey))
+        let currentSet = Set(detail.members.map(memberKey))
+        return desiredSet != currentSet
             || threshold != Int(detail.threshold)
             || timeLockSeconds != detail.timeLockSeconds
+            || rentCollector != detail.rentCollector
     }
 
     var validationError: String? {
-        guard projectedVoterCount >= 1 else {
+        if desiredMembers.contains(where: { !$0.canInitiate && !$0.canVote && !$0.canExecute }) {
+            return CosignCopy.ManageSquad.memberMissingPermission
+        }
+        let voters = desiredMembers.count(where: \.canVote)
+        guard voters >= 1 else {
             return CosignCopy.ManageSquad.noVotersRemain
         }
         guard threshold >= 1 else {
             return CosignCopy.ManageSquad.thresholdTooLow
         }
-        guard threshold <= projectedVoterCount else {
+        guard threshold <= voters else {
             return CosignCopy.ManageSquad.thresholdTooHigh
         }
-        if let detail {
-            let keptProposers = detail.members.count(where: { !stagedRemovals.contains($0.pubkey) && $0.canInitiate })
-            let keptExecutors = detail.members.count(where: { !stagedRemovals.contains($0.pubkey) && $0.canExecute })
-            let projectedProposerCount = keptProposers + stagedAdditions.count
-            let projectedExecutorCount = keptExecutors + stagedAdditions.count
-            guard projectedProposerCount >= 1 else {
-                return CosignCopy.ManageSquad.noProposersRemain
-            }
-            guard projectedExecutorCount >= 1 else {
-                return CosignCopy.ManageSquad.noExecutorsRemain
-            }
+        let proposers = desiredMembers.count(where: \.canInitiate)
+        guard proposers >= 1 else {
+            return CosignCopy.ManageSquad.noProposersRemain
+        }
+        let executors = desiredMembers.count(where: \.canExecute)
+        guard executors >= 1 else {
+            return CosignCopy.ManageSquad.noExecutorsRemain
         }
         guard timeLockSeconds <= SquadsService.maxTimeLockSeconds else {
             return CosignCopy.ManageSquad.timeLockOutOfRange
@@ -201,13 +256,20 @@ extension ManageSquadConfigView {
     }
 
     var hasSelfRemoval: Bool {
-        !stagedRemovals.isDisjoint(with: currentSignerAddresses)
+        !removedKeys.isDisjoint(with: currentSignerAddresses)
     }
 
-    var stagedChangeDiff: String {
-        CosignCopy.ManageSquad.diff(
-            added: stagedAdditions.count,
-            removed: stagedRemovals.count
-        )
+    var memberDiffTitle: String {
+        guard let detail else { return "" }
+        let originalKeys = Set(detail.members.map(\.pubkey))
+        let addedCount = desiredMembers.count(where: { !originalKeys.contains($0.pubkey) })
+        let changedCount = desiredMembers.count(where: { member in
+            guard let original = detail.members.first(where: { $0.pubkey == member.pubkey }) else { return false }
+            return original.canInitiate != member.canInitiate
+                || original.canVote != member.canVote
+                || original.canExecute != member.canExecute
+        })
+        let removedCount = removedKeys.count
+        return CosignCopy.ManageSquad.memberChangeDiff(added: addedCount, changed: changedCount, removed: removedCount)
     }
 }

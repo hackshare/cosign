@@ -42,9 +42,13 @@ extension ProposalDetailView {
         let decodedInstructions = instructionDecoder.decode(proposal)
         let roles = decodedFieldRoles(for: action, decodedInstructions: decodedInstructions)
         let instructionRows = decodedInstructionRows(roles: roles, decodedInstructions: decodedInstructions)
-        let hasRoleAndInstructionRows = !roles.isEmpty && !instructionRows.isEmpty
+        let configRows = squadDetail.map {
+            ConfigChangeSummary.build(detail: $0, instructions: proposal.instructions)
+        } ?? []
 
-        if !roles.isEmpty || !instructionRows.isEmpty {
+        if !configRows.isEmpty {
+            ConfigChangeSection(rows: configRows)
+        } else if !roles.isEmpty || !instructionRows.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 CosignSectionTitle(title: CosignCopy.ProposalDetail.decodedFieldsSectionTitle)
                 CosignCard(padding: 0) {
@@ -57,12 +61,9 @@ extension ProposalDetailView {
                                 )
                             }
                         }
-
-                        if hasRoleAndInstructionRows {
-                            Divider()
-                                .overlay(CosignTheme.line)
+                        if !roles.isEmpty, !instructionRows.isEmpty {
+                            Divider().overlay(CosignTheme.line)
                         }
-
                         if !instructionRows.isEmpty {
                             decodedInstructionSummaryRows(instructionRows)
                         }
@@ -235,6 +236,22 @@ extension ProposalDetailView {
     }
 
     func proposalActionObject(for proposal: SquadProposalDetail) -> ActionObject {
+        let base = baseProposalActionObject(for: proposal)
+        guard let squadDetail else { return base }
+        let rows = ConfigChangeSummary.build(detail: squadDetail, instructions: proposal.instructions)
+        guard !rows.isEmpty else { return base }
+        return ActionObject(
+            title: CosignCopy.ProposalDetail.configProposalTitle,
+            subtitle: CosignCopy.ProposalDetail.configProposalSubtitle(count: rows.count),
+            severity: base.severity == .high ? .high : .authority,
+            confidence: base.confidence,
+            source: base.source,
+            roles: base.roles,
+            warnings: base.warnings
+        )
+    }
+
+    private func baseProposalActionObject(for proposal: SquadProposalDetail) -> ActionObject {
         let localAction = localDecodedAction(for: proposal)
 
         if let action = executedInspectionReport?.action {

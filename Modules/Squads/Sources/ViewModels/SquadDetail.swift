@@ -10,6 +10,7 @@ public struct SquadDetail: Equatable, Sendable, Identifiable {
     public let displayName: String?
     public let threshold: UInt16
     public let timeLockSeconds: UInt32
+    public let rentCollector: String?
     public let transactionIndex: UInt64
     public let staleTransactionIndex: UInt64
     public let isAutonomous: Bool
@@ -21,6 +22,7 @@ public struct SquadDetail: Equatable, Sendable, Identifiable {
         displayName: String? = nil,
         threshold: UInt16,
         timeLockSeconds: UInt32,
+        rentCollector: String? = nil,
         transactionIndex: UInt64,
         staleTransactionIndex: UInt64,
         isAutonomous: Bool = true,
@@ -31,6 +33,7 @@ public struct SquadDetail: Equatable, Sendable, Identifiable {
         self.displayName = displayName
         self.threshold = threshold
         self.timeLockSeconds = timeLockSeconds
+        self.rentCollector = rentCollector
         self.transactionIndex = transactionIndex
         self.staleTransactionIndex = staleTransactionIndex
         self.isAutonomous = isAutonomous

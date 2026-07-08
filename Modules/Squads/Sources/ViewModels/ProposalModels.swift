@@ -123,25 +123,59 @@ public struct SquadProposalDetail: Equatable, Sendable, Identifiable {
     }
 }
 
+public struct SquadConfigAction: Equatable, Sendable {
+    public let memberKey: String?
+    public let canInitiate: Bool
+    public let canVote: Bool
+    public let canExecute: Bool
+    public let newThreshold: UInt16?
+    public let newTimeLockSeconds: UInt32?
+    public let newRentCollector: String?
+    public let clearsRentCollector: Bool
+
+    public init(
+        memberKey: String? = nil,
+        canInitiate: Bool = false,
+        canVote: Bool = false,
+        canExecute: Bool = false,
+        newThreshold: UInt16? = nil,
+        newTimeLockSeconds: UInt32? = nil,
+        newRentCollector: String? = nil,
+        clearsRentCollector: Bool = false
+    ) {
+        self.memberKey = memberKey
+        self.canInitiate = canInitiate
+        self.canVote = canVote
+        self.canExecute = canExecute
+        self.newThreshold = newThreshold
+        self.newTimeLockSeconds = newTimeLockSeconds
+        self.newRentCollector = newRentCollector
+        self.clearsRentCollector = clearsRentCollector
+    }
+}
+
 public struct SquadDecodedInstruction: Equatable, Sendable {
     public let program: String
     public let kind: String
     public let summary: String
     public let accounts: [String]
     public let rawDataHex: String
+    public let configAction: SquadConfigAction?
 
     public init(
         program: String,
         kind: String,
         summary: String,
         accounts: [String] = [],
-        rawDataHex: String
+        rawDataHex: String,
+        configAction: SquadConfigAction? = nil
     ) {
         self.program = program
         self.kind = kind
         self.summary = summary
         self.accounts = accounts
         self.rawDataHex = rawDataHex
+        self.configAction = configAction
     }
 }
 

@@ -110,7 +110,23 @@ extension SquadDecodedInstruction {
             kind: record.kind,
             summary: record.summary,
             accounts: record.accounts,
-            rawDataHex: record.rawDataHex
+            rawDataHex: record.rawDataHex,
+            configAction: record.configAction.map(SquadConfigAction.init(record:))
+        )
+    }
+}
+
+extension SquadConfigAction {
+    init(record: ProposalInspectionConfigAction) {
+        self.init(
+            memberKey: record.memberKey,
+            canInitiate: record.canInitiate,
+            canVote: record.canVote,
+            canExecute: record.canExecute,
+            newThreshold: record.newThreshold,
+            newTimeLockSeconds: record.newTimeLockSeconds,
+            newRentCollector: record.newRentCollector,
+            clearsRentCollector: record.clearsRentCollector
         )
     }
 }

@@ -67,6 +67,13 @@ pub struct TokenTransferProposalParams {
     pub memo: Option<String>,
 }
 
+pub struct ConfigMemberInput {
+    pub pubkey: String,
+    pub can_initiate: bool,
+    pub can_vote: bool,
+    pub can_execute: bool,
+}
+
 pub fn generate_mnemonic(word_count: u8) -> Result<String, CryptoError> {
     mnemonic::generate(word_count).map_err(Into::into)
 }
@@ -143,8 +150,8 @@ pub use transactions::{
     SignatureStatus, SimulationResult, TransactionSubmission, VoteType,
 };
 pub use types::{
-    ActivityItem, DecodedInstruction, MemberInfo, MultisigDetail, MultisigSummary, ProposalDetail,
-    ProposalSummary, VaultRef,
+    ActivityItem, ConfigActionInfo, DecodedInstruction, MemberInfo, MultisigDetail,
+    MultisigSummary, ProposalDetail, ProposalSummary, VaultRef,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -344,31 +351,53 @@ pub fn squads_build_config_change_proposal_transaction(
     rpc_url: String,
     multisig_address: String,
     member_pubkey: String,
-    added_members: Vec<String>,
-    removed_members: Vec<String>,
+    desired_members: Vec<ConfigMemberInput>,
     new_threshold: u16,
     new_time_lock: u32,
+    new_rent_collector: Option<String>,
+    expected_members: Vec<ConfigMemberInput>,
+    expected_threshold: u16,
+    expected_time_lock: u32,
+    expected_rent_collector: Option<String>,
     memo: Option<String>,
 ) -> Result<PreparedProposalCreation, SquadsFFIError> {
+    use squads_multisig::state::{Member, Permissions};
     let multisig = parse_pubkey(&multisig_address)?;
     let member = parse_pubkey(&member_pubkey)?;
-    let added = added_members
-        .iter()
-        .map(|m| parse_pubkey(m))
-        .collect::<Result<Vec<_>, _>>()?;
-    let removed = removed_members
-        .iter()
-        .map(|m| parse_pubkey(m))
-        .collect::<Result<Vec<_>, _>>()?;
+    let parse_members = |inputs: Vec<ConfigMemberInput>| {
+        inputs
+            .into_iter()
+            .map(|m| {
+                let key = parse_pubkey(&m.pubkey)?;
+                let mask = (m.can_initiate as u8)
+                    | ((m.can_vote as u8) << 1)
+                    | ((m.can_execute as u8) << 2);
+                Ok(Member {
+                    key,
+                    permissions: Permissions { mask },
+                })
+            })
+            .collect::<Result<Vec<_>, SquadsFFIError>>()
+    };
+    let desired = parse_members(desired_members)?;
+    let expected = parse_members(expected_members)?;
+    let rent_collector = new_rent_collector.map(|s| parse_pubkey(&s)).transpose()?;
+    let exp_rent_collector = expected_rent_collector
+        .map(|s| parse_pubkey(&s))
+        .transpose()?;
     let rpc = rpc::RpcClient::new(rpc_url);
     Ok(transactions::build_config_change_proposal_transaction(
         rpc,
         multisig,
         member,
-        added,
-        removed,
+        desired,
         new_threshold,
         new_time_lock,
+        rent_collector,
+        expected,
+        expected_threshold,
+        expected_time_lock,
+        exp_rent_collector,
         memo,
     )?)
 }

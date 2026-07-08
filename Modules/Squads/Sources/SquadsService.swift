@@ -170,6 +170,7 @@ private extension SquadsService {
             displayName: record.displayName,
             threshold: record.threshold,
             timeLockSeconds: record.timeLockSeconds,
+            rentCollector: record.rentCollector,
             transactionIndex: record.transactionIndex,
             staleTransactionIndex: record.staleTransactionIndex,
             isAutonomous: record.isAutonomous,
@@ -193,6 +194,7 @@ private extension SquadsService {
             displayName: record.displayName,
             threshold: record.threshold,
             timeLockSeconds: record.timeLockSeconds,
+            rentCollector: record.rentCollector,
             transactionIndex: record.transactionIndex,
             staleTransactionIndex: record.staleTransactionIndex,
             isAutonomous: record.isAutonomous,
@@ -220,6 +222,7 @@ private extension SquadsService {
             displayName: fields.displayName,
             threshold: fields.threshold,
             timeLockSeconds: fields.timeLockSeconds,
+            rentCollector: fields.rentCollector,
             transactionIndex: fields.transactionIndex,
             staleTransactionIndex: fields.staleTransactionIndex,
             isAutonomous: fields.isAutonomous,
@@ -242,6 +245,7 @@ private struct SquadDetailFields {
     let displayName: String?
     let threshold: UInt16
     let timeLockSeconds: UInt32
+    let rentCollector: String?
     let transactionIndex: UInt64
     let staleTransactionIndex: UInt64
     let isAutonomous: Bool

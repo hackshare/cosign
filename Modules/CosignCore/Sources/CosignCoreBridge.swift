@@ -90,10 +90,14 @@ public enum CosignCore {
             rpcUrl: request.rpcURL,
             multisigAddress: request.multisigAddress,
             memberPubkey: request.memberPubkey,
-            addedMembers: request.addedMembers,
-            removedMembers: request.removedMembers,
+            desiredMembers: request.desiredMembers,
             newThreshold: request.newThreshold,
             newTimeLock: request.newTimeLockSeconds,
+            newRentCollector: request.newRentCollector,
+            expectedMembers: request.expectedMembers,
+            expectedThreshold: request.expectedThreshold,
+            expectedTimeLock: request.expectedTimeLockSeconds,
+            expectedRentCollector: request.expectedRentCollector,
             memo: request.memo
         )
     }
@@ -233,10 +237,14 @@ public struct ConfigChangeProposalRequest: Sendable {
     public var rpcURL = ""
     public var multisigAddress = ""
     public var memberPubkey = ""
-    public var addedMembers: [String] = []
-    public var removedMembers: [String] = []
+    public var desiredMembers: [ConfigMemberInput] = []
     public var newThreshold: UInt16 = 1
     public var newTimeLockSeconds: UInt32 = 0
+    public var newRentCollector: String?
+    public var expectedMembers: [ConfigMemberInput] = []
+    public var expectedThreshold: UInt16 = 0
+    public var expectedTimeLockSeconds: UInt32 = 0
+    public var expectedRentCollector: String?
     public var memo: String?
 
     public init() {}

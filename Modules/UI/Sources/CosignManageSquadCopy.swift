@@ -17,6 +17,29 @@ public extension CosignCopy {
         public static let youBadge = "You"
         public static let addedBadge = "New"
 
+        // Permissions
+        public static let permissionPropose = "Propose"
+        public static let permissionVote = "Vote"
+        public static let permissionExecute = "Execute"
+        public static let changedBadge = "Changed"
+        public static let memberMissingPermission = "Every member needs at least one permission."
+
+        /// Per-member diff line for proposal review: "<short addr>: <old bits> → <new bits>"
+        public static func memberDiff(address: String, old: String, new: String) -> String {
+            "\(address): \(old) \u{2192} \(new)"
+        }
+
+        /// Section title diff: only includes non-zero segments, separated by U+00B7
+        public static func memberChangeDiff(added: Int, changed: Int, removed: Int) -> String {
+            [
+                added > 0 ? (added == 1 ? "1 added" : "\(added) added") : nil,
+                changed > 0 ? (changed == 1 ? "1 changed" : "\(changed) changed") : nil,
+                removed > 0 ? (removed == 1 ? "1 removed" : "\(removed) removed") : nil
+            ]
+            .compactMap(\.self)
+            .joined(separator: " \u{00B7} ")
+        }
+
         // Self-removal warnings
         public static let selfRemovalSoloWarning = "You will lose access to this squad."
         public static let selfRemovalQuorumWarning =
@@ -25,7 +48,6 @@ public extension CosignCopy {
         // Address validation
         public static let invalidAddress = "That is not a valid Solana address."
         public static let duplicateAddress = "That member is already in the squad."
-        public static let notAMemberError = "That address is not a member of this squad."
 
         /// Diff summary
         public static func diff(added: Int, removed: Int) -> String {
@@ -67,6 +89,21 @@ public extension CosignCopy {
 
         public static func timeLockDiff(old: String, new: String) -> String {
             "Time lock: \(old) \u{2192} \(new)"
+        }
+
+        // Rent collector
+        public static let rentCollectorSection = "Rent collector"
+        public static let rentCollectorSubtitle = "Receives reclaimed rent from closed accounts."
+        public static let rentCollectorPlaceholder = "Collector address"
+        public static let rentCollectorHint = "Optional. Left unset, reclaimed rent stays with the squad."
+        public static let rentCollectorSet = "Set"
+
+        public static func rentCollectorCurrent(_ display: String) -> String {
+            "Currently: \(display)"
+        }
+
+        public static func rentCollectorDiff(old: String, new: String) -> String {
+            "Rent collector: \(old) \u{2192} \(new)"
         }
 
         // Proposal creation

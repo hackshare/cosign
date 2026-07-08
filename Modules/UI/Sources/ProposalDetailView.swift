@@ -18,6 +18,7 @@ public struct ProposalDetailView: View {
     let transactionIndex: UInt64
     let instructionDecoder = InstructionDecoder()
     @State private var proposal: SquadProposalDetail?
+    @State var squadDetail: SquadDetail?
     @State var squadMembers = [SquadMember]()
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -167,21 +168,23 @@ public struct ProposalDetailView: View {
 
         do {
             async let loadedProposal = squadsService.proposal(in: squadAddress, transactionIndex: transactionIndex)
-            async let loadedMembers = if forceRefresh {
-                squadsService.refreshMembers(of: squadAddress)
+            async let loadedDetail = if forceRefresh {
+                squadsService.refreshDetail(of: squadAddress)
             } else {
-                squadsService.members(of: squadAddress)
+                squadsService.detail(of: squadAddress)
             }
-            let (newProposal, newMembers) = try await (loadedProposal, loadedMembers)
+            let (newProposal, newDetail) = try await (loadedProposal, loadedDetail)
             async let newVaultAccounts = vaultAccountAddresses()
             let newExecutionSignature = await latestExecutionSignature(for: newProposal, forceRefresh: forceRefresh)
             proposal = newProposal
-            squadMembers = newMembers
+            squadDetail = newDetail
+            squadMembers = newDetail.members
             ownVaultAccounts = await newVaultAccounts
             executionSignature = newExecutionSignature
             errorMessage = nil
         } catch {
             if proposal == nil {
+                squadDetail = nil
                 squadMembers = []
                 executionSignature = nil
                 clearInspection()

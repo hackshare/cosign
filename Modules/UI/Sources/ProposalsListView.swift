@@ -294,7 +294,7 @@ struct ProposalsPreviewSection: View {
     }
 
     private var proposalRange: ProposalRange? {
-        ProposalRange.recent(through: latestTransactionIndex, limit: 5)
+        ProposalRange.recent(through: latestTransactionIndex, limit: 6)
     }
 
     private var taskID: String {

@@ -77,7 +77,7 @@ private struct OperationsDemoSquad {
             displayName: "Operations",
             threshold: 3,
             memberCount: UInt32(memberRecords.count),
-            transactionIndex: 14,
+            transactionIndex: 15,
             staleTransactionIndex: 0
         )
     }
@@ -88,7 +88,8 @@ private struct OperationsDemoSquad {
             displayName: "Operations",
             threshold: 3,
             timeLockSeconds: 0,
-            transactionIndex: 14,
+            rentCollector: nil,
+            transactionIndex: 15,
             staleTransactionIndex: 0,
             members: memberRecords,
             vaults: vaults
@@ -129,6 +130,12 @@ private struct OperationsDemoSquad {
 
     private var proposals: [ProposalInspectionProposal] {
         [
+            makeDemoConfigPermissionProposal(
+                voting: voting(15, status: "active", approvals: Array(memberApprovals.dropFirst())),
+                squad: squad,
+                memberToPromote: memberRecords.first { $0.canVote && !$0.canExecute }?.pubkey ?? squad,
+                memberToAdd: members.member(3)
+            ),
             makeDemoTransferProposal(DemoTransferProposalDraft(
                 voting: voting(14, status: "active", approvals: Array(memberApprovals.dropFirst())),
                 source: vault0,
@@ -264,6 +271,8 @@ private struct OperationsDemoSquad {
 
     private func transactionAccount(_ index: UInt64) -> String {
         switch index {
+        case 15:
+            "Tx15ConfigPermOperations9vV7nH8rUxYkC8JmQ4eL2p"
         case 14:
             "Tx14OPerationsQG5LqMKv5kmgV7pS9wYudGx9F"
         case 13:
