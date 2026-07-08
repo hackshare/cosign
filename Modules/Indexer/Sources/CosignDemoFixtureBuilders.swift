@@ -37,6 +37,48 @@ func makeDemoConfigProposal(
     ))
 }
 
+func makeDemoConfigPermissionProposal(
+    voting: DemoProposalVoting,
+    squad: String,
+    memberToPromote: String,
+    memberToAdd: String
+) -> ProposalInspectionProposal {
+    makeDemoProposal(DemoProposalDraft(
+        voting: voting,
+        kind: "config",
+        accounts: [squad],
+        instructions: [
+            // Permission change: a vote-only member is re-added with full permissions.
+            ProposalInspectionInstruction(
+                program: "Squads", kind: "remove_member",
+                summary: "Remove member \(memberToPromote)",
+                accounts: [memberToPromote], rawDataHex: "",
+                configAction: ProposalInspectionConfigAction(memberKey: memberToPromote)
+            ),
+            ProposalInspectionInstruction(
+                program: "Squads", kind: "add_member",
+                summary: "Add member \(memberToPromote) with initiate, vote, execute permissions",
+                accounts: [memberToPromote], rawDataHex: "",
+                configAction: ProposalInspectionConfigAction(
+                    memberKey: memberToPromote,
+                    canInitiate: true, canVote: true, canExecute: true
+                )
+            ),
+            // A new voting member enlarges the signer pool without an explicit threshold
+            // change, producing the derived signing-power (approval-ratio) row.
+            ProposalInspectionInstruction(
+                program: "Squads", kind: "add_member",
+                summary: "Add member \(memberToAdd) with initiate, vote, execute permissions",
+                accounts: [memberToAdd], rawDataHex: "",
+                configAction: ProposalInspectionConfigAction(
+                    memberKey: memberToAdd,
+                    canInitiate: true, canVote: true, canExecute: true
+                )
+            )
+        ]
+    ))
+}
+
 func makeDemoMemoProposal(_ voting: DemoProposalVoting) -> ProposalInspectionProposal {
     makeDemoProposal(DemoProposalDraft(
         voting: voting,

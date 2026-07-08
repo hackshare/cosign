@@ -16,8 +16,11 @@ public struct ManageSquadConfigView: View {
 
     @State var detail: SquadDetail?
     @State var loadError: Bool = false
-    @State var stagedRemovals: Set<String> = []
-    @State var stagedAdditions: [String] = []
+    @State var desiredMembers: [SquadMember] = []
+    @State var removedKeys: Set<String> = []
+    @State var rentCollector: String?
+    @State var rentCollectorInput: String = ""
+    @State var rentCollectorError: String?
     @State var newMember: String = ""
     @State var memberError: String?
     @State var threshold: Int = 1
@@ -42,8 +45,7 @@ public struct ManageSquadConfigView: View {
         .task {
             await load()
         }
-        .onChange(of: stagedRemovals) { clampThreshold() }
-        .onChange(of: stagedAdditions) { clampThreshold() }
+        .onChange(of: desiredMembers) { clampThreshold() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             editorFooter
                 .cosignMeasureHeight($footerHeight)
@@ -88,6 +90,7 @@ extension ManageSquadConfigView {
                 addMemberSection
                 thresholdSection(detail)
                 timeLockSection(detail)
+                rentCollectorSection(detail)
                 if let err = createError {
                     CosignInlineBanner(tone: .red) {
                         Text(err)
@@ -110,7 +113,9 @@ extension ManageSquadConfigView {
     // MARK: - Members section
 
     private func membersSection(_ detail: SquadDetail) -> some View {
-        let diffText = stagedChangeDiff
+        let diffText = memberDiffTitle
+        let originalKeys = Set(detail.members.map(\.pubkey))
+        let addedMembers = desiredMembers.filter { !originalKeys.contains($0.pubkey) }
         return VStack(alignment: .leading, spacing: 10) {
             CosignSectionTitle(
                 title: CosignCopy.ManageSquad.membersSection,
@@ -119,80 +124,13 @@ extension ManageSquadConfigView {
             CosignCard {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(detail.members.enumerated()), id: \.element.id) { index, member in
-                        existingMemberRow(member, index: index)
+                        existingMemberRow(member, index: index, detail: detail)
                     }
-                    ForEach(Array(stagedAdditions.enumerated()), id: \.element) { index, address in
-                        addedMemberRow(address, index: index)
-                    }
-                }
-            }
-        }
-    }
-
-    private func existingMemberRow(_ member: SquadMember, index: Int) -> some View {
-        let staged = stagedRemovals.contains(member.pubkey)
-        let isYou = currentSignerAddresses.contains(member.pubkey)
-        return HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(cosignShortAddress(member.pubkey))
-                        .font(CosignTheme.FontStyle.titleM)
-                        .foregroundStyle(staged ? CosignTheme.inkFaint : CosignTheme.ink)
-                        .strikethrough(staged, color: CosignTheme.inkFaint)
-                    if isYou {
-                        Text(CosignCopy.ManageSquad.youBadge)
-                            .font(CosignTheme.FontStyle.eyebrow)
-                            .foregroundStyle(CosignTheme.accentDeep)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(CosignTheme.accentWash, in: .capsule)
+                    ForEach(Array(addedMembers.enumerated()), id: \.element.id) { index, member in
+                        addedMemberRow(member, newIndex: index)
                     }
                 }
-                Text(cosignShortAddress(member.pubkey, prefix: 6, suffix: 6))
-                    .font(CosignTheme.FontStyle.monoSmall)
-                    .foregroundStyle(CosignTheme.inkDim)
             }
-            Spacer()
-            Button {
-                toggleRemoval(member.pubkey)
-            } label: {
-                CosignGlyphView(
-                    glyph: .xmark,
-                    size: 14,
-                    color: staged ? CosignTheme.accentDeep : CosignTheme.inkDim
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(isYou ? "manage-squad-remove-you" : "manage-squad-remove-\(index)")
-        }
-    }
-
-    private func addedMemberRow(_ address: String, index: Int) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(cosignShortAddress(address))
-                        .font(CosignTheme.FontStyle.titleM)
-                        .foregroundStyle(CosignTheme.mint)
-                    Text(CosignCopy.ManageSquad.addedBadge)
-                        .font(CosignTheme.FontStyle.eyebrow)
-                        .foregroundStyle(CosignTheme.mint)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(CosignTheme.mintWash, in: .capsule)
-                }
-                Text(cosignShortAddress(address, prefix: 6, suffix: 6))
-                    .font(CosignTheme.FontStyle.monoSmall)
-                    .foregroundStyle(CosignTheme.inkDim)
-            }
-            Spacer()
-            Button {
-                removeStagedAddition(address)
-            } label: {
-                CosignGlyphView(glyph: .xmark, size: 14, color: CosignTheme.inkDim)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("manage-squad-remove-added-\(index)")
         }
     }
 

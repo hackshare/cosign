@@ -14,7 +14,7 @@ use cosign_core::{
     rpc::RpcClient,
     squads::{ProposalCompanion, SquadsClient},
     transactions,
-    types::{self, DecodedInstruction, ProposalCompanionRef, ProposalDetail},
+    types::{self, ConfigActionInfo, DecodedInstruction, ProposalCompanionRef, ProposalDetail},
 };
 use serde_json::{Value, json};
 use solana_client::client_error::reqwest;
@@ -1518,6 +1518,7 @@ fn decode_system_instruction(instruction: &DecodedInstruction, data: &[u8]) -> D
                     summary: format!("Create nonce account with {}", format_lamports(lamports)),
                     accounts: instruction.accounts.clone(),
                     raw_data_hex: instruction.raw_data_hex.clone(),
+                    config_action: None,
                 };
             }
             DecodedInstruction {
@@ -1529,6 +1530,7 @@ fn decode_system_instruction(instruction: &DecodedInstruction, data: &[u8]) -> D
                 ),
                 accounts: instruction.accounts.clone(),
                 raw_data_hex: instruction.raw_data_hex.clone(),
+                config_action: None,
             }
         }
         Some(2) => {
@@ -1541,6 +1543,7 @@ fn decode_system_instruction(instruction: &DecodedInstruction, data: &[u8]) -> D
                 summary: format!("Transfer {}", format_lamports(lamports)),
                 accounts: instruction.accounts.clone(),
                 raw_data_hex: instruction.raw_data_hex.clone(),
+                config_action: None,
             }
         }
         _ => instruction.clone(),
@@ -1629,6 +1632,7 @@ fn decode_system_admin_instruction(
         summary,
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     })
 }
 
@@ -1728,6 +1732,7 @@ fn decode_token_instruction(instruction: &DecodedInstruction, data: &[u8]) -> De
         summary,
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     }
 }
 
@@ -1751,6 +1756,7 @@ fn decode_associated_token_account_instruction(
         summary: summary.into(),
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     }
 }
 
@@ -1768,6 +1774,7 @@ fn decode_memo_instruction(instruction: &DecodedInstruction, data: &[u8]) -> Dec
         summary,
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     }
 }
 
@@ -1824,6 +1831,7 @@ fn decode_compute_budget_instruction(
         summary,
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     }
 }
 
@@ -1839,6 +1847,7 @@ fn decode_stake_instruction(instruction: &DecodedInstruction, data: &[u8]) -> De
         summary,
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     }
 }
 
@@ -1859,6 +1868,7 @@ fn decode_address_lookup_table_instruction(
         summary,
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     }
 }
 
@@ -1877,6 +1887,7 @@ fn decode_upgradeable_loader_instruction(
         summary,
         accounts: instruction.accounts.clone(),
         raw_data_hex: instruction.raw_data_hex.clone(),
+        config_action: None,
     }
 }
 
@@ -5148,6 +5159,7 @@ fn squad_detail_json(detail: &types::MultisigDetail) -> Value {
         "address": detail.address,
         "threshold": detail.threshold,
         "timeLockSeconds": detail.time_lock_seconds,
+        "rentCollector": detail.rent_collector,
         "transactionIndex": detail.transaction_index,
         "staleTransactionIndex": detail.stale_transaction_index,
         "isAutonomous": detail.is_autonomous,
@@ -5210,7 +5222,21 @@ fn instruction_json(instruction: &DecodedInstruction) -> Value {
         "kind": instruction.kind,
         "summary": instruction.summary,
         "accounts": instruction.accounts,
-        "rawDataHex": instruction.raw_data_hex
+        "rawDataHex": instruction.raw_data_hex,
+        "configAction": instruction.config_action.as_ref().map(config_action_json)
+    })
+}
+
+fn config_action_json(info: &ConfigActionInfo) -> Value {
+    json!({
+        "memberKey": info.member_key,
+        "canInitiate": info.can_initiate,
+        "canVote": info.can_vote,
+        "canExecute": info.can_execute,
+        "newThreshold": info.new_threshold,
+        "newTimeLockSeconds": info.new_time_lock,
+        "newRentCollector": info.new_rent_collector,
+        "clearsRentCollector": info.clears_rent_collector
     })
 }
 
@@ -5998,6 +6024,7 @@ mod tests {
             address: "squad111".into(),
             threshold: 2,
             time_lock_seconds: 30,
+            rent_collector: None,
             transaction_index: 7,
             stale_transaction_index: 1,
             is_autonomous: true,
@@ -6021,6 +6048,27 @@ mod tests {
         assert_eq!(body["squad"]["members"][0]["pubkey"], "member111");
         assert_eq!(body["squad"]["members"][0]["canVote"], true);
         assert_eq!(body["squad"]["vaults"][0]["address"], "vault111");
+        assert_eq!(body["squad"]["rentCollector"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn serializes_squad_detail_rent_collector_present() {
+        let collector = "So11111111111111111111111111111111111111112";
+        let detail = types::MultisigDetail {
+            address: "squad222".into(),
+            threshold: 1,
+            time_lock_seconds: 0,
+            rent_collector: Some(collector.into()),
+            transaction_index: 1,
+            stale_transaction_index: 0,
+            is_autonomous: true,
+            members: vec![],
+            vaults: vec![],
+        };
+        let response = squad_detail_json_response(&detail);
+        let body: Value = serde_json::from_slice(&response.body).expect("json");
+
+        assert_eq!(body["squad"]["rentCollector"], collector);
     }
 
     #[test]
@@ -6068,6 +6116,7 @@ mod tests {
                 summary: "Transfer 1 SOL".into(),
                 accounts: Vec::new(),
                 raw_data_hex: String::new(),
+                config_action: None,
             }],
             accounts_referenced: Vec::new(),
             transaction_address: Some("transaction111".into()),
@@ -6153,6 +6202,7 @@ mod tests {
             summary: "raw".into(),
             accounts: vec!["source111".into(), "destination111".into()],
             raw_data_hex: "020000008813000000000000".into(),
+            config_action: None,
         };
 
         let decoded = decode_known_instruction(&instruction);
@@ -6175,6 +6225,7 @@ mod tests {
             raw_data_hex: hex_bytes(
                 &bincode::serialize(&SystemInstruction::Assign { owner }).expect("system assign"),
             ),
+            config_action: None,
         };
         let new_authority = Pubkey::new_unique();
         let nonce = DecodedInstruction {
@@ -6186,6 +6237,7 @@ mod tests {
                 &bincode::serialize(&SystemInstruction::AuthorizeNonceAccount(new_authority))
                     .expect("nonce authorize"),
             ),
+            config_action: None,
         };
 
         let assign = decode_known_instruction(&assign);
@@ -6220,6 +6272,7 @@ mod tests {
                 })
                 .expect("nonce create"),
             ),
+            config_action: None,
         };
         let initialize = DecodedInstruction {
             program: SYSTEM_PROGRAM_ID.into(),
@@ -6230,6 +6283,7 @@ mod tests {
                 &bincode::serialize(&SystemInstruction::InitializeNonceAccount(new_authority))
                     .expect("nonce initialize"),
             ),
+            config_action: None,
         };
         let withdraw = DecodedInstruction {
             program: SYSTEM_PROGRAM_ID.into(),
@@ -6246,6 +6300,7 @@ mod tests {
                 &bincode::serialize(&SystemInstruction::WithdrawNonceAccount(2_000_000))
                     .expect("nonce withdraw"),
             ),
+            config_action: None,
         };
 
         let create = decode_known_instruction(&create);
@@ -6281,6 +6336,7 @@ mod tests {
                 "mint111".into(),
             ],
             raw_data_hex: "01".into(),
+            config_action: None,
         };
         let transfer = DecodedInstruction {
             program: SPL_TOKEN_PROGRAM_ID.into(),
@@ -6293,6 +6349,7 @@ mod tests {
                 "owner111".into(),
             ],
             raw_data_hex: "0c40420f000000000006".into(),
+            config_action: None,
         };
 
         let decoded = vec![
@@ -6323,6 +6380,7 @@ mod tests {
                 "owner111".into(),
             ],
             raw_data_hex: "0440420f0000000000".into(),
+            config_action: None,
         };
 
         let decoded = decode_known_instruction(&instruction);
@@ -6348,6 +6406,7 @@ mod tests {
                 "authority111".into(),
             ],
             raw_data_hex: "0e40420f000000000006".into(),
+            config_action: None,
         };
         let burn = DecodedInstruction {
             program: TOKEN_2022_PROGRAM_ID.into(),
@@ -6355,6 +6414,7 @@ mod tests {
             summary: "raw".into(),
             accounts: vec!["source111".into(), "mint111".into(), "authority111".into()],
             raw_data_hex: "0f40420f000000000006".into(),
+            config_action: None,
         };
         let freeze = DecodedInstruction {
             program: SPL_TOKEN_PROGRAM_ID.into(),
@@ -6362,6 +6422,7 @@ mod tests {
             summary: "raw".into(),
             accounts: vec!["account111".into(), "mint111".into(), "authority111".into()],
             raw_data_hex: "0a".into(),
+            config_action: None,
         };
         let close = DecodedInstruction {
             program: SPL_TOKEN_PROGRAM_ID.into(),
@@ -6373,6 +6434,7 @@ mod tests {
                 "owner111".into(),
             ],
             raw_data_hex: "09".into(),
+            config_action: None,
         };
 
         let mint = decode_known_instruction(&mint);
@@ -6413,6 +6475,7 @@ mod tests {
             summary: "Change threshold to 2".into(),
             accounts: vec!["squad111".into()],
             raw_data_hex: "00".into(),
+            config_action: None,
         };
 
         let action = action_from_decoded_instructions(&[instruction]);
@@ -6442,6 +6505,7 @@ mod tests {
                 &bincode::serialize(&UpgradeableLoaderInstruction::Upgrade)
                     .expect("program upgrade"),
             ),
+            config_action: None,
         };
         let set_authority = DecodedInstruction {
             program: BPF_UPGRADEABLE_LOADER_PROGRAM_ID.into(),
@@ -6456,6 +6520,7 @@ mod tests {
                 &bincode::serialize(&UpgradeableLoaderInstruction::SetAuthority)
                     .expect("set authority"),
             ),
+            config_action: None,
         };
 
         let upgrade = decode_known_instruction(&upgrade);
@@ -6495,6 +6560,7 @@ mod tests {
                 ))
                 .expect("stake authorize"),
             ),
+            config_action: None,
         };
         let delegate = DecodedInstruction {
             program: STAKE_PROGRAM_ID.into(),
@@ -6511,6 +6577,7 @@ mod tests {
             raw_data_hex: hex_bytes(
                 &bincode::serialize(&StakeInstruction::DelegateStake).expect("stake delegate"),
             ),
+            config_action: None,
         };
         let withdraw = DecodedInstruction {
             program: STAKE_PROGRAM_ID.into(),
@@ -6527,6 +6594,7 @@ mod tests {
                 &bincode::serialize(&StakeInstruction::Withdraw(1_000_000))
                     .expect("stake withdraw"),
             ),
+            config_action: None,
         };
 
         let authorize = decode_known_instruction(&authorize);
@@ -6567,6 +6635,7 @@ mod tests {
                 })
                 .expect("lookup table extend"),
             ),
+            config_action: None,
         };
         let close = DecodedInstruction {
             program: ADDRESS_LOOKUP_TABLE_PROGRAM_ID.into(),
@@ -6581,6 +6650,7 @@ mod tests {
                 &bincode::serialize(&AddressLookupTableInstruction::CloseLookupTable)
                     .expect("lookup table close"),
             ),
+            config_action: None,
         };
 
         let extend = decode_known_instruction(&extend);
@@ -6641,6 +6711,7 @@ mod tests {
             summary: "Add member member111 with initiate, vote permissions".into(),
             accounts: vec!["member111".into()],
             raw_data_hex: String::new(),
+            config_action: None,
         };
         let time_lock = DecodedInstruction {
             program: "Squads".into(),
@@ -6648,6 +6719,7 @@ mod tests {
             summary: "Set time lock to 3600 seconds".into(),
             accounts: Vec::new(),
             raw_data_hex: String::new(),
+            config_action: None,
         };
 
         let action = action_from_decoded_instructions(&[add_member, time_lock]);
@@ -6758,6 +6830,7 @@ mod tests {
             summary: "raw".into(),
             accounts: Vec::new(),
             raw_data_hex: "02a0860100".into(),
+            config_action: None,
         };
         let memo = DecodedInstruction {
             program: MEMO_PROGRAM_ID.into(),
@@ -6765,6 +6838,7 @@ mod tests {
             summary: "raw".into(),
             accounts: Vec::new(),
             raw_data_hex: "68656c6c6f".into(),
+            config_action: None,
         };
         let transfer = DecodedInstruction {
             program: SYSTEM_PROGRAM_ID.into(),
@@ -6772,6 +6846,7 @@ mod tests {
             summary: "raw".into(),
             accounts: vec!["source111".into(), "destination111".into()],
             raw_data_hex: "020000008813000000000000".into(),
+            config_action: None,
         };
 
         let decoded = vec![

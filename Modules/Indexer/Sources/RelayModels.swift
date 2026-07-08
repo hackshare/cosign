@@ -156,6 +156,7 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
     public let displayName: String?
     public let threshold: UInt16
     public let timeLockSeconds: UInt32
+    public let rentCollector: String?
     public let transactionIndex: UInt64
     public let staleTransactionIndex: UInt64
     public let isAutonomous: Bool
@@ -167,6 +168,7 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
         displayName: String? = nil,
         threshold: UInt16,
         timeLockSeconds: UInt32,
+        rentCollector: String? = nil,
         transactionIndex: UInt64,
         staleTransactionIndex: UInt64,
         isAutonomous: Bool = true,
@@ -177,6 +179,7 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
         self.displayName = displayName
         self.threshold = threshold
         self.timeLockSeconds = timeLockSeconds
+        self.rentCollector = rentCollector
         self.transactionIndex = transactionIndex
         self.staleTransactionIndex = staleTransactionIndex
         self.isAutonomous = isAutonomous
@@ -190,6 +193,7 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
         displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
         threshold = try container.decode(UInt16.self, forKey: .threshold)
         timeLockSeconds = try container.decode(UInt32.self, forKey: .timeLockSeconds)
+        rentCollector = try container.decodeIfPresent(String.self, forKey: .rentCollector)
         transactionIndex = try container.decode(UInt64.self, forKey: .transactionIndex)
         staleTransactionIndex = try container.decode(UInt64.self, forKey: .staleTransactionIndex)
         isAutonomous = try container.decodeIfPresent(Bool.self, forKey: .isAutonomous) ?? true
@@ -198,8 +202,8 @@ public struct RelaySquadDetail: Decodable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case address, displayName, threshold, timeLockSeconds, transactionIndex,
-             staleTransactionIndex, isAutonomous, members, vaults
+        case address, displayName, threshold, timeLockSeconds, rentCollector,
+             transactionIndex, staleTransactionIndex, isAutonomous, members, vaults
     }
 }
 

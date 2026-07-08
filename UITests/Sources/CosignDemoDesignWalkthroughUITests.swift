@@ -176,7 +176,7 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         tapButton("tab-proposals")
         waitForButton("proposal-preview-row-0")
         capture("07-squad-proposals")
-        tapButton("proposal-preview-row-0")
+        tapButton("proposal-preview-row-1")
         waitForScreen("screen.proposal-detail")
         capture("08-proposal-detail")
         // The predicted asset-movement card sits below the decoded fields.
@@ -235,6 +235,29 @@ final class CoreSurfacesUITests: DemoWalkthroughUITestCase {
         tapButton("squad-manage-cta")
         waitForScreen("screen.manage-squad")
         capture("50-manage-squad")
+
+        // Permission: grant Propose to member index 2 (canInitiate is off in the
+        // fixture), showing the mint-ring Changed chip and the "Changed" row badge.
+        // Second tap resets it to its original off state.
+        tapButton("manage-squad-perm-2-propose")
+        capture("80-manage-perms-changed")
+        tapButton("manage-squad-perm-2-propose")
+
+        // Rent collector: scroll to the bottom section, stage the wrapped-SOL
+        // address via the submit action (shows Changed / diff since the squad starts
+        // without a collector), then clear to reset. The RunLoop wait lets the
+        // keyboard dismiss animation finish so capture's dismissKeyboardIfPresent
+        // is a no-op and doesn't interfere with the scroll position.
+        app.swipeUp()
+        app.swipeUp()
+        typeText("manage-squad-rent-field", "So11111111111111111111111111111111111111112\n")
+        RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+        waitForButton("manage-squad-rent-clear")
+        capture("81-rent-collector-set")
+        tapButton("manage-squad-rent-clear")
+        app.swipeDown()
+        app.swipeDown()
+        app.swipeDown()
 
         // Time lock: default (Currently: None), then a staged 24h change with
         // the mint chip and the "Time lock: None -> 24 hours" diff line.
@@ -353,18 +376,20 @@ final class ProposalFlowUITests: DemoWalkthroughUITestCase {
         launchDemo(profile: "appstore")
         openFirstSquadProposals()
 
-        captureProposalDetail(row: 0, name: "25-proposal-active-known")
-        captureProposalDetail(row: 1, name: "26-proposal-approved-ready")
-        captureProposalDetail(row: 2, name: "27-proposal-config")
-        captureProposalDetail(row: 3, name: "28-proposal-unknown")
-        captureProposalDetail(row: 4, name: "29-proposal-executed")
+        captureProposalDetail(row: 1, name: "25-proposal-active-known")
+        captureProposalDetail(row: 2, name: "26-proposal-approved-ready")
+        captureProposalDetail(row: 3, name: "27-proposal-config")
+        captureProposalDetail(row: 4, name: "28-proposal-unknown")
+        captureProposalDetail(row: 5, name: "29-proposal-executed")
     }
 
     func testDemoHighRiskTypeToConfirm() {
         launchDemo(profile: "appstore")
         openFirstSquadProposals()
 
-        tapButton("proposal-preview-row-3")
+        // Row 4: unknown-program proposal (index 11), which triggers the high-risk
+        // type-to-confirm gate. Row 0 is now the config-permission proposal (index 15).
+        tapButton("proposal-preview-row-4")
         waitForScreen("screen.proposal-detail")
         capture("30-high-risk-active-detail")
 
@@ -373,6 +398,27 @@ final class ProposalFlowUITests: DemoWalkthroughUITestCase {
         // button stays disabled until the confirmation phrase is typed.
         waitForElement("proposal-signing-confirmation-field")
         capture("31-high-risk-type-to-confirm")
+    }
+}
+
+// MARK: - Configuration changes section
+
+final class ConfigPermissionProposalUITests: DemoWalkthroughUITestCase {
+    func testDemoConfigPermissionProposalDetail() {
+        launchDemo(profile: "appstore")
+        openFirstSquadProposals()
+
+        // Row 0 is the config-permission proposal (index 15, highest = newest):
+        // a remove+add of the same key collapses to one permission-diff row, a new
+        // voting member adds an Add row, and the enlarged signer pool produces the
+        // derived signing-power (approval-ratio) row. Verifies the grouped
+        // "Configuration changes" section.
+        tapButton("proposal-preview-row-0")
+        waitForScreen("screen.proposal-detail")
+        app.swipeUp()
+        app.swipeUp()
+        app.swipeUp()
+        capture("82-config-permission-diff")
     }
 }
 

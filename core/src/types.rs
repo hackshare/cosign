@@ -47,6 +47,7 @@ pub struct MultisigDetail {
     pub address: String,
     pub threshold: u16,
     pub time_lock_seconds: u32,
+    pub rent_collector: Option<String>,
     pub transaction_index: u64,
     pub stale_transaction_index: u64,
     pub is_autonomous: bool,
@@ -97,6 +98,18 @@ pub struct ProposalDetail {
     pub created_at_unix: Option<i64>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ConfigActionInfo {
+    pub member_key: Option<String>,
+    pub can_initiate: bool,
+    pub can_vote: bool,
+    pub can_execute: bool,
+    pub new_threshold: Option<u16>,
+    pub new_time_lock: Option<u32>,
+    pub new_rent_collector: Option<String>,
+    pub clears_rent_collector: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct DecodedInstruction {
     pub program: String,
@@ -104,6 +117,7 @@ pub struct DecodedInstruction {
     pub summary: String,
     pub accounts: Vec<String>,
     pub raw_data_hex: String,
+    pub config_action: Option<ConfigActionInfo>,
 }
 
 #[derive(Debug, Clone)]
@@ -141,6 +155,7 @@ pub fn multisig_detail(
         address: address.to_string(),
         threshold: ms.threshold,
         time_lock_seconds: ms.time_lock,
+        rent_collector: ms.rent_collector.map(|p| p.to_string()),
         transaction_index: ms.transaction_index,
         stale_transaction_index: ms.stale_transaction_index,
         is_autonomous: ms.config_authority == Pubkey::default(),
@@ -273,6 +288,7 @@ fn vault_transaction_details(
                 summary: format!("Instruction for program {program}"),
                 accounts,
                 raw_data_hex: bytes_to_hex(&ix.data),
+                config_action: None,
             }
         })
         .collect();
@@ -314,6 +330,13 @@ fn config_action_instruction(
                 ),
                 accounts: vec![new_member.key.to_string()],
                 raw_data_hex: String::new(),
+                config_action: Some(ConfigActionInfo {
+                    member_key: Some(new_member.key.to_string()),
+                    can_initiate: new_member.permissions.has(Permission::Initiate),
+                    can_vote: new_member.permissions.has(Permission::Vote),
+                    can_execute: new_member.permissions.has(Permission::Execute),
+                    ..Default::default()
+                }),
             }
         }
         ConfigAction::RemoveMember { old_member } => {
@@ -324,6 +347,10 @@ fn config_action_instruction(
                 summary: format!("Remove member {old_member}"),
                 accounts: vec![old_member.to_string()],
                 raw_data_hex: String::new(),
+                config_action: Some(ConfigActionInfo {
+                    member_key: Some(old_member.to_string()),
+                    ..Default::default()
+                }),
             }
         }
         ConfigAction::ChangeThreshold { new_threshold } => DecodedInstruction {
@@ -332,6 +359,10 @@ fn config_action_instruction(
             summary: format!("Change threshold to {new_threshold}"),
             accounts: Vec::new(),
             raw_data_hex: String::new(),
+            config_action: Some(ConfigActionInfo {
+                new_threshold: Some(*new_threshold),
+                ..Default::default()
+            }),
         },
         ConfigAction::SetTimeLock { new_time_lock } => DecodedInstruction {
             program: "Squads".into(),
@@ -339,6 +370,10 @@ fn config_action_instruction(
             summary: format!("Set time lock to {}", format_time_lock(*new_time_lock)),
             accounts: Vec::new(),
             raw_data_hex: String::new(),
+            config_action: Some(ConfigActionInfo {
+                new_time_lock: Some(*new_time_lock),
+                ..Default::default()
+            }),
         },
         ConfigAction::AddSpendingLimit {
             create_key,
@@ -355,6 +390,7 @@ fn config_action_instruction(
                 summary: format!("Add spending limit for vault {vault_index}: {amount}"),
                 accounts: vec![create_key.to_string(), mint.to_string()],
                 raw_data_hex: String::new(),
+                config_action: None,
             }
         }
         ConfigAction::RemoveSpendingLimit { spending_limit } => {
@@ -365,6 +401,7 @@ fn config_action_instruction(
                 summary: format!("Remove spending limit {spending_limit}"),
                 accounts: vec![spending_limit.to_string()],
                 raw_data_hex: String::new(),
+                config_action: None,
             }
         }
         ConfigAction::SetRentCollector { new_rent_collector } => {
@@ -381,6 +418,11 @@ fn config_action_instruction(
                 summary,
                 accounts: new_rent_collector.iter().map(ToString::to_string).collect(),
                 raw_data_hex: String::new(),
+                config_action: Some(ConfigActionInfo {
+                    new_rent_collector: new_rent_collector.map(|p| p.to_string()),
+                    clears_rent_collector: new_rent_collector.is_none(),
+                    ..Default::default()
+                }),
             }
         }
         _ => DecodedInstruction {
@@ -389,6 +431,7 @@ fn config_action_instruction(
             summary: "Unknown config action".into(),
             accounts: Vec::new(),
             raw_data_hex: String::new(),
+            config_action: None,
         },
     }
 }
@@ -517,6 +560,27 @@ mod tests {
 
         assert_eq!(instruction.kind, "add_member");
         assert!(instruction.summary.contains("initiate, vote permissions"));
+        let info = instruction
+            .config_action
+            .expect("add_member carries config_action");
+        assert!(info.can_initiate);
+        assert!(info.can_vote);
+        assert!(!info.can_execute);
+        assert!(info.member_key.is_some());
+    }
+
+    #[test]
+    fn config_action_instruction_carries_new_threshold() {
+        let mut accounts = Vec::new();
+        let instruction = config_action_instruction(
+            &ConfigAction::ChangeThreshold { new_threshold: 3 },
+            &mut accounts,
+        );
+        let info = instruction
+            .config_action
+            .expect("change_threshold carries config_action");
+        assert_eq!(info.new_threshold, Some(3));
+        assert_eq!(info.member_key, None);
     }
 
     #[test]
@@ -531,6 +595,7 @@ mod tests {
 
         assert_eq!(instruction.kind, "set_rent_collector");
         assert_eq!(instruction.summary, "Clear rent collector");
+        assert!(instruction.config_action.unwrap().clears_rent_collector);
     }
 
     #[test]

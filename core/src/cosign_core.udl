@@ -80,10 +80,14 @@ namespace cosign_core {
         string rpc_url,
         string multisig_address,
         string member_pubkey,
-        sequence<string> added_members,
-        sequence<string> removed_members,
+        sequence<ConfigMemberInput> desired_members,
         u16 new_threshold,
         u32 new_time_lock,
+        string? new_rent_collector,
+        sequence<ConfigMemberInput> expected_members,
+        u16 expected_threshold,
+        u32 expected_time_lock,
+        string? expected_rent_collector,
         string? memo
     );
 
@@ -167,6 +171,13 @@ dictionary TokenTransferProposalParams {
     string? memo;
 };
 
+dictionary ConfigMemberInput {
+    string pubkey;
+    boolean can_initiate;
+    boolean can_vote;
+    boolean can_execute;
+};
+
 [Error]
 enum CryptoError {
     "InvalidWordCount",
@@ -189,6 +200,7 @@ dictionary MultisigDetail {
     string address;
     u16 threshold;
     u32 time_lock_seconds;
+    string? rent_collector;
     u64 transaction_index;
     u64 stale_transaction_index;
     boolean is_autonomous;
@@ -235,12 +247,24 @@ dictionary ProposalDetail {
     i64? created_at_unix;
 };
 
+dictionary ConfigActionInfo {
+    string? member_key;
+    boolean can_initiate;
+    boolean can_vote;
+    boolean can_execute;
+    u16? new_threshold;
+    u32? new_time_lock;
+    string? new_rent_collector;
+    boolean clears_rent_collector;
+};
+
 dictionary DecodedInstruction {
     string program;
     string kind;
     string summary;
     sequence<string> accounts;
     string raw_data_hex;
+    ConfigActionInfo? config_action;
 };
 
 dictionary ActivityItem {

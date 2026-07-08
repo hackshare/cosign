@@ -4,10 +4,9 @@ import Foundation
 
 public enum ConfigChangeError: Error, Sendable {
     case notAutonomous
-    case signerNotMember(String)
-    case missingInitiatePermission
     case invalidMemberAddress(String)
     case contradictoryEdit(String)
+    case memberMissingPermission(String)
     case noChanges
     case thresholdOutOfRange(String)
     case timeLockOutOfRange
@@ -18,14 +17,12 @@ extension ConfigChangeError: LocalizedError {
         switch self {
         case .notAutonomous:
             "Config changes require an autonomous Squad."
-        case let .signerNotMember(address):
-            "The selected signer (\(address)) is not a member of this Squad."
-        case .missingInitiatePermission:
-            "The selected signer does not have permission to create proposals for this Squad."
         case let .invalidMemberAddress(address):
             "'\(address)' is not a valid Solana address."
         case let .contradictoryEdit(reason):
             "Contradictory change: \(reason)."
+        case .memberMissingPermission:
+            "Every member needs at least one permission."
         case .noChanges:
             "No changes were specified."
         case let .thresholdOutOfRange(reason):
@@ -37,122 +34,62 @@ extension ConfigChangeError: LocalizedError {
 }
 
 public extension SquadsService {
-    /// Validates a config-change request against the current squad state.
-    /// Mirrors the Rust projected-invariant logic: checks autonomous flag,
-    /// signer membership + initiate permission, address validity, no
-    /// contradictions, and threshold bounds against the projected member set.
     static let maxTimeLockSeconds: UInt32 = 7_776_000
 
-    // swiftlint:disable:next function_parameter_count
     static func validateConfigChange(
         detail: SquadDetail,
-        memberPubkey: String,
-        addedMembers: [String],
-        removedMembers: [String],
+        desiredMembers: [SquadMember],
         newThreshold: UInt16,
-        newTimeLockSeconds: UInt32
-    ) throws {
-        guard detail.isAutonomous else {
-            throw ConfigChangeError.notAutonomous
-        }
-        guard newTimeLockSeconds <= maxTimeLockSeconds else {
-            throw ConfigChangeError.timeLockOutOfRange
-        }
-        guard let signer = detail.members.first(where: { $0.pubkey == memberPubkey }) else {
-            throw ConfigChangeError.signerNotMember(memberPubkey)
-        }
-        guard signer.canInitiate else {
-            throw ConfigChangeError.missingInitiatePermission
-        }
-        let currentPubkeys = Set(detail.members.map(\.pubkey))
-        try validateConfigEdits(
-            addedMembers: addedMembers,
-            removedMembers: removedMembers,
-            currentPubkeys: currentPubkeys,
-            newThreshold: newThreshold,
-            currentThreshold: detail.threshold,
-            newTimeLockSeconds: newTimeLockSeconds,
-            currentTimeLockSeconds: detail.timeLockSeconds
-        )
-        // Projected member set: (existing − removed) + added.
-        // Added members are treated as full-permission (canVote, canInitiate, canExecute).
-        let addedSet = Set(addedMembers)
-        let removedSet = Set(removedMembers)
-        let projectedExisting = detail.members.filter { !removedSet.contains($0.pubkey) }
-        try validateProjectedInvariant(
-            newThreshold: newThreshold,
-            projectedVoterCount: projectedExisting.filter(\.canVote).count + addedSet.count,
-            projectedProposerCount: projectedExisting.filter(\.canInitiate).count + addedSet.count,
-            projectedExecutorCount: projectedExisting.filter(\.canExecute).count + addedSet.count
-        )
-    }
-
-    // swiftlint:disable:next function_parameter_count
-    private static func validateConfigEdits(
-        addedMembers: [String],
-        removedMembers: [String],
-        currentPubkeys: Set<String>,
-        newThreshold: UInt16,
-        currentThreshold: UInt16,
         newTimeLockSeconds: UInt32,
-        currentTimeLockSeconds: UInt32
+        newRentCollector: String?
     ) throws {
-        for address in addedMembers where !CosignCore.isValidSolanaPubkey(address) {
-            throw ConfigChangeError.invalidMemberAddress(address)
-        }
-        for address in removedMembers where !CosignCore.isValidSolanaPubkey(address) {
-            throw ConfigChangeError.invalidMemberAddress(address)
-        }
-        // Check intersection before individual add/remove checks so that
-        // "add+remove same key" is reported as a contradiction rather than
-        // collapsing into the remove-non-member branch.
-        let addedSet = Set(addedMembers)
-        let removedSet = Set(removedMembers)
-        if let conflict = addedSet.intersection(removedSet).first {
-            throw ConfigChangeError.contradictoryEdit("\(conflict) appears in both added and removed")
-        }
-        for address in addedMembers where currentPubkeys.contains(address) {
-            throw ConfigChangeError.contradictoryEdit("\(address) is already a member")
-        }
-        for address in removedMembers where !currentPubkeys.contains(address) {
-            throw ConfigChangeError.contradictoryEdit("\(address) is not a member")
-        }
-        let isNoOp = addedMembers.isEmpty && removedMembers.isEmpty
-            && newThreshold == currentThreshold
-            && newTimeLockSeconds == currentTimeLockSeconds
-        guard !isNoOp else {
-            throw ConfigChangeError.noChanges
-        }
-    }
+        guard detail.isAutonomous else { throw ConfigChangeError.notAutonomous }
+        guard newTimeLockSeconds <= maxTimeLockSeconds else { throw ConfigChangeError.timeLockOutOfRange }
 
-    private static func validateProjectedInvariant(
-        newThreshold: UInt16,
-        projectedVoterCount: Int,
-        projectedProposerCount: Int,
-        projectedExecutorCount: Int
-    ) throws {
+        try validateMemberAddresses(desiredMembers, rentCollector: newRentCollector)
+        if Set(desiredMembers.map(\.pubkey)).count != desiredMembers.count {
+            throw ConfigChangeError.contradictoryEdit("a member appears more than once")
+        }
+        for member in desiredMembers where !(member.canInitiate || member.canVote || member.canExecute) {
+            throw ConfigChangeError.memberMissingPermission(member.pubkey)
+        }
+
+        let voters = desiredMembers.count(where: \.canVote)
+        let proposers = desiredMembers.count(where: \.canInitiate)
+        let executors = desiredMembers.count(where: \.canExecute)
         guard newThreshold >= 1 else {
             throw ConfigChangeError.thresholdOutOfRange("threshold must be at least 1")
         }
-        guard newThreshold <= projectedVoterCount else {
+        guard Int(newThreshold) <= voters else {
             throw ConfigChangeError.thresholdOutOfRange(
-                "threshold \(newThreshold) exceeds projected voter count \(projectedVoterCount)"
+                "threshold \(newThreshold) exceeds voter count \(voters)"
             )
         }
-        guard projectedProposerCount >= 1 else {
-            throw ConfigChangeError.thresholdOutOfRange("no projected member has initiate permission")
+        guard proposers >= 1 else {
+            throw ConfigChangeError.thresholdOutOfRange("no member has propose permission")
         }
-        guard projectedExecutorCount >= 1 else {
-            throw ConfigChangeError.thresholdOutOfRange("no projected member has execute permission")
+        guard executors >= 1 else {
+            throw ConfigChangeError.thresholdOutOfRange("no member has execute permission")
         }
+
+        let sameMembers = Set(desiredMembers.map(memberKey)) == Set(detail.members.map(memberKey))
+        let isNoOp = sameMembers
+            && newThreshold == detail.threshold
+            && newTimeLockSeconds == detail.timeLockSeconds
+            && newRentCollector == detail.rentCollector
+        if isNoOp { throw ConfigChangeError.noChanges }
     }
 
     // swiftlint:disable:next function_parameter_count
     func submitConfigChangeProposal(
-        addedMembers: [String],
-        removedMembers: [String],
+        desiredMembers: [SquadMember],
         newThreshold: UInt16,
         newTimeLockSeconds: UInt32,
+        newRentCollector: String?,
+        expectedMembers: [SquadMember],
+        expectedThreshold: UInt16,
+        expectedTimeLockSeconds: UInt32,
+        expectedRentCollector: String?,
         in squadAddress: String,
         signer: any Signer
     ) async throws -> ProposalCreationSubmission {
@@ -160,21 +97,30 @@ public extension SquadsService {
         let detail = try await detail(of: squadAddress)
         try Self.validateConfigChange(
             detail: detail,
-            memberPubkey: memberPubkey,
-            addedMembers: addedMembers,
-            removedMembers: removedMembers,
+            desiredMembers: desiredMembers,
             newThreshold: newThreshold,
-            newTimeLockSeconds: newTimeLockSeconds
+            newTimeLockSeconds: newTimeLockSeconds,
+            newRentCollector: newRentCollector
         )
 
+        let toConfigMemberInput = { (mem: SquadMember) in
+            ConfigMemberInput(
+                pubkey: mem.pubkey, canInitiate: mem.canInitiate,
+                canVote: mem.canVote, canExecute: mem.canExecute
+            )
+        }
         var request = ConfigChangeProposalRequest()
         request.rpcURL = rpcURL
         request.multisigAddress = squadAddress
         request.memberPubkey = memberPubkey
-        request.addedMembers = addedMembers
-        request.removedMembers = removedMembers
+        request.desiredMembers = desiredMembers.map(toConfigMemberInput)
         request.newThreshold = newThreshold
         request.newTimeLockSeconds = newTimeLockSeconds
+        request.newRentCollector = newRentCollector
+        request.expectedMembers = expectedMembers.map(toConfigMemberInput)
+        request.expectedThreshold = expectedThreshold
+        request.expectedTimeLockSeconds = expectedTimeLockSeconds
+        request.expectedRentCollector = expectedRentCollector
         let prepared = try CosignCore.buildSquadsConfigChangeProposal(request)
 
         let signatureBytes = try await signer.sign(message: prepared.messageBytes)
@@ -184,5 +130,21 @@ public extension SquadsService {
             signatureBytes: signatureBytes,
             squadAddress: squadAddress
         )
+    }
+
+    private static func validateMemberAddresses(
+        _ desiredMembers: [SquadMember],
+        rentCollector: String?
+    ) throws {
+        for member in desiredMembers where !CosignCore.isValidSolanaPubkey(member.pubkey) {
+            throw ConfigChangeError.invalidMemberAddress(member.pubkey)
+        }
+        if let collector = rentCollector, !CosignCore.isValidSolanaPubkey(collector) {
+            throw ConfigChangeError.invalidMemberAddress(collector)
+        }
+    }
+
+    private static func memberKey(_ member: SquadMember) -> String {
+        "\(member.pubkey):\(member.canInitiate ? 1 : 0)\(member.canVote ? 1 : 0)\(member.canExecute ? 1 : 0)"
     }
 }

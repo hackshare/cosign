@@ -112,6 +112,49 @@ extension CosignCopy {
             "Instruction \(index)"
         }
 
+        static let configProposalTitle = "Change squad configuration"
+        static func configProposalSubtitle(count: Int) -> String {
+            count == 1
+                ? "1 change to members, permissions, and threshold"
+                : "\(count) changes to members, permissions, and threshold"
+        }
+
+        static let configAuthorityBadge = "CONFIG · AUTHORITY"
+        static let configChangesSectionTitle = "Configuration changes"
+        static let authorityBannerTitle = "Changes signing authority"
+        static let authorityBannerBody =
+            "This proposal alters who can sign and how many signatures execute. Review each change below."
+        static let configNewChip = "New"
+        static let configRemovedNote = "No longer a signer"
+        static let configThresholdLabel = "Signatures to execute"
+        static let configTimeLockLabel = "Time lock"
+        static let configRentCollectorLabel = "Rent collector"
+        static let configRentCollectorNone = "None"
+        static let configPermissionLabel = "Permission"
+        static let configAddLabel = "Add"
+        static let configRemoveLabel = "Remove"
+        static let configPermissionsNone = "None"
+        static let configSigningPowerLabel = "Signing power"
+        static let configApprovalRatio = "Approval ratio"
+        static let configDerivedTag = "DERIVED"
+        static let configLooserChip = "Looser"
+        static let configTighterChip = "Tighter"
+        static let configNowUnanimousChip = "Now unanimous"
+
+        static func signingPowerCaveat(signatures: Int, looser: Bool) -> String {
+            let subject = signatures == 1 ? "1 signature now comes" : "\(signatures) signatures now come"
+            let pool = looser ? "a larger pool, a proportionally looser bar" : "a smaller pool"
+            return "Threshold unchanged. Same \(subject) from \(pool)."
+        }
+
+        static func configChangesCount(_ count: Int) -> String {
+            "\(count) · this proposal"
+        }
+
+        static func thresholdDiff(oldValue: Int, oldOf: Int, newValue: Int, newOf: Int) -> String {
+            "\(oldValue) of \(oldOf) \u{2192} \(newValue) of \(newOf)"
+        }
+
         static func voteRingThreshold(_ threshold: UInt16) -> String {
             "/\(threshold)"
         }

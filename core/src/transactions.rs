@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use solana_sdk::signer::{Signer as _, keypair::Keypair};
 use solana_sdk::{
     instruction::Instruction,
@@ -69,87 +71,46 @@ pub(crate) fn validate_threshold(
     Ok(())
 }
 
-pub(crate) fn project_config_members(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn diff_config_actions(
     current: &[Member],
-    added: &[Pubkey],
-    removed: &[Pubkey],
-) -> Result<Vec<Member>, TransactionBuildError> {
-    let invalid = |m: String| TransactionBuildError::InvalidTransaction(m);
-    for key in added {
-        if removed.contains(key) {
-            return Err(invalid(format!("{key} is both added and removed")));
-        }
-        if current.iter().any(|m| &m.key == key) {
-            return Err(invalid(format!("{key} is already a member")));
-        }
-    }
-    for key in removed {
-        if !current.iter().any(|m| &m.key == key) {
-            return Err(invalid(format!("{key} is not a member")));
-        }
-    }
-    let full = Permissions { mask: 7 };
-    let mut projected: Vec<Member> = current
-        .iter()
-        .filter(|m| !removed.contains(&m.key))
-        .cloned()
-        .collect();
-    for key in added {
-        projected.push(Member {
-            key: *key,
-            permissions: full,
-        });
-    }
-    Ok(projected)
-}
-
-pub(crate) fn validate_config_projection(
-    projected: &[Member],
-    new_threshold: u16,
-) -> Result<(), TransactionBuildError> {
-    let invalid = |m: &str| TransactionBuildError::InvalidTransaction(m.to_string());
-    if new_threshold == 0 {
-        return Err(invalid("threshold must be at least 1"));
-    }
-    let voters = Multisig::num_voters(projected);
-    if usize::from(new_threshold) > voters {
-        return Err(TransactionBuildError::InvalidTransaction(format!(
-            "threshold {new_threshold} cannot exceed the {voters} voting members"
-        )));
-    }
-    if Multisig::num_proposers(projected) == 0 {
-        return Err(invalid(
-            "the squad must keep at least one member who can propose",
-        ));
-    }
-    if Multisig::num_executors(projected) == 0 {
-        return Err(invalid(
-            "the squad must keep at least one member who can execute",
-        ));
-    }
-    Ok(())
-}
-
-pub(crate) fn build_config_actions(
+    desired: &[Member],
     current_threshold: u16,
     new_threshold: u16,
-    added: &[Pubkey],
-    removed: &[Pubkey],
     current_time_lock: u32,
     new_time_lock: u32,
+    current_rent_collector: Option<Pubkey>,
+    new_rent_collector: Option<Pubkey>,
 ) -> Vec<ConfigAction> {
-    let full = Permissions { mask: 7 };
+    let mask_of = |members: &[Member], key: &Pubkey| {
+        members
+            .iter()
+            .find(|m| &m.key == key)
+            .map(|m| m.permissions.mask)
+    };
     let mut actions: Vec<ConfigAction> = Vec::new();
-    for key in removed {
-        actions.push(ConfigAction::RemoveMember { old_member: *key });
+
+    // Removes: a current key that is absent from desired, or whose mask changed.
+    for m in current {
+        match mask_of(desired, &m.key) {
+            None => actions.push(ConfigAction::RemoveMember { old_member: m.key }),
+            Some(mask) if mask != m.permissions.mask => {
+                actions.push(ConfigAction::RemoveMember { old_member: m.key })
+            }
+            Some(_) => {}
+        }
     }
-    for key in added {
-        actions.push(ConfigAction::AddMember {
-            new_member: Member {
-                key: *key,
-                permissions: full,
-            },
-        });
+    // Adds: a desired key absent from current, or whose mask changed (re-added with the new mask).
+    for m in desired {
+        let changed = match mask_of(current, &m.key) {
+            None => true,
+            Some(mask) => mask != m.permissions.mask,
+        };
+        if changed {
+            actions.push(ConfigAction::AddMember {
+                new_member: m.clone(),
+            });
+        }
     }
     if new_threshold != current_threshold {
         actions.push(ConfigAction::ChangeThreshold { new_threshold });
@@ -157,7 +118,93 @@ pub(crate) fn build_config_actions(
     if new_time_lock != current_time_lock {
         actions.push(ConfigAction::SetTimeLock { new_time_lock });
     }
+    if new_rent_collector != current_rent_collector {
+        actions.push(ConfigAction::SetRentCollector { new_rent_collector });
+    }
     actions
+}
+
+/// Returns true when the expected snapshot matches the on-chain multisig state.
+/// Membership comparison is order-independent; both (key, mask) pairs must match.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn config_matches(
+    expected_members: &[Member],
+    expected_threshold: u16,
+    expected_time_lock: u32,
+    expected_rent_collector: Option<Pubkey>,
+    current_members: &[Member],
+    current_threshold: u16,
+    current_time_lock: u32,
+    current_rent_collector: Option<Pubkey>,
+) -> bool {
+    if expected_threshold != current_threshold {
+        return false;
+    }
+    if expected_time_lock != current_time_lock {
+        return false;
+    }
+    if expected_rent_collector != current_rent_collector {
+        return false;
+    }
+    // Build sets of (key, mask) pairs.  The length guard is required: if
+    // expected contains duplicates (e.g. [A, A]) they collapse to one entry
+    // in the set, so a set-equality check alone would wrongly accept
+    // expected=[A,A] vs current=[A] (both sets become {A}).  With the length
+    // guard that case is caught before reaching the set comparison.
+    if expected_members.len() != current_members.len() {
+        return false;
+    }
+    let expected_set: HashSet<(Pubkey, u8)> = expected_members
+        .iter()
+        .map(|m| (m.key, m.permissions.mask))
+        .collect();
+    let current_set: HashSet<(Pubkey, u8)> = current_members
+        .iter()
+        .map(|m| (m.key, m.permissions.mask))
+        .collect();
+    expected_set == current_set
+}
+
+pub(crate) fn validate_desired_config(
+    desired: &[Member],
+    new_threshold: u16,
+) -> Result<(), TransactionBuildError> {
+    let invalid = |m: &str| TransactionBuildError::InvalidTransaction(m.to_string());
+    // Unique keys and valid masks.
+    for (i, m) in desired.iter().enumerate() {
+        if desired[i + 1..].iter().any(|other| other.key == m.key) {
+            return Err(TransactionBuildError::InvalidTransaction(format!(
+                "{} appears more than once",
+                m.key
+            )));
+        }
+        if m.permissions.mask == 0 || m.permissions.mask > 7 {
+            return Err(TransactionBuildError::InvalidTransaction(format!(
+                "{} must have at least one permission",
+                m.key
+            )));
+        }
+    }
+    if new_threshold == 0 {
+        return Err(invalid("threshold must be at least 1"));
+    }
+    let voters = Multisig::num_voters(desired);
+    if usize::from(new_threshold) > voters {
+        return Err(TransactionBuildError::InvalidTransaction(format!(
+            "threshold {new_threshold} cannot exceed the {voters} voting members"
+        )));
+    }
+    if Multisig::num_proposers(desired) == 0 {
+        return Err(invalid(
+            "the squad must keep at least one member who can propose",
+        ));
+    }
+    if Multisig::num_executors(desired) == 0 {
+        return Err(invalid(
+            "the squad must keep at least one member who can execute",
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_time_lock(new_time_lock: u32) -> Result<(), TransactionBuildError> {
@@ -644,14 +691,33 @@ pub fn build_config_change_proposal_transaction(
     rpc: RpcClient,
     multisig: Pubkey,
     member: Pubkey,
-    added_members: Vec<Pubkey>,
-    removed_members: Vec<Pubkey>,
+    desired_members: Vec<Member>,
     new_threshold: u16,
     new_time_lock: u32,
+    new_rent_collector: Option<Pubkey>,
+    expected_members: Vec<Member>,
+    expected_threshold: u16,
+    expected_time_lock: u32,
+    expected_rent_collector: Option<Pubkey>,
     memo: Option<String>,
 ) -> Result<PreparedProposalCreation, TransactionBuildError> {
     let client = SquadsClient::new(rpc);
     let multisig_account = client.get_multisig(&multisig)?;
+
+    if !config_matches(
+        &expected_members,
+        expected_threshold,
+        expected_time_lock,
+        expected_rent_collector,
+        &multisig_account.members,
+        multisig_account.threshold,
+        multisig_account.time_lock,
+        multisig_account.rent_collector,
+    ) {
+        return Err(TransactionBuildError::InvalidTransaction(
+            "the squad configuration changed on-chain; reload and try again".into(),
+        ));
+    }
 
     if multisig_account.config_authority != Pubkey::default() {
         return Err(TransactionBuildError::InvalidTransaction(
@@ -664,17 +730,17 @@ pub fn build_config_change_proposal_transaction(
         ));
     }
     validate_time_lock(new_time_lock)?;
+    validate_desired_config(&desired_members, new_threshold)?;
 
-    let projected =
-        project_config_members(&multisig_account.members, &added_members, &removed_members)?;
-    validate_config_projection(&projected, new_threshold)?;
-    let actions = build_config_actions(
+    let actions = diff_config_actions(
+        &multisig_account.members,
+        &desired_members,
         multisig_account.threshold,
         new_threshold,
-        &added_members,
-        &removed_members,
         multisig_account.time_lock,
         new_time_lock,
+        multisig_account.rent_collector,
+        new_rent_collector,
     );
     if actions.is_empty() {
         return Err(TransactionBuildError::InvalidTransaction(
@@ -1296,137 +1362,297 @@ mod tests {
         assert_eq!(cost.total, 2_105_000);
     }
 
-    fn member(mask: u8) -> Member {
-        Member {
-            key: Pubkey::new_unique(),
-            permissions: Permissions { mask },
-        }
+    #[test]
+    fn config_matches_detects_drift() {
+        let a = Pubkey::new_unique();
+        let b = Pubkey::new_unique();
+        let full = Permissions { mask: 7 };
+        let vote_only = Permissions { mask: 2 };
+        let rc = Pubkey::new_unique();
+
+        let members = vec![
+            Member {
+                key: a,
+                permissions: full,
+            },
+            Member {
+                key: b,
+                permissions: full,
+            },
+        ];
+
+        // Identical snapshot → matches
+        assert!(config_matches(&members, 2, 0, None, &members, 2, 0, None));
+
+        // Order-independent: same members, reversed order → matches
+        let reordered = vec![
+            Member {
+                key: b,
+                permissions: full,
+            },
+            Member {
+                key: a,
+                permissions: full,
+            },
+        ];
+        assert!(config_matches(&members, 2, 0, None, &reordered, 2, 0, None));
+
+        // Changed permission mask → mismatch
+        let changed_mask = vec![
+            Member {
+                key: a,
+                permissions: vote_only,
+            },
+            Member {
+                key: b,
+                permissions: full,
+            },
+        ];
+        assert!(!config_matches(
+            &members,
+            2,
+            0,
+            None,
+            &changed_mask,
+            2,
+            0,
+            None
+        ));
+
+        // Changed threshold → mismatch
+        assert!(!config_matches(&members, 2, 0, None, &members, 1, 0, None));
+
+        // Changed time lock → mismatch
+        assert!(!config_matches(
+            &members, 2, 0, None, &members, 2, 3600, None
+        ));
+
+        // Changed rent collector (None → Some) → mismatch
+        assert!(!config_matches(
+            &members,
+            2,
+            0,
+            None,
+            &members,
+            2,
+            0,
+            Some(rc)
+        ));
+
+        // Changed rent collector (Some → None) → mismatch
+        assert!(!config_matches(
+            &members,
+            2,
+            0,
+            Some(rc),
+            &members,
+            2,
+            0,
+            None
+        ));
+
+        // Member added on-chain → mismatch
+        let c = Pubkey::new_unique();
+        let extended = vec![
+            Member {
+                key: a,
+                permissions: full,
+            },
+            Member {
+                key: b,
+                permissions: full,
+            },
+            Member {
+                key: c,
+                permissions: full,
+            },
+        ];
+        assert!(!config_matches(&members, 2, 0, None, &extended, 2, 0, None));
+
+        // Member removed on-chain → mismatch
+        let shortened = vec![Member {
+            key: a,
+            permissions: full,
+        }];
+        assert!(!config_matches(
+            &members, 2, 0, None, &shortened, 2, 0, None
+        ));
+
+        // Duplicate-safe: expected=[A, A] vs current=[A, B] must be false.
+        // The old all/any check would pass because both A entries in expected
+        // find A in current; the new set equality detects B is absent.
+        let dup_a = Pubkey::new_unique();
+        let other_b = Pubkey::new_unique();
+        let dup_expected = vec![
+            Member {
+                key: dup_a,
+                permissions: full,
+            },
+            Member {
+                key: dup_a,
+                permissions: full,
+            },
+        ];
+        let distinct_current = vec![
+            Member {
+                key: dup_a,
+                permissions: full,
+            },
+            Member {
+                key: other_b,
+                permissions: full,
+            },
+        ];
+        assert!(!config_matches(
+            &dup_expected,
+            2,
+            0,
+            None,
+            &distinct_current,
+            2,
+            0,
+            None
+        ));
     }
 
     #[test]
-    fn project_config_members_adds_full_perm_and_drops_removed() {
-        let a = member(7);
-        let b = member(7);
-        let current = vec![a.clone(), b.clone()];
-        let newk = Pubkey::new_unique();
-        let projected = project_config_members(&current, &[newk], &[b.key]).unwrap();
-        assert_eq!(projected.len(), 2);
-        assert!(projected.iter().any(|m| m.key == a.key));
+    fn diff_config_actions_emits_minimal_delta() {
+        let a = Pubkey::new_unique();
+        let b = Pubkey::new_unique();
+        let c = Pubkey::new_unique();
+        let full = Permissions { mask: 7 };
+        let vote_only = Permissions { mask: 2 };
+        let current = vec![
+            Member {
+                key: a,
+                permissions: full,
+            },
+            Member {
+                key: b,
+                permissions: full,
+            },
+        ];
+        // desired: keep a (full), drop b, add c (full), change is only membership
+        let desired = vec![
+            Member {
+                key: a,
+                permissions: full,
+            },
+            Member {
+                key: c,
+                permissions: full,
+            },
+        ];
+        let actions = diff_config_actions(&current, &desired, 2, 2, 0, 0, None, None);
+        // remove b, add c; no threshold/timelock/rent actions
+        assert_eq!(actions.len(), 2);
+        assert!(matches!(actions[0], ConfigAction::RemoveMember { old_member } if old_member == b));
         assert!(
-            projected
+            matches!(&actions[1], ConfigAction::AddMember { new_member } if new_member.key == c)
+        );
+
+        // mask change on a: remove a then add a with new mask, before adds of brand-new keys? order: removes first, then adds
+        let desired2 = vec![
+            Member {
+                key: a,
+                permissions: vote_only,
+            },
+            Member {
+                key: b,
+                permissions: full,
+            },
+        ];
+        let actions2 = diff_config_actions(&current, &desired2, 2, 2, 0, 0, None, None);
+        assert_eq!(actions2.len(), 2);
+        assert!(
+            matches!(actions2[0], ConfigAction::RemoveMember { old_member } if old_member == a)
+        );
+        assert!(
+            matches!(&actions2[1], ConfigAction::AddMember { new_member } if new_member.key == a && new_member.permissions.mask == 2)
+        );
+
+        // threshold + time lock + rent collector deltas, no member change
+        let rc = Pubkey::new_unique();
+        let actions3 = diff_config_actions(&current, &current, 2, 1, 0, 3600, None, Some(rc));
+        assert!(
+            actions3
                 .iter()
-                .any(|m| m.key == newk && m.permissions.mask == 7)
+                .any(|x| matches!(x, ConfigAction::ChangeThreshold { new_threshold: 1 }))
         );
-        assert!(!projected.iter().any(|m| m.key == b.key));
-    }
-
-    #[test]
-    fn project_config_members_rejects_contradictions() {
-        let a = member(7);
-        let current = vec![a.clone()];
-        // remove a key that is not a member
-        assert!(project_config_members(&current, &[], &[Pubkey::new_unique()]).is_err());
-        // add a key that is already a member
-        assert!(project_config_members(&current, &[a.key], &[]).is_err());
-        // add and remove the same key
-        let k = Pubkey::new_unique();
-        assert!(project_config_members(&current, &[k], &[k]).is_err());
-    }
-
-    #[test]
-    fn validate_config_projection_enforces_threshold_and_voters() {
-        let projected = vec![member(7)]; // 1 voter/proposer/executor
-        assert!(validate_config_projection(&projected, 1).is_ok());
-        assert!(validate_config_projection(&projected, 0).is_err()); // threshold >= 1
-        assert!(validate_config_projection(&projected, 2).is_err()); // threshold <= voters
-        // no voters at all (mask 1 = Initiate only)
-        let no_voters = vec![member(1)];
-        assert!(validate_config_projection(&no_voters, 1).is_err());
-    }
-
-    #[test]
-    fn build_config_actions_orders_removes_adds_threshold() {
-        let add = Pubkey::new_unique();
-        let rem = Pubkey::new_unique();
-        let actions = build_config_actions(1, 2, &[add], &[rem], 0, 0);
-        assert!(
-            matches!(actions[0], ConfigAction::RemoveMember { old_member } if old_member == rem)
-        );
-        assert!(
-            matches!(&actions[1], ConfigAction::AddMember { new_member } if new_member.key == add)
-        );
-        assert!(matches!(
-            actions[2],
-            ConfigAction::ChangeThreshold { new_threshold: 2 }
-        ));
-        // threshold unchanged -> no ChangeThreshold action
-        let actions2 = build_config_actions(1, 1, &[add], &[], 0, 0);
-        assert_eq!(actions2.len(), 1);
-        assert!(matches!(&actions2[0], ConfigAction::AddMember { .. }));
-    }
-
-    #[test]
-    fn config_change_builds_actions_and_validates() {
-        let a = member(7);
-        let b = member(7);
-        let current = vec![a.clone(), b.clone()];
-        let add = Pubkey::new_unique();
-        let projected = project_config_members(&current, &[add], &[b.key]).unwrap();
-        validate_config_projection(&projected, 2).unwrap();
-        let actions = build_config_actions(2, 2, &[add], &[b.key], 0, 0);
-        assert_eq!(actions.len(), 2); // remove + add, threshold unchanged
-    }
-
-    #[test]
-    fn no_proposers_after_projection_is_rejected() {
-        // mask 6 = Vote | Execute (no Initiate), so num_proposers == 0 after projection
-        let projected = vec![member(6)];
-        let result = validate_config_projection(&projected, 1);
-        assert!(
-            matches!(&result, Err(TransactionBuildError::InvalidTransaction(m)) if m.contains("propose")),
-            "expected proposer error, got {result:?}"
-        );
-    }
-
-    #[test]
-    fn no_executors_after_projection_is_rejected() {
-        // mask 3 = Initiate | Vote (no Execute), so num_executors == 0 after projection
-        let projected = vec![member(3)];
-        let result = validate_config_projection(&projected, 1);
-        assert!(
-            matches!(&result, Err(TransactionBuildError::InvalidTransaction(m)) if m.contains("execute")),
-            "expected executor error, got {result:?}"
-        );
-    }
-
-    #[test]
-    fn build_config_actions_appends_set_time_lock_when_changed() {
-        // time lock changed 0 -> 86400, no other changes
-        let actions = build_config_actions(2, 2, &[], &[], 0, 86_400);
-        assert_eq!(actions.len(), 1);
-        assert!(matches!(
-            actions[0],
+        assert!(actions3.iter().any(|x| matches!(
+            x,
             ConfigAction::SetTimeLock {
-                new_time_lock: 86_400
+                new_time_lock: 3600
             }
-        ));
-        // time lock unchanged -> no SetTimeLock action
-        let unchanged = build_config_actions(2, 2, &[], &[], 86_400, 86_400);
-        assert!(unchanged.is_empty());
-        // ordering: members/threshold first, then time lock
-        let add = Pubkey::new_unique();
-        let mixed = build_config_actions(1, 2, &[add], &[], 0, 3_600);
-        assert!(matches!(&mixed[0], ConfigAction::AddMember { .. }));
-        assert!(matches!(
-            mixed[1],
-            ConfigAction::ChangeThreshold { new_threshold: 2 }
-        ));
-        assert!(matches!(
-            mixed[2],
-            ConfigAction::SetTimeLock {
-                new_time_lock: 3_600
-            }
-        ));
+        )));
+        assert!(actions3.iter().any(|x| matches!(x, ConfigAction::SetRentCollector { new_rent_collector } if *new_rent_collector == Some(rc))));
+
+        // clearing rent collector
+        let actions4 = diff_config_actions(&current, &current, 2, 2, 0, 0, Some(rc), None);
+        assert!(actions4.iter().any(|x| matches!(x, ConfigAction::SetRentCollector { new_rent_collector } if new_rent_collector.is_none())));
+
+        // no-op
+        assert!(diff_config_actions(&current, &current, 2, 2, 0, 0, None, None).is_empty());
+    }
+
+    #[test]
+    fn validate_desired_config_enforces_invariants() {
+        let full = Permissions { mask: 7 };
+        let vote_only = Permissions { mask: 2 };
+        let a = Member {
+            key: Pubkey::new_unique(),
+            permissions: full,
+        };
+        let b = Member {
+            key: Pubkey::new_unique(),
+            permissions: full,
+        };
+        assert!(validate_desired_config(&[a.clone(), b.clone()], 2).is_ok());
+        // threshold over voters
+        assert!(validate_desired_config(std::slice::from_ref(&a), 2).is_err());
+        // zero-bit member invalid
+        let zero = Member {
+            key: Pubkey::new_unique(),
+            permissions: Permissions { mask: 0 },
+        };
+        assert!(validate_desired_config(&[a.clone(), zero], 1).is_err());
+        // vote-only: fails the proposer check first
+        let v = Member {
+            key: Pubkey::new_unique(),
+            permissions: vote_only,
+        };
+        assert!(validate_desired_config(&[v], 1).is_err());
+        // no proposer (Vote|Execute, mask 6): fails because num_proposers == 0
+        assert!(
+            validate_desired_config(
+                &[Member {
+                    key: Pubkey::new_unique(),
+                    permissions: Permissions { mask: 6 },
+                }],
+                1
+            )
+            .is_err()
+        );
+        // no executor (Initiate|Vote, mask 3): passes proposer check, fails executor check
+        assert!(
+            validate_desired_config(
+                &[Member {
+                    key: Pubkey::new_unique(),
+                    permissions: Permissions { mask: 3 },
+                }],
+                1
+            )
+            .is_err()
+        );
+        // duplicate key
+        let dup_key = Pubkey::new_unique();
+        let m = Member {
+            key: dup_key,
+            permissions: full,
+        };
+        assert!(validate_desired_config(&[m.clone(), m], 1).is_err());
+        // empty desired: threshold 1 exceeds 0 voters
+        assert!(validate_desired_config(&[], 1).is_err());
     }
 
     #[test]

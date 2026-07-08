@@ -14,6 +14,7 @@ use cosign_core::{
     rpc::RpcClient,
     transactions::{self, VoteType},
 };
+use squads_multisig::state::{Member, Permissions};
 
 #[allow(dead_code)]
 #[path = "support/localnet.rs"]
@@ -79,14 +80,34 @@ fn config_change_proposal_round_trip() -> Result<(), Box<dyn Error>> {
 
     // Build a config-change proposal: add a second member, raise threshold to 2.
     let new_member = solana_sdk::pubkey::Pubkey::new_unique();
+    let full = Permissions { mask: 7 };
+    let desired_members = vec![
+        Member {
+            key: creator.pubkey(),
+            permissions: full,
+        },
+        Member {
+            key: new_member,
+            permissions: full,
+        },
+    ];
+    // The expected current state: 1-of-1 with creator only (matches the just-created multisig).
+    let expected_members = vec![Member {
+        key: creator.pubkey(),
+        permissions: full,
+    }];
     let prepared_proposal = transactions::build_config_change_proposal_transaction(
         RpcClient::new(rpc_url.clone()),
         multisig,
         creator.pubkey(),
-        vec![new_member],
-        vec![],
+        desired_members,
         2,
         0,
+        None,
+        expected_members,
+        1,
+        0,
+        None,
         Some("add member and raise threshold".into()),
     )?;
     let proposal_sig: Vec<u8> = creator
