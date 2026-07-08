@@ -46,7 +46,7 @@ solana-account-decoder = "1.18"
 squads-multisig = "2.1"
 spl-associated-token-account = "2.3"
 spl-token = "4.0"
-spl-token-2022 = "1.0"
+spl-token-2022 = "3.0"
 
 # BIP39 mnemonic + SLIP-0010 + base58 + secret zeroizing.
 # ed25519-dalek 2 was dropped because it requires curve25519-dalek 4 (newer
