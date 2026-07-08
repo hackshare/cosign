@@ -72,7 +72,7 @@ struct ActivityRow: View {
         let movement = AssetMovement.build(from: effects, ownAccounts: ownVaultAccounts)
         guard let leg = movement.primaryLeg else { return nil }
         if let counterparty = leg.counterparty {
-            let short = cosignShortAddress(counterparty, prefix: 6, suffix: 6)
+            let short = cosignMediumAddress(counterparty)
             return leg.direction == .outflow
                 ? CosignCopy.Movement.leg(destination: short)
                 : CosignCopy.Movement.leg(source: short)

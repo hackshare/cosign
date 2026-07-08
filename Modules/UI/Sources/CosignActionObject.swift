@@ -235,6 +235,12 @@ func cosignShortAddress(_ address: String, prefix: Int = 4, suffix: Int = 4) -> 
     return "\(address.prefix(prefix))…\(address.suffix(suffix))"
 }
 
+/// Medium address form (7+7) for surfaces with room for more disambiguation
+/// than the default 4+4 short form (member rows, squad/vault headers, movement legs).
+func cosignMediumAddress(_ address: String) -> String {
+    cosignShortAddress(address, prefix: 7, suffix: 7)
+}
+
 private func uniqueRoles(_ roles: [ActionRole]) -> [ActionRole] {
     var seen = Set<String>()
     return roles.filter { role in

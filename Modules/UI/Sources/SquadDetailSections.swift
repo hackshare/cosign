@@ -175,7 +175,7 @@ struct MemberRow: View {
 
     var body: some View {
         CosignObjectRow(
-            title: cosignShortAddress(member.pubkey, prefix: 6, suffix: 6),
+            title: cosignMediumAddress(member.pubkey),
             metadata: member.pubkey,
             copyValue: member.pubkey,
             copyAccessibilityLabel: CosignCopy.Squads.copyMemberAddress,

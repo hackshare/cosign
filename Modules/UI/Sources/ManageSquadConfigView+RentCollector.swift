@@ -54,7 +54,7 @@ extension ManageSquadConfigView {
                         )
                     }
                 }
-                Text(cosignShortAddress(collector, prefix: 6, suffix: 6))
+                Text(cosignMediumAddress(collector))
                     .font(CosignTheme.FontStyle.monoSmall)
                     .foregroundStyle(CosignTheme.inkDim)
             }

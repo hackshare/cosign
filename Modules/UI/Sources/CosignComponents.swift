@@ -232,7 +232,7 @@ struct CosignNetworkFooter: View {
             Text(text)
                 .font(.system(size: 11, weight: .regular, design: .monospaced))
                 .foregroundStyle(CosignTheme.inkFaint)
-                .tracking(0.2)
+                .tracking(CosignTheme.Tracking.label)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

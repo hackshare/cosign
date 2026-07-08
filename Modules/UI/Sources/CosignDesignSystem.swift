@@ -21,6 +21,7 @@ enum CosignTheme {
     static let accent = Color(hex: 0xF2C26C)
     static let accentDeep = Color(hex: 0xD69A3B)
     static let accentWash = accent.opacity(0.10)
+    static let selectedWash = accent.opacity(0.12)
     static let accentInk = Color(hex: 0x1A1305)
 
     // Status & risk — theme-independent, reserved for meaning.
@@ -29,6 +30,13 @@ enum CosignTheme {
     static let mintWash = mint.opacity(0.10)
     static let riskAmber = Color(hex: 0xF2A65C)
     static let riskRed = Color(hex: 0xF26464)
+
+    /// Letter-spacing for uppercase eyebrow / tag / badge labels.
+    enum Tracking {
+        static let label: CGFloat = 0.2
+        static let tag: CGFloat = 0.6
+        static let badge: CGFloat = 0.8
+    }
 
     enum Radius {
         static let small: CGFloat = 8

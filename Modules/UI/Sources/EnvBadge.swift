@@ -14,7 +14,7 @@ struct EnvBadge: View {
     var body: some View {
         Text(label)
             .font(.system(size: 10, weight: .semibold, design: .rounded))
-            .tracking(0.8)
+            .tracking(CosignTheme.Tracking.badge)
             .foregroundStyle(foreground)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
