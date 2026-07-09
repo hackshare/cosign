@@ -4610,11 +4610,13 @@ fn capabilities_response(config: &RelayConfig, host: Option<&str>) -> HttpRespon
 
 fn prices_response(query: Option<&str>) -> HttpResponse {
     let mints = parse_price_ids(query);
+    let (prices, changes) = fetch_jupiter_price_data(&mints);
     json_response(
         200,
         json!({
             "kind": "prices",
-            "prices": fetch_jupiter_prices(&mints),
+            "prices": prices,
+            "changes": changes,
         }),
     )
 }
@@ -4635,26 +4637,43 @@ fn parse_price_ids(query: Option<&str>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Per-mint USD prices from Jupiter. Mints without a price (and any fetch
-/// failure) are simply absent — the app renders an em-dash, never a fake value.
-fn fetch_jupiter_prices(mints: &[String]) -> serde_json::Map<String, Value> {
+/// Per-mint USD price and 24h change from Jupiter, as two parallel maps. Mints
+/// without data (and any fetch failure) are simply absent — the app renders an
+/// em-dash, never a fake value. `changes` is a percentage (e.g. -1.55).
+fn fetch_jupiter_price_data(
+    mints: &[String],
+) -> (
+    serde_json::Map<String, Value>,
+    serde_json::Map<String, Value>,
+) {
     let mut prices = serde_json::Map::new();
+    let mut changes = serde_json::Map::new();
     if mints.is_empty() {
-        return prices;
+        return (prices, changes);
     }
     let url = format!("https://lite-api.jup.ag/price/v3?ids={}", mints.join(","));
     let Ok(response) = ureq::get(&url).call() else {
-        return prices;
+        return (prices, changes);
     };
     let Ok(body) = response.into_json::<Value>() else {
-        return prices;
+        return (prices, changes);
     };
     for mint in mints {
         if let Some(price) = jupiter_usd_price(&body, mint) {
             prices.insert(mint.clone(), json!(price));
         }
+        if let Some(change) = jupiter_price_change_24h(&body, mint) {
+            changes.insert(mint.clone(), json!(change));
+        }
     }
-    prices
+    (prices, changes)
+}
+
+/// Jupiter Price API v3 24h change percentage: `{ "<mint>": { "priceChange24h": <number> } }`.
+fn jupiter_price_change_24h(body: &Value, mint: &str) -> Option<f64> {
+    body.get(mint)
+        .and_then(|entry| entry.get("priceChange24h"))
+        .and_then(Value::as_f64)
 }
 
 fn jupiter_usd_price(body: &Value, mint: &str) -> Option<f64> {

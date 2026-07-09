@@ -19,6 +19,10 @@ extension CosignCopy {
         static let executeAfterApprovalDetail = "Auto-broadcasts on success"
         static let networkFeeEstimateDetail = "Estimate · paid by the signer"
 
+        static func priceAsOf(_ date: Date) -> String {
+            "price as of \(date.formatted(.dateTime.hour().minute()))"
+        }
+
         static func networkFeeEstimate(lamports: UInt64, solPrice: Double?) -> String {
             let sol = "~\(solQuantity(lamports)) SOL"
             guard let solPrice, solPrice > 0 else {

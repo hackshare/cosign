@@ -11,7 +11,7 @@ public struct SquadDetailView: View {
     private let squadAddress: String
 
     @State private var detail: SquadDetail?
-    @State var prices: [String: Double]?
+    @State var priceSnapshot: PriceSnapshot?
     @State private var selectedTab: SquadDetailTab = .vaults
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -81,31 +81,34 @@ public struct SquadDetailView: View {
     }
 
     private func detailContent(_ detail: SquadDetail) -> some View {
-        CosignScreen {
-            squadNavigationHeader(detail)
-            squadHeader(detail)
-            if !detail.vaults.isEmpty {
-                squadAssetCard(detail)
-                pricingNotice(for: detail)
-                squadMetadataCard(detail)
-            }
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let freshness = priceSnapshot?.freshness(now: context.date)
+            CosignScreen {
+                squadNavigationHeader(detail)
+                squadHeader(detail)
+                if !detail.vaults.isEmpty {
+                    squadAssetCard(detail)
+                    pricingNotice(freshness: freshness, for: detail)
+                    squadMetadataCard(detail)
+                }
 
-            CosignSegmentedTabs(
-                tabs: SquadDetailTab.allCases,
-                selection: $selectedTab,
-                style: .underline,
-                title: \.title
-            )
+                CosignSegmentedTabs(
+                    tabs: SquadDetailTab.allCases,
+                    selection: $selectedTab,
+                    style: .underline,
+                    title: \.title
+                )
 
-            switch selectedTab {
-            case .vaults:
-                vaultsSection(detail)
-            case .proposals:
-                proposalsSection(detail)
-            case .activity:
-                activitySection(detail)
-            case .members:
-                membersSection(detail)
+                switch selectedTab {
+                case .vaults:
+                    vaultsSection(detail, freshness: freshness)
+                case .proposals:
+                    proposalsSection(detail)
+                case .activity:
+                    activitySection(detail)
+                case .members:
+                    membersSection(detail)
+                }
             }
         }
     }
@@ -149,9 +152,9 @@ public struct SquadDetailView: View {
     }
 
     @ViewBuilder
-    private func vaultsSection(_ detail: SquadDetail) -> some View {
+    private func vaultsSection(_ detail: SquadDetail, freshness: PriceFreshness?) -> some View {
         if detail.vaults.count == 1, let vault = detail.vaults.first {
-            singleVaultSection(vault)
+            singleVaultSection(vault, freshness: freshness)
         } else {
             VaultsListView(squadAddress: detail.address, vaults: detail.vaults) {
                 selectedTab = .members
@@ -159,8 +162,13 @@ public struct SquadDetailView: View {
         }
     }
 
-    private func singleVaultSection(_ vault: VaultDetail) -> some View {
-        SingleVaultDetailSection(squadAddress: squadAddress, vault: vault, prices: prices)
+    private func singleVaultSection(_ vault: VaultDetail, freshness: PriceFreshness?) -> some View {
+        SingleVaultDetailSection(
+            squadAddress: squadAddress,
+            vault: vault,
+            priceSnapshot: priceSnapshot,
+            freshness: freshness ?? .fresh
+        )
     }
 
     private func proposalsSection(_ detail: SquadDetail) -> some View {
@@ -213,10 +221,15 @@ public struct SquadDetailView: View {
                 try await squadsService.detail(of: squadAddress)
             }
             detail = loaded
-            if demoMode == nil {
-                let mints = [cosignWrappedSolMint] + loaded.vaults.flatMap { $0.assets.map(\.id) }
-                prices = await squadsService.prices(for: Array(Set(mints)))
+            let mints = [cosignWrappedSolMint] + loaded.vaults.flatMap { $0.assets.map(\.id) }
+            var snapshot = await squadsService.priceSnapshot(for: Array(Set(mints)))
+            #if DEBUG
+            if let ageSeconds = CosignDemoMode.priceAgeSeconds(), demoMode != nil {
+                let shiftedAt = snapshot.fetchedAt.addingTimeInterval(-Double(ageSeconds))
+                snapshot = PriceSnapshot(prices: snapshot.prices, changes: snapshot.changes, fetchedAt: shiftedAt)
             }
+            #endif
+            priceSnapshot = snapshot
             errorMessage = nil
         } catch {
             if detail == nil {

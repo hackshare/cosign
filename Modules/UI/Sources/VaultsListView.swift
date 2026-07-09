@@ -48,7 +48,24 @@ struct CosignVaultCard: View {
 
 struct NativeTokenRow: View {
     let lamports: UInt64
-    var trailingValue: String?
+    private let _trailing: AnyView
+
+    /// String-based trailing (existing callers, demo mode, VaultInspectionView).
+    init(lamports: UInt64, trailingValue: String? = nil) {
+        self.lamports = lamports
+        _trailing = AnyView(
+            Text(trailingValue ?? solAmount(lamports))
+                .font(CosignTheme.FontStyle.body)
+                .foregroundStyle(CosignTheme.inkDim)
+                .monospacedDigit()
+        )
+    }
+
+    /// View-based trailing for freshness-aware content (PriceValueView callers).
+    init(lamports: UInt64, @ViewBuilder trailing: () -> some View) {
+        self.lamports = lamports
+        _trailing = AnyView(trailing())
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -66,10 +83,7 @@ struct NativeTokenRow: View {
                     .foregroundStyle(CosignTheme.inkFaint)
             }
             Spacer()
-            Text(trailingValue ?? solAmount(lamports))
-                .font(CosignTheme.FontStyle.body)
-                .foregroundStyle(CosignTheme.inkDim)
-                .monospacedDigit()
+            _trailing
         }
         .padding(.vertical, 4)
     }
@@ -83,7 +97,33 @@ func copyToPasteboard(_ value: String) {
 
 struct FungibleAssetRow: View {
     let asset: DASAsset
-    var trailingValue: String?
+    private let _trailing: AnyView
+
+    /// String-based trailing (existing callers, demo mode, VaultInspectionView).
+    init(asset: DASAsset, trailingValue: String? = nil) {
+        self.asset = asset
+        let sym = normalized(asset.symbol)
+        let amount = formattedTokenAmount(
+            rawAmount: asset.tokenAmount,
+            displayAmount: asset.tokenDisplayAmount,
+            decimals: asset.decimals
+        )
+        let display = trailingValue ?? CosignCopy.Vaults.tokenAmount(amount, symbol: sym)
+        _trailing = AnyView(
+            Text(display)
+                .font(CosignTheme.FontStyle.body)
+                .foregroundStyle(CosignTheme.inkDim)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .monospacedDigit()
+        )
+    }
+
+    /// View-based trailing for freshness-aware content (PriceValueView callers).
+    init(asset: DASAsset, @ViewBuilder trailing: () -> some View) {
+        self.asset = asset
+        _trailing = AnyView(trailing())
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -124,12 +164,7 @@ struct FungibleAssetRow: View {
 
             Spacer(minLength: 8)
 
-            Text(trailingValue ?? displayAmount)
-                .font(CosignTheme.FontStyle.body)
-                .foregroundStyle(CosignTheme.inkDim)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .monospacedDigit()
+            _trailing
         }
         .padding(.vertical, 4)
     }
@@ -150,15 +185,6 @@ struct FungibleAssetRow: View {
             return nil
         }
         return assetName
-    }
-
-    private var displayAmount: String {
-        let amount = formattedTokenAmount(
-            rawAmount: asset.tokenAmount,
-            displayAmount: asset.tokenDisplayAmount,
-            decimals: asset.decimals
-        )
-        return CosignCopy.Vaults.tokenAmount(amount, symbol: assetSymbol)
     }
 }
 

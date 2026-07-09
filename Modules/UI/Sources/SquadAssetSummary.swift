@@ -77,12 +77,6 @@ func demoUSDValueText(lamports: UInt64) -> String? {
     return formatDemoUSDValue(usd)
 }
 
-/// USD column value: the price when known, otherwise an em-dash — never blank,
-/// never $0 (the holdings column always renders so the unit reads as a ledger).
-func usdTrailing(_ value: String?) -> String {
-    value ?? CosignCopy.VaultDetail.usdUnavailable
-}
-
 func demoUSDValueText(asset: DASAsset) -> String? {
     guard let amount = demoTokenAmount(asset),
           let symbol = asset.symbol?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -111,6 +105,36 @@ func demoUSDValueText(asset: DASAsset) -> String? {
 
 let cosignWrappedSolMint = "So11111111111111111111111111111111111111112"
 
+/// Formats a raw Double USD value as a currency string ("$X.XX").
+/// Used by PriceValueView and the vault balance hero for live-mode prices.
+func formatLiveUSD(_ value: Double) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.currencyCode = CosignCopy.SquadDetail.usdSymbol
+    formatter.currencySymbol = "$"
+    formatter.maximumFractionDigits = 2
+    formatter.minimumFractionDigits = 2
+    return formatter.string(from: NSDecimalNumber(value: value)) ?? String(format: "$%.2f", value)
+}
+
+/// Raw USD value for a SOL balance from a live snapshot.
+/// Returns nil if the snapshot has no SOL price or the balance is zero.
+func usdValue(lamports: UInt64, snapshot: PriceSnapshot) -> Double? {
+    guard lamports > 0, let solPrice = snapshot.prices[cosignWrappedSolMint] else {
+        return nil
+    }
+    return Double(lamports) / 1_000_000_000 * solPrice
+}
+
+/// Raw USD value for a fungible asset from a live snapshot.
+/// Returns nil if the snapshot has no price for the asset's mint.
+func usdValue(asset: DASAsset, snapshot: PriceSnapshot) -> Double? {
+    guard let amount = demoTokenAmount(asset), let price = snapshot.prices[asset.id] else {
+        return nil
+    }
+    return NSDecimalNumber(decimal: amount * Decimal(price)).doubleValue
+}
+
 /// Real-mode USD from a live price book (mint → USD, from the relay). Falls back
 /// to the demo price model when `prices` is nil (the demo build), so demo output
 /// is byte-for-byte unchanged.
@@ -133,13 +157,6 @@ func usdValueText(asset: DASAsset, prices: [String: Double]?) -> String? {
         return nil
     }
     return formatDemoUSDValue(amount * Decimal(price))
-}
-
-func estimatedUSDText(lamports: UInt64, prices: [String: Double]?) -> String? {
-    guard let formatted = usdValueText(lamports: lamports, prices: prices) else {
-        return nil
-    }
-    return CosignCopy.SquadDetail.estimatedUSD(formatted)
 }
 
 private let demoSolUSDPrice = Decimal(159_392_295_227_591) / Decimal(1_000_000_000_000)

@@ -57,7 +57,10 @@ public struct DemoRelayClient: RelayClient {
     }
 
     public func prices(for mints: [String]) async throws -> RelayPrices {
-        RelayPrices(prices: CosignDemoPrices.usd.filter { mints.contains($0.key) })
+        RelayPrices(
+            prices: CosignDemoPrices.usd.filter { mints.contains($0.key) },
+            changes: CosignDemoPrices.changes24h.filter { mints.contains($0.key) }
+        )
     }
 
     private func demoURL(_ pathComponents: [String]) -> URL? {
@@ -69,13 +72,22 @@ public struct DemoRelayClient: RelayClient {
     }
 }
 
-/// Illustrative USD prices for the demo's mints — matches the demo USD values
-/// so demo screenshots are unchanged. Real builds fetch live prices via the relay.
+/// Illustrative USD prices and 24h changes for the demo's mints.
+/// Real builds fetch live prices via the relay.
 enum CosignDemoPrices {
     static let usd: [String: Double] = [
         "So11111111111111111111111111111111111111112": 159.392295227591,
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 1.0,
         "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL": 3.0,
         "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": 0.00002584
+    ]
+
+    /// Illustrative 24h percentage changes matching the design figure:
+    /// SOL ▲ 2.4%, USDC flat 0.0%, JTO ▼ 1.1%, BONK ▲ 6.8%.
+    static let changes24h: [String: Double] = [
+        "So11111111111111111111111111111111111111112": 2.4,
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 0.0,
+        "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL": -1.1,
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": 6.8
     ]
 }

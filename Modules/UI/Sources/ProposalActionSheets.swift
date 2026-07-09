@@ -14,7 +14,8 @@ struct ProposalSigningSheet: View {
     @Environment(\.squadsService) private var squadsService
     @State private var confirmationText = ""
     @State private var footerHeight = CosignLayout.estimatedSheetStickyFooterHeight
-    @State private var solPrice: Double?
+    @State private var frozenSolPrice: Double?
+    @State private var frozenPriceAt: Date?
 
     private static let solMint = "So11111111111111111111111111111111111111112"
 
@@ -79,7 +80,11 @@ struct ProposalSigningSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .task {
-            solPrice = await squadsService.prices(for: [Self.solMint])[Self.solMint]
+            let price = await squadsService.prices(for: [Self.solMint])[Self.solMint]
+            frozenSolPrice = price
+            if price != nil {
+                frozenPriceAt = Date()
+            }
         }
     }
 
@@ -152,6 +157,13 @@ struct ProposalSigningSheet: View {
         )
     }
 
+    private var feeDetail: String {
+        guard let frozenPriceAt, frozenSolPrice != nil else {
+            return CosignCopy.ProposalSigning.networkFeeEstimateDetail
+        }
+        return "\(CosignCopy.ProposalSigning.networkFeeEstimateDetail) · \(CosignCopy.ProposalSigning.priceAsOf(frozenPriceAt))"
+    }
+
     private var estimatedFeeLamports: UInt64 {
         // Solana base fee is 5000 lamports per signature; approve-and-execute
         // broadcasts two transactions.
@@ -168,9 +180,9 @@ struct ProposalSigningSheet: View {
             label: CosignCopy.ProposalSigning.networkFeeLabel,
             value: CosignCopy.ProposalSigning.networkFeeEstimate(
                 lamports: estimatedFeeLamports,
-                solPrice: solPrice
+                solPrice: frozenSolPrice
             ),
-            detail: CosignCopy.ProposalSigning.networkFeeEstimateDetail
+            detail: feeDetail
         )
 
         switch request.action {

@@ -90,14 +90,6 @@ public struct SquadProposalResponse: Decodable, Equatable, Sendable {
     public let proposal: ProposalInspectionProposal
 }
 
-public struct RelayPrices: Decodable, Equatable, Sendable {
-    public let prices: [String: Double]
-
-    public init(prices: [String: Double]) {
-        self.prices = prices
-    }
-}
-
 public struct AccountActivityRequest: Equatable, Sendable {
     public let address: String
     public let beforeSignature: String?
