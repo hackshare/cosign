@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cosign</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="description" content="A native iOS signer for Solana Squads multisigs. Know what you sign before you approve it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,7 +65,14 @@
 </style>
 </head>
 <body>
-<div style="background:#08090B; color:#F4F5F3; font-family:'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; min-height:100vh; overflow-x:hidden;">
+<div style="background:#08090B; color:#F4F5F3; font-family:'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; min-height:100vh; overflow-x:clip;">
+
+  <!-- ROOT overflow-x:clip (NOT hidden): clip prevents horizontal overflow without creating a scroll
+       container, so position:sticky in the how-it-works section resolves against the viewport and
+       pins correctly. Never change this back to overflow-x:hidden or overflow:hidden on the root
+       (or on any ancestor of the sticky phone) — hidden forces overflow-y to compute to auto, makes
+       the element a scroll container, and the sticky phone silently scrolls away in real browsers
+       (Chrome/Safari) even though it looks fine in a scaled preview. -->
 
   <!-- HEADER -->
   <header style="position:sticky; top:0; z-index:40; background:rgba(8,9,11,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,0.06);">
@@ -199,7 +207,7 @@
       </div>
 
       <div style="margin-top:clamp(32px,5vw,64px); display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,300px), 1fr)); gap:clamp(24px,4vw,64px); align-items:start;">
-        <div class="sticky-phone-col" style="position:sticky; top:96px; align-self:start; display:flex; justify-content:center; order:2;">
+        <div class="sticky-phone-col" style="position:sticky; top:0; align-self:start; height:100vh; display:flex; align-items:center; justify-content:center; order:2;">
           <div class="phone" style="position:relative; width:clamp(258px,27vw,300px); border-radius:46px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px;">
             <div style="position:relative; border-radius:38px; overflow:hidden; aspect-ratio:293/634; background:#0C0E12;">
               <img data-shot="0" src="/assets/08-proposal-detail.png" alt="Cosign decoded proposal detail" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:1; transition:opacity .6s ease;">
@@ -211,30 +219,32 @@
         </div>
 
         <div class="beats-col" style="order:1;">
-          <div data-beat="0" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="0" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:#F2C26C; font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">01</span><span data-beat-title style="font-size:15px; font-weight:500; color:#F4F5F3; transition:color .4s ease;">Decoded and inspectable</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Read the action, not the bytes.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Every instruction is decoded into plain language with a severity and a confidence read on the data. Open the raw fields whenever you want them. Nothing is hidden behind a blind signature.</p>
           </div>
 
-          <div data-beat="1" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="1" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">02</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Co-sign to the threshold</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Add your signature, watch the threshold close.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">See who has approved and how many signatures remain. The threshold ring fills as co-signers sign, and Face ID confirms before anything is broadcast. Hold to approve keeps an accidental tap from spending anything.</p>
           </div>
 
-          <div data-beat="2" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="2" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">03</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Self-custody</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Your keys stay on the device.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Keys are generated and held on your iPhone, in the iOS Keychain. Import an existing wallet from its recovery phrase or a raw Solana secret key, all behind Face ID. Cosign cannot move your funds.</p>
             <p style="margin:14px 0 0; max-width:44ch; font-family:'Geist Mono', monospace; font-size:12px; line-height:1.6; color:rgba(244,245,243,0.36);">Hardware signer support is on the roadmap.</p>
           </div>
 
-          <div data-beat="3" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="3" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">04</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Verifiable receipt</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">A receipt you can check on-chain.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">After a proposal executes, Cosign shows the signature and the decoded result, with a link to inspect the transaction on-chain. What you approved and what landed are the same thing, and you can prove it.</p>
           </div>
+
+          <div aria-hidden="true" style="min-height:clamp(60px,20vh,180px);"></div>
         </div>
       </div>
     </section>
@@ -289,21 +299,11 @@
         </div>
         <div style="display:flex; justify-content:center;">
           <div style="width:100%; max-width:420px; border:1px solid rgba(255,255,255,0.1); border-radius:18px; overflow:hidden; background:#0C0E12;">
-            <div style="display:flex; align-items:center; gap:11px; padding:15px 18px; border-bottom:1px solid rgba(255,255,255,0.07);"><span style="width:30px; height:30px; border-radius:999px; background:rgba(124,242,176,0.14); display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 20 20"><path d="M5 10.5l3.2 3.2L15 7" stroke="#7CF2B0" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><div style="flex:1;"><div style="font-size:15px; font-weight:600; color:#7CF2B0; letter-spacing:-0.2px;">Verified build</div></div><span style="font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.42);">v0.1.0</span></div>
-            <div style="display:flex; gap:16px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Release</span><span style="font-family:'Geist Mono', monospace; font-size:13px;">v0.1.0+1751312345</span></div>
-            <div style="display:flex; gap:16px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Commit</span><span style="font-family:'Geist Mono', monospace; font-size:13px;">aca62f4c</span></div>
-            <div style="display:flex; gap:16px; align-items:center; padding:14px 18px;"><div style="flex:1; min-width:0;"><div style="font-size:12px; color:rgba(244,245,243,0.36); margin-bottom:6px;">Fingerprint · SHA-256</div><div style="font-family:'Geist Mono', monospace; font-size:12px; line-height:1.5; letter-spacing:0.3px; color:rgba(244,245,243,0.82); word-break:break-all;">aca62f4c9d3b71e04f2a8c61bd09e710f5a23c4e8b90d172a6f3c5</div></div>
-              <div style="width:66px; height:66px; flex-shrink:0; border-radius:9px; background:#F4F5F3; padding:6px; display:grid; grid-template-columns:repeat(9,1fr); grid-template-rows:repeat(9,1fr); gap:1px;">
-                <span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span>
-                <span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span>
-                <span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span>
-                <span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span>
-                <span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span>
-                <span></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span>
-                <span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span>
-                <span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span>
-                <span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span>
-              </div>
+            <div style="display:flex; align-items:center; gap:11px; padding:15px 18px; border-bottom:1px solid rgba(255,255,255,0.07);"><span style="width:30px; height:30px; border-radius:999px; background:rgba(124,242,176,0.14); display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 20 20"><path d="M5 10.5l3.2 3.2L15 7" stroke="#7CF2B0" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><div style="flex:1;"><div style="font-size:15px; font-weight:600; color:#7CF2B0; letter-spacing:-0.2px;">Verified build</div><a data-release-link href="https://github.com/hackshare/cosign/releases/latest" target="_blank" rel="noopener" style="display:none; font-size:11px; color:rgba(244,245,243,0.38); text-decoration:none;">View release</a></div><span data-release-version style="font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.42);">v0.1.0</span></div>
+            <div style="display:flex; gap:16px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Release</span><span data-release-tag style="font-family:'Geist Mono', monospace; font-size:13px;">v0.1.0+1751312345</span></div>
+            <div style="display:flex; gap:16px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Commit</span><span data-release-commit style="font-family:'Geist Mono', monospace; font-size:13px;">aca62f4c</span></div>
+            <div style="display:flex; gap:16px; align-items:center; padding:14px 18px;"><div style="flex:1; min-width:0;"><div style="font-size:12px; color:rgba(244,245,243,0.36); margin-bottom:6px;">Fingerprint · SHA-256</div><div data-release-fingerprint style="font-family:'Geist Mono', monospace; font-size:12px; line-height:1.5; letter-spacing:0.3px; color:rgba(244,245,243,0.82); word-break:break-all;">aca62f4c9d3b71e04f2a8c61bd09e710f5a23c4e8b90d172a6f3c5</div></div>
+              <div style="width:66px; height:66px; flex-shrink:0; border-radius:9px; background:#F4F5F3; padding:6px;"><svg viewBox="0 0 35 35" width="100%" height="100%"><path fill="#08090B" d="M1,1H2V2H1zM2,1H3V2H2zM3,1H4V2H3zM4,1H5V2H4zM5,1H6V2H5zM6,1H7V2H6zM7,1H8V2H7zM11,1H12V2H11zM17,1H18V2H17zM19,1H20V2H19zM20,1H21V2H20zM21,1H22V2H21zM24,1H25V2H24zM27,1H28V2H27zM28,1H29V2H28zM29,1H30V2H29zM30,1H31V2H30zM31,1H32V2H31zM32,1H33V2H32zM33,1H34V2H33zM1,2H2V3H1zM7,2H8V3H7zM10,2H11V3H10zM11,2H12V3H11zM12,2H13V3H12zM16,2H17V3H16zM17,2H18V3H17zM19,2H20V3H19zM21,2H22V3H21zM23,2H24V3H23zM27,2H28V3H27zM33,2H34V3H33zM1,3H2V4H1zM3,3H4V4H3zM4,3H5V4H4zM5,3H6V4H5zM7,3H8V4H7zM9,3H10V4H9zM11,3H12V4H11zM13,3H14V4H13zM15,3H16V4H15zM17,3H18V4H17zM22,3H23V4H22zM23,3H24V4H23zM27,3H28V4H27zM29,3H30V4H29zM30,3H31V4H30zM31,3H32V4H31zM33,3H34V4H33zM1,4H2V5H1zM3,4H4V5H3zM4,4H5V5H4zM5,4H6V5H5zM7,4H8V5H7zM9,4H10V5H9zM11,4H12V5H11zM19,4H20V5H19zM23,4H24V5H23zM25,4H26V5H25zM27,4H28V5H27zM29,4H30V5H29zM30,4H31V5H30zM31,4H32V5H31zM33,4H34V5H33zM1,5H2V6H1zM3,5H4V6H3zM4,5H5V6H4zM5,5H6V6H5zM7,5H8V6H7zM9,5H10V6H9zM11,5H12V6H11zM12,5H13V6H12zM15,5H16V6H15zM16,5H17V6H16zM17,5H18V6H17zM21,5H22V6H21zM22,5H23V6H22zM24,5H25V6H24zM25,5H26V6H25zM27,5H28V6H27zM29,5H30V6H29zM30,5H31V6H30zM31,5H32V6H31zM33,5H34V6H33zM1,6H2V7H1zM7,6H8V7H7zM9,6H10V7H9zM10,6H11V7H10zM11,6H12V7H11zM13,6H14V7H13zM14,6H15V7H14zM18,6H19V7H18zM19,6H20V7H19zM20,6H21V7H20zM27,6H28V7H27zM33,6H34V7H33zM1,7H2V8H1zM2,7H3V8H2zM3,7H4V8H3zM4,7H5V8H4zM5,7H6V8H5zM6,7H7V8H6zM7,7H8V8H7zM9,7H10V8H9zM11,7H12V8H11zM13,7H14V8H13zM15,7H16V8H15zM17,7H18V8H17zM19,7H20V8H19zM21,7H22V8H21zM23,7H24V8H23zM25,7H26V8H25zM27,7H28V8H27zM28,7H29V8H28zM29,7H30V8H29zM30,7H31V8H30zM31,7H32V8H31zM32,7H33V8H32zM33,7H34V8H33zM9,8H10V9H9zM15,8H16V9H15zM17,8H18V9H17zM20,8H21V9H20zM21,8H22V9H21zM22,8H23V9H22zM24,8H25V9H24zM25,8H26V9H25zM1,9H2V10H1zM3,9H4V10H3zM4,9H5V10H4zM5,9H6V10H5zM6,9H7V10H6zM7,9H8V10H7zM10,9H11V10H10zM12,9H13V10H12zM13,9H14V10H13zM14,9H15V10H14zM15,9H16V10H15zM18,9H19V10H18zM20,9H21V10H20zM27,9H28V10H27zM28,9H29V10H28zM29,9H30V10H29zM30,9H31V10H30zM31,9H32V10H31zM3,10H4V11H3zM5,10H6V11H5zM6,10H7V11H6zM8,10H9V11H8zM10,10H11V11H10zM11,10H12V11H11zM12,10H13V11H12zM13,10H14V11H13zM14,10H15V11H14zM18,10H19V11H18zM19,10H20V11H19zM20,10H21V11H20zM21,10H22V11H21zM24,10H25V11H24zM27,10H28V11H27zM28,10H29V11H28zM30,10H31V11H30zM31,10H32V11H31zM33,10H34V11H33zM1,11H2V12H1zM7,11H8V12H7zM8,11H9V12H8zM10,11H11V12H10zM14,11H15V12H14zM15,11H16V12H15zM16,11H17V12H16zM17,11H18V12H17zM18,11H19V12H18zM22,11H23V12H22zM23,11H24V12H23zM25,11H26V12H25zM26,11H27V12H26zM27,11H28V12H27zM29,11H30V12H29zM31,11H32V12H31zM32,11H33V12H32zM1,12H2V13H1zM2,12H3V13H2zM4,12H5V13H4zM5,12H6V13H5zM9,12H10V13H9zM11,12H12V13H11zM12,12H13V13H12zM14,12H15V13H14zM16,12H17V13H16zM17,12H18V13H17zM18,12H19V13H18zM19,12H20V13H19zM22,12H23V13H22zM25,12H26V13H25zM29,12H30V13H29zM30,12H31V13H30zM31,12H32V13H31zM32,12H33V13H32zM1,13H2V14H1zM2,13H3V14H2zM4,13H5V14H4zM5,13H6V14H5zM7,13H8V14H7zM8,13H9V14H8zM10,13H11V14H10zM11,13H12V14H11zM15,13H16V14H15zM16,13H17V14H16zM17,13H18V14H17zM20,13H21V14H20zM23,13H24V14H23zM24,13H25V14H24zM26,13H27V14H26zM28,13H29V14H28zM29,13H30V14H29zM30,13H31V14H30zM33,13H34V14H33zM1,14H2V15H1zM13,14H14V15H13zM14,14H15V15H14zM16,14H17V15H16zM18,14H19V15H18zM19,14H20V15H19zM24,14H25V15H24zM27,14H28V15H27zM30,14H31V15H30zM31,14H32V15H31zM32,14H33V15H32zM33,14H34V15H33zM3,15H4V16H3zM7,15H8V16H7zM8,15H9V16H8zM9,15H10V16H9zM11,15H12V16H11zM12,15H13V16H12zM14,15H15V16H14zM16,15H17V16H16zM17,15H18V16H17zM18,15H19V16H18zM19,15H20V16H19zM23,15H24V16H23zM26,15H27V16H26zM27,15H28V16H27zM30,15H31V16H30zM32,15H33V16H32zM1,16H2V17H1zM2,16H3V17H2zM3,16H4V17H3zM4,16H5V17H4zM5,16H6V17H5zM9,16H10V17H9zM10,16H11V17H10zM11,16H12V17H11zM12,16H13V17H12zM14,16H15V17H14zM15,16H16V17H15zM16,16H17V17H16zM21,16H22V17H21zM22,16H23V17H22zM26,16H27V17H26zM27,16H28V17H27zM30,16H31V17H30zM31,16H32V17H31zM4,17H5V18H4zM7,17H8V18H7zM11,17H12V18H11zM13,17H14V18H13zM14,17H15V18H14zM16,17H17V18H16zM18,17H19V18H18zM23,17H24V18H23zM25,17H26V18H25zM26,17H27V18H26zM28,17H29V18H28zM29,17H30V18H29zM33,17H34V18H33zM9,18H10V19H9zM13,18H14V19H13zM14,18H15V19H14zM17,18H18V19H17zM20,18H21V19H20zM21,18H22V19H21zM22,18H23V19H22zM24,18H25V19H24zM27,18H28V19H27zM28,18H29V19H28zM30,18H31V19H30zM31,18H32V19H31zM33,18H34V19H33zM1,19H2V20H1zM2,19H3V20H2zM4,19H5V20H4zM5,19H6V20H5zM6,19H7V20H6zM7,19H8V20H7zM8,19H9V20H8zM10,19H11V20H10zM12,19H13V20H12zM13,19H14V20H13zM14,19H15V20H14zM15,19H16V20H15zM16,19H17V20H16zM19,19H20V20H19zM21,19H22V20H21zM22,19H23V20H22zM25,19H26V20H25zM26,19H27V20H26zM28,19H29V20H28zM29,19H30V20H29zM31,19H32V20H31zM32,19H33V20H32zM5,20H6V21H5zM6,20H7V21H6zM9,20H10V21H9zM13,20H14V21H13zM14,20H15V21H14zM15,20H16V21H15zM20,20H21V21H20zM21,20H22V21H21zM22,20H23V21H22zM23,20H24V21H23zM26,20H27V21H26zM28,20H29V21H28zM29,20H30V21H29zM30,20H31V21H30zM31,20H32V21H31zM32,20H33V21H32zM33,20H34V21H33zM3,21H4V22H3zM6,21H7V22H6zM7,21H8V22H7zM8,21H9V22H8zM10,21H11V22H10zM11,21H12V22H11zM12,21H13V22H12zM15,21H16V22H15zM16,21H17V22H16zM19,21H20V22H19zM20,21H21V22H20zM21,21H22V22H21zM23,21H24V22H23zM25,21H26V22H25zM26,21H27V22H26zM28,21H29V22H28zM29,21H30V22H29zM30,21H31V22H30zM1,22H2V23H1zM5,22H6V23H5zM6,22H7V23H6zM9,22H10V23H9zM10,22H11V23H10zM12,22H13V23H12zM13,22H14V23H13zM16,22H17V23H16zM17,22H18V23H17zM20,22H21V23H20zM21,22H22V23H21zM22,22H23V23H22zM23,22H24V23H23zM24,22H25V23H24zM27,22H28V23H27zM30,22H31V23H30zM33,22H34V23H33zM1,23H2V24H1zM3,23H4V24H3zM4,23H5V24H4zM5,23H6V24H5zM6,23H7V24H6zM7,23H8V24H7zM8,23H9V24H8zM10,23H11V24H10zM11,23H12V24H11zM12,23H13V24H12zM13,23H14V24H13zM15,23H16V24H15zM18,23H19V24H18zM19,23H20V24H19zM21,23H22V24H21zM26,23H27V24H26zM28,23H29V24H28zM29,23H30V24H29zM32,23H33V24H32zM1,24H2V25H1zM4,24H5V25H4zM5,24H6V25H5zM6,24H7V25H6zM10,24H11V25H10zM11,24H12V25H11zM12,24H13V25H12zM14,24H15V25H14zM17,24H18V25H17zM20,24H21V25H20zM22,24H23V25H22zM23,24H24V25H23zM24,24H25V25H24zM25,24H26V25H25zM26,24H27V25H26zM27,24H28V25H27zM28,24H29V25H28zM31,24H32V25H31zM32,24H33V25H32zM33,24H34V25H33zM1,25H2V26H1zM5,25H6V26H5zM6,25H7V26H6zM7,25H8V26H7zM13,25H14V26H13zM15,25H16V26H15zM17,25H18V26H17zM18,25H19V26H18zM23,25H24V26H23zM25,25H26V26H25zM26,25H27V26H26zM27,25H28V26H27zM28,25H29V26H28zM29,25H30V26H29zM9,26H10V27H9zM10,26H11V27H10zM11,26H12V27H11zM12,26H13V27H12zM14,26H15V27H14zM17,26H18V27H17zM18,26H19V27H18zM19,26H20V27H19zM20,26H21V27H20zM22,26H23V27H22zM24,26H25V27H24zM25,26H26V27H25zM29,26H30V27H29zM31,26H32V27H31zM32,26H33V27H32zM33,26H34V27H33zM1,27H2V28H1zM2,27H3V28H2zM3,27H4V28H3zM4,27H5V28H4zM5,27H6V28H5zM6,27H7V28H6zM7,27H8V28H7zM10,27H11V28H10zM12,27H13V28H12zM13,27H14V28H13zM16,27H17V28H16zM17,27H18V28H17zM18,27H19V28H18zM21,27H22V28H21zM22,27H23V28H22zM23,27H24V28H23zM24,27H25V28H24zM25,27H26V28H25zM27,27H28V28H27zM29,27H30V28H29zM31,27H32V28H31zM32,27H33V28H32zM1,28H2V29H1zM7,28H8V29H7zM9,28H10V29H9zM10,28H11V29H10zM11,28H12V29H11zM13,28H14V29H13zM14,28H15V29H14zM15,28H16V29H15zM16,28H17V29H16zM18,28H19V29H18zM19,28H20V29H19zM21,28H22V29H21zM22,28H23V29H22zM24,28H25V29H24zM25,28H26V29H25zM29,28H30V29H29zM30,28H31V29H30zM31,28H32V29H31zM32,28H33V29H32zM33,28H34V29H33zM1,29H2V30H1zM3,29H4V30H3zM4,29H5V30H4zM5,29H6V30H5zM7,29H8V30H7zM9,29H10V30H9zM10,29H11V30H10zM11,29H12V30H11zM12,29H13V30H12zM13,29H14V30H13zM14,29H15V30H14zM16,29H17V30H16zM17,29H18V30H17zM20,29H21V30H20zM21,29H22V30H21zM23,29H24V30H23zM25,29H26V30H25zM26,29H27V30H26zM27,29H28V30H27zM28,29H29V30H28zM29,29H30V30H29zM30,29H31V30H30zM32,29H33V30H32zM33,29H34V30H33zM1,30H2V31H1zM3,30H4V31H3zM4,30H5V31H4zM5,30H6V31H5zM7,30H8V31H7zM9,30H10V31H9zM10,30H11V31H10zM14,30H15V31H14zM16,30H17V31H16zM18,30H19V31H18zM19,30H20V31H19zM20,30H21V31H20zM21,30H22V31H21zM24,30H25V31H24zM25,30H26V31H25zM26,30H27V31H26zM29,30H30V31H29zM30,30H31V31H30zM32,30H33V31H32zM33,30H34V31H33zM1,31H2V32H1zM3,31H4V32H3zM4,31H5V32H4zM5,31H6V32H5zM7,31H8V32H7zM9,31H10V32H9zM13,31H14V32H13zM14,31H15V32H14zM15,31H16V32H15zM16,31H17V32H16zM17,31H18V32H17zM19,31H20V32H19zM21,31H22V32H21zM23,31H24V32H23zM27,31H28V32H27zM28,31H29V32H28zM30,31H31V32H30zM1,32H2V33H1zM7,32H8V33H7zM10,32H11V33H10zM12,32H13V33H12zM15,32H16V33H15zM16,32H17V33H16zM19,32H20V33H19zM21,32H22V33H21zM22,32H23V33H22zM23,32H24V33H23zM24,32H25V33H24zM29,32H30V33H29zM30,32H31V33H30zM31,32H32V33H31zM1,33H2V34H1zM2,33H3V34H2zM3,33H4V34H3zM4,33H5V34H4zM5,33H6V34H5zM6,33H7V34H6zM7,33H8V34H7zM9,33H10V34H9zM10,33H11V34H10zM12,33H13V34H12zM14,33H15V34H14zM15,33H16V34H15zM16,33H17V34H16zM18,33H19V34H18zM23,33H24V34H23zM24,33H25V34H24zM25,33H26V34H25zM26,33H27V34H26zM28,33H29V34H28zM30,33H31V34H30zM32,33H33V34H32z"/></svg></div>
             </div>
           </div>
         </div>
@@ -376,9 +376,12 @@
     });
   }
 
+  // sticky how-it-works cross-fade — deterministic ratio-based: tracks every beat's intersection
+  // ratio and activates the most-visible one, rather than last-wins (old threshold:0.55 approach).
   var beats = document.querySelectorAll('[data-beat]');
   var shots = document.querySelectorAll('[data-shot]');
   if (beats.length && shots.length && 'IntersectionObserver' in window) {
+    var ratios = {}, current = null;
     var setActive = function(i){
       shots.forEach(function(s){ s.style.opacity = (String(s.getAttribute('data-shot'))===String(i)) ? '1' : '0'; });
       document.querySelectorAll('[data-beat]').forEach(function(b){
@@ -390,10 +393,13 @@
       });
     };
     var bio = new IntersectionObserver(function(es){
-      es.forEach(function(e){ if(e.isIntersecting){ setActive(e.target.getAttribute('data-beat')); } });
-    }, { threshold:0.55 });
+      es.forEach(function(e){ ratios[e.target.getAttribute('data-beat')] = e.isIntersecting ? e.intersectionRatio : 0; });
+      var bestI = null, bestR = -1;
+      Object.keys(ratios).forEach(function(k){ if(ratios[k] > bestR){ bestR = ratios[k]; bestI = k; } });
+      if(bestI !== null && bestR > 0 && bestI !== current){ current = bestI; setActive(bestI); }
+    }, { threshold:[0,0.15,0.3,0.45,0.6,0.75,0.9,1] });
     beats.forEach(function(b){ bio.observe(b); });
-    setActive(0);
+    current = '0'; setActive(0);
   }
 
   document.querySelectorAll('[data-toggle-group]').forEach(function(wrap){
@@ -430,6 +436,23 @@
       onScroll();
     }
   }
+})();
+</script>
+<script>
+(function(){
+  fetch('/cosign/v1/release').then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); }).then(function(d){
+    if (!d || !d.fingerprint) return;
+    var v = document.querySelector('[data-release-version]');
+    var t = document.querySelector('[data-release-tag]');
+    var c = document.querySelector('[data-release-commit]');
+    var f = document.querySelector('[data-release-fingerprint]');
+    var l = document.querySelector('[data-release-link]');
+    if (v && d.version) v.textContent = 'v' + d.version;
+    if (t && d.tag) t.textContent = d.tag;
+    if (c && d.commitShort) c.textContent = d.commitShort;
+    if (f && d.fingerprint) f.textContent = d.fingerprint;
+    if (l && d.releaseUrl) { l.href = d.releaseUrl; l.style.display = 'inline'; }
+  }).catch(function(){});
 })();
 </script>
 </body>

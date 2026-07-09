@@ -124,7 +124,13 @@ jobs:
           path: |
             Modules/CosignCore/Frameworks/CosignCore.xcframework
             Modules/CosignCore/Sources/Generated
-          key: xcframework-${{ runner.os }}-${{ hashFiles('core/src/**', 'core/Cargo.toml', 'core/Cargo.lock', 'core/build.rs', 'core/uniffi.toml', 'scripts/build-rust.sh', 'scripts/build-xcframework.sh') }}
+          # Key on the Rust LIBRARY only: the top-level core/src/*.rs sources + the .udl,
+          # NOT core/src/bin/** (the relay binary). The XCFramework is built from the
+          # cosign_core library and does not depend on the relay binary, so relay-only
+          # edits must not invalidate this cache (they used to, via a core/src/** glob,
+          # forcing an ~18 min rebuild). If a nested library module dir is ever added
+          # under core/src, add it here.
+          key: xcframework-${{ runner.os }}-${{ hashFiles('core/src/*.rs', 'core/src/cosign_core.udl', 'core/Cargo.toml', 'core/Cargo.lock', 'core/build.rs', 'core/uniffi.toml', 'scripts/build-rust.sh', 'scripts/build-xcframework.sh') }}
 
       - name: Build XCFramework
         if: steps.xcframework.outputs.cache-hit != 'true'
