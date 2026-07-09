@@ -101,5 +101,15 @@ extension CosignCopy {
                 "The proposal is closed to further voting."
             }
         }
+
+        static let partialTitle = "Approval recorded"
+        static let partialSubtitle = "Your approval landed and is counted toward the threshold. Execution did not broadcast, so the transfer has not run yet. You can execute it later."
+        static let partialActionSectionTitle = "This action"
+        static let partialStepApprove = "Approve"
+        static let partialStepExecute = "Execute"
+        static let partialApproveDone = "Done"
+        static let partialExecutePending = "Pending"
+        static let partialExecuteDetail = "Not broadcast \u{00B7} ready to run"
+        static let partialFinishExecution = "Finish execution"
     }
 }

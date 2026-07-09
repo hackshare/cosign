@@ -52,6 +52,19 @@ extension ProposalDetailView {
         )
     }
 
+    func partialSubmissionResult(
+        approveTransaction: ProposalActionSubmittedTransaction,
+        proposalIndex: UInt64?
+    ) -> ProposalSubmissionResult {
+        ProposalSubmissionResult(
+            action: .approveAndExecute,
+            signatures: [signatureRecord(approveTransaction)],
+            status: "approved",
+            proposalIndex: proposalIndex,
+            kind: .partialApproveExecuted
+        )
+    }
+
     private func signatureRecord(_ transaction: ProposalActionSubmittedTransaction) -> ProposalSubmissionSignature {
         signatureRecord(label: transaction.action.label, signature: transaction.signature)
     }

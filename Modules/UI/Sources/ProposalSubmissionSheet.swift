@@ -9,35 +9,63 @@ struct ProposalSubmissionSheet: View {
     let result: ProposalSubmissionResult
     let squadAddress: String
     let onDone: () -> Void
+    var onFinishExecution: (() -> Void)?
     @State private var footerHeight = CosignLayout.estimatedSheetStickyFooterHeight
     @State private var executedStatus: ExecutedTransactionInspectionStatus?
     @State private var executedFee: UInt64?
 
     var body: some View {
         CosignScreen(bottomPadding: CosignLayout.screenBottomPadding(stickyFooterHeight: footerHeight)) {
-            ReceiptHeadline(result: result)
+            if result.kind == .partialApproveExecuted {
+                PartialReceiptHeadline()
 
-            SignatureReceiptSection(result: result) { signature in
-                onDone()
-                coordinator.go(to: .transactionInspection(signature: signature, squad: squadAddress))
-            }
+                ReceiptTwoStepCard()
 
-            ReceiptFactsCard(
-                result: result,
-                executedStatus: executedStatus,
-                executedFee: executedFee
-            ) { signature in
-                onDone()
-                coordinator.go(to: .transactionInspection(signature: signature, squad: squadAddress))
+                if let sig = result.signatures.first {
+                    VStack(alignment: .leading, spacing: 10) {
+                        CosignSectionTitle(title: CosignCopy.ProposalReceipt.signaturesTitle)
+                        SignatureReceiptCard(transaction: sig) {
+                            onDone()
+                            coordinator.go(to: .transactionInspection(signature: sig.signature, squad: squadAddress))
+                        }
+                    }
+                }
+            } else {
+                ReceiptHeadline(result: result)
+
+                SignatureReceiptSection(result: result) { signature in
+                    onDone()
+                    coordinator.go(to: .transactionInspection(signature: signature, squad: squadAddress))
+                }
+
+                ReceiptFactsCard(
+                    result: result,
+                    executedStatus: executedStatus,
+                    executedFee: executedFee
+                ) { signature in
+                    onDone()
+                    coordinator.go(to: .transactionInspection(signature: signature, squad: squadAddress))
+                }
             }
         }
         .presentationDetents([.large])
+        .accessibilityIdentifier(result.kind == .partialApproveExecuted ? "screen.partial-receipt" : "")
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            CosignReceiptDoneFooter(onViewProposal: onDone, onDone: onDone)
+            if result.kind == .partialApproveExecuted {
+                ReceiptPartialFooter(
+                    onFinishExecution: onFinishExecution ?? {},
+                    onDone: onDone
+                )
                 .cosignMeasureHeight($footerHeight)
+            } else {
+                CosignReceiptDoneFooter(onViewProposal: onDone, onDone: onDone)
+                    .cosignMeasureHeight($footerHeight)
+            }
         }
         .task {
-            await loadExecutedStatus()
+            if result.kind != .partialApproveExecuted {
+                await loadExecutedStatus()
+            }
         }
     }
 
@@ -340,36 +368,6 @@ private struct ReceiptSignatureFactRow: View {
 
     private var copyButtonTitle: String {
         copiedSignature ? CosignCopy.Common.copied : CosignCopy.Common.copy
-    }
-}
-
-private struct ReceiptSignatureIconButton: View {
-    let title: String
-    let glyph: CosignGlyph
-    let accessibilityIdentifier: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ReceiptSignatureIconLabel(glyph: glyph)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityIdentifier(accessibilityIdentifier)
-    }
-}
-
-private struct ReceiptSignatureIconLabel: View {
-    let glyph: CosignGlyph
-
-    var body: some View {
-        CosignGlyphView(glyph: glyph, size: 14, color: CosignTheme.inkDim)
-            .frame(width: 34, height: 34)
-            .background(CosignTheme.surface2, in: .circle)
-            .overlay {
-                Circle().stroke(CosignTheme.line, lineWidth: 1)
-            }
-            .accessibilityHidden(true)
     }
 }
 

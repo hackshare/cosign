@@ -7,28 +7,32 @@ import SwiftUI
 
 public struct ProposalDetailView: View {
     @Environment(Coordinator.self) var coordinator
-    @Environment(\.cosignDemoMode) private var demoMode
+    @Environment(\.cosignDemoMode) var demoMode
     @Environment(\.indexerEnvironment) var indexerEnvironment
     @Environment(\.openURL) var openURL
-    @Environment(\.squadsService) private var squadsService
+    @Environment(\.squadsService) var squadsService
     @Query(sort: \RegisteredSigner.createdAt, order: .forward)
     private var registeredSigners: [RegisteredSigner]
 
     let squadAddress: String
     let transactionIndex: UInt64
     let instructionDecoder = InstructionDecoder()
-    @State private var proposal: SquadProposalDetail?
+    @State var proposal: SquadProposalDetail?
     @State var squadDetail: SquadDetail?
     @State var squadMembers = [SquadMember]()
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State var selectedSignerID: UUID?
-    @State private var signingRequest: ProposalSigningRequest?
+    @State var signingRequest: ProposalSigningRequest?
     @State var isSubmittingAction = false
-    @State private var actionErrorMessage: String?
-    @State private var actionDeviceStatusMessage: String?
-    @State private var actionYubiKeyOptions = YubiKeySigningOptions()
-    @State private var submittedResult: ProposalSubmissionResult?
+    @State var actionErrorMessage: String?
+    @State var actionDeviceStatusMessage: String?
+    @State var actionBroadcaster: ProposalActionBroadcaster?
+    @State var broadcastFailure: BroadcastFailure?
+    @State var pendingBroadcastRequest: ProposalSigningRequest?
+    @State var actionYubiKeyOptions = YubiKeySigningOptions()
+    @State var submittedResult: ProposalSubmissionResult?
+    @State var pendingExecuteSigner: ProposalActionSigner?
     @State var executionSignature: String?
     @State var inspectionReport: ProposalInspectionReport?
     @State var executedInspectionReport: ExecutedTransactionInspectionReport?
@@ -114,8 +118,32 @@ public struct ProposalDetailView: View {
             ProposalSubmissionSheet(
                 result: result,
                 squadAddress: squadAddress,
-                onDone: { submittedResult = nil }
+                onDone: { submittedResult = nil; pendingExecuteSigner = nil },
+                onFinishExecution: result.kind == .partialApproveExecuted ? {
+                    let signer = pendingExecuteSigner
+                    submittedResult = nil
+                    pendingExecuteSigner = nil
+                    if let signer {
+                        beginSigning(action: .execute, signer: signer)
+                    }
+                } : nil
             )
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { broadcastFailure != nil },
+                set: { presented in if !presented { handleBroadcastErrorDismiss() } }
+            )
+        ) {
+            if let failure = broadcastFailure {
+                BroadcastErrorSheet(
+                    failure: failure,
+                    isTerminal: failure.attempt >= CosignCopy.BroadcastError.maxAttempts,
+                    isRetrying: isSubmittingAction,
+                    onRetry: { Task { await runBroadcaster() } },
+                    onDismiss: { handleBroadcastErrorDismiss() }
+                )
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let proposal {
@@ -157,7 +185,7 @@ public struct ProposalDetailView: View {
     }
 
     @MainActor
-    private func load(forceRefresh: Bool = false, showsLoading: Bool = true) async {
+    func load(forceRefresh: Bool = false, showsLoading: Bool = true) async {
         if showsLoading {
             isLoading = true
         }
@@ -339,51 +367,6 @@ extension ProposalDetailView {
             signer: signer,
             inspectionAction: inspectionReport?.action
         )
-    }
-
-    @MainActor
-    func submit(_ request: ProposalSigningRequest) async {
-        guard let proposal else { return }
-        if demoMode?.disablesNetworkWrites == true {
-            signingRequest = nil
-            actionErrorMessage = nil
-            actionDeviceStatusMessage = nil
-            submittedResult = demoSubmissionResult(for: request, proposal: proposal)
-            return
-        }
-
-        isSubmittingAction = true
-        actionErrorMessage = nil
-        actionDeviceStatusMessage = nil
-        defer { isSubmittingAction = false }
-
-        do {
-            let submission = try await withResolvedProposalSigner(
-                request.signer,
-                yubiKeyOptions: request.signer.type == .yubikey ? actionYubiKeyOptions : nil,
-                deviceStatus: { actionDeviceStatusMessage = $0 },
-                operation: { signer in
-                    try await squadsService.submitProposalAction(
-                        request.action,
-                        in: squadAddress,
-                        transactionIndex: transactionIndex,
-                        signer: signer,
-                        displayedProposal: proposal
-                    )
-                }
-            )
-            signingRequest = nil
-            actionDeviceStatusMessage = nil
-            submittedResult = submissionResult(for: request, submission: submission)
-            await load()
-        } catch {
-            actionErrorMessage = error.localizedDescription
-            if request.action == .approveAndExecute {
-                await load(forceRefresh: true)
-            } else if let actionError = error as? ProposalActionError, case .proposalChanged = actionError {
-                await load()
-            }
-        }
     }
 
     var actionSigners: [ProposalActionSigner] {

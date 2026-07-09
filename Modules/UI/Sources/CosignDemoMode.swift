@@ -1,3 +1,4 @@
+import CosignCore
 import Foundation
 import SwiftUI
 
@@ -66,4 +67,54 @@ public struct CosignDemoMode: Equatable, Sendable {
 
 public extension EnvironmentValues {
     @Entry var cosignDemoMode: CosignDemoMode?
+}
+
+public extension CosignDemoMode {
+    enum BroadcastFailureMode: Equatable, Sendable {
+        case retryable
+        case terminal
+        /// Approve leg succeeds; execute leg always fails. Drives the partial-receipt path.
+        case executeOnly
+    }
+
+    /// Returns the active broadcast-failure simulation mode, if any.
+    ///
+    /// Parsed from launch arguments. Only active in DEBUG builds; returns nil in release.
+    static func broadcastFailureMode(
+        arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> BroadcastFailureMode? {
+        #if DEBUG
+        if arguments.contains("--broadcast-failure-terminal") { return .terminal }
+        if arguments.contains("--broadcast-failure-execute-only") { return .executeOnly }
+        if arguments.contains("--broadcast-failure") { return .retryable }
+        #endif
+        return nil
+    }
+
+    /// Seeds the signing tally for UI-test walkthroughs.
+    ///
+    /// Reads `--signing-tally-seed=N` and sets each signer's count to N.
+    /// Only active in DEBUG builds; no-ops in release.
+    static func seedSigningTallyIfRequested(signerSeeds: [CosignDemoSignerSeed]) {
+        #if DEBUG
+        let prefix = "--signing-tally-seed="
+        guard
+            let arg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }),
+            let tally = Int(String(arg.dropFirst(prefix.count))),
+            tally > 0
+        else { return }
+        for seed in signerSeeds {
+            SigningTally.set(for: CosignCore.base58(seed.pubkey), count: tally)
+        }
+        #endif
+    }
+
+    /// Clears the signing tally for all given signer seeds.
+    ///
+    /// Call during demo resets so the tally starts fresh each UI-test run.
+    static func resetSigningTally(signerSeeds: [CosignDemoSignerSeed]) {
+        for seed in signerSeeds {
+            SigningTally.reset(for: CosignCore.base58(seed.pubkey))
+        }
+    }
 }

@@ -157,6 +157,11 @@ private extension ContentView {
                 ))
             }
             try modelContext.save()
+
+            if shouldResetDemoData {
+                CosignDemoMode.resetSigningTally(signerSeeds: demoSeeds)
+            }
+            CosignDemoMode.seedSigningTallyIfRequested(signerSeeds: demoSeeds)
         } catch {
             assertionFailure("Failed to seed demo signers: \(error)")
         }

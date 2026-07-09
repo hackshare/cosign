@@ -32,6 +32,19 @@ public enum SquadProposalAction: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+public struct SignedProposalTransaction: Equatable, Sendable {
+    public let action: SquadProposalAction
+    public let messageBytes: Data
+    public let signature: Data
+    public let simulationLogs: [String]
+}
+
+public struct BroadcastFailure: Equatable, Sendable {
+    public let action: SquadProposalAction
+    public let reason: String
+    public let attempt: Int
+}
+
 public struct ProposalActionSubmittedTransaction: Equatable, Sendable {
     public let action: SquadProposalAction
     public let signature: String
@@ -69,6 +82,7 @@ public enum ProposalActionError: Error, Equatable, Sendable {
     case simulationFailed(String)
     case transactionFailed(String)
     case confirmationTimedOut(String)
+    case broadcastFailed(BroadcastFailure)
 }
 
 extension ProposalActionError: LocalizedError {
@@ -93,6 +107,8 @@ extension ProposalActionError: LocalizedError {
             "Transaction failed: \(message)"
         case let .confirmationTimedOut(signature):
             "Transaction submitted but was not confirmed yet: \(signature)"
+        case let .broadcastFailed(failure):
+            failure.reason
         }
     }
 }

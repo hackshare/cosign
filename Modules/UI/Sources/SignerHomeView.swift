@@ -104,7 +104,8 @@ public struct SignerHomeView: View {
     }
 
     private func identitySummary(for signer: RegisteredSigner, address: String) -> some View {
-        HStack(alignment: .center, spacing: 12) {
+        let tallyCount = SigningTally.count(for: address)
+        return HStack(alignment: .center, spacing: 12) {
             signerAvatar(for: signer.type)
 
             VStack(alignment: .leading, spacing: 5) {
@@ -129,9 +130,20 @@ public struct SignerHomeView: View {
                     color: CosignTheme.inkFaint
                 )
 
-                Text(statusHint(for: signer.type))
-                    .font(CosignTheme.FontStyle.caption)
-                    .foregroundStyle(CosignTheme.inkDim)
+                HStack(spacing: 6) {
+                    Text(statusHint(for: signer.type))
+                        .font(CosignTheme.FontStyle.caption)
+                        .foregroundStyle(CosignTheme.inkDim)
+
+                    if tallyCount > 0 {
+                        Text(CosignCopy.SignerHome.signedHere(tallyCount))
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(CosignTheme.mint)
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 7)
+                            .background(CosignTheme.mintWash, in: .capsule)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

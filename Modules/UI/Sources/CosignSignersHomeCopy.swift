@@ -1,3 +1,17 @@
+extension CosignCopy {
+    enum SignerHome {
+        static func signedHere(_ count: Int) -> String {
+            "\(count) signed here"
+        }
+
+        static let approvedStatus = "Approved"
+
+        static func awaitingMore(_ remaining: Int) -> String {
+            "awaiting \(remaining) more"
+        }
+    }
+}
+
 extension CosignCopy.Signers {
     static let searchAccessibilityLabel = "Search Signers"
 
