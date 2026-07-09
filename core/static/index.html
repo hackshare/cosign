@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cosign</title>
-<meta name="description" content="A native iOS signer for Solana Squads multisigs. Review and co-sign proposals from your phone, with your keys held on device.">
+<meta name="description" content="A native iOS signer for Solana Squads multisigs. Know what you sign before you approve it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -14,206 +14,319 @@
   a { color:inherit; }
   ::selection { background:rgba(242,194,108,0.24); }
   .phone { box-shadow:0 50px 90px -28px rgba(0,0,0,0.8); }
-  @media (max-width: 880px){ .hide-narrow { display:none !important; } }
+  @media (max-width: 900px){ .hide-narrow { display:none !important; } }
+
+  @keyframes cosignScan {
+    0%, 16% { opacity:0; transform:translateY(6px); }
+    22% { opacity:1; }
+    46% { opacity:1; }
+    52% { opacity:0; transform:translateY(268px); }
+    100% { opacity:0; transform:translateY(268px); }
+  }
+  @keyframes cosignRaw {
+    0%, 24% { opacity:1; filter:blur(0px); }
+    44% { opacity:0; filter:blur(7px); }
+    90% { opacity:0; filter:blur(7px); }
+    99%, 100% { opacity:1; filter:blur(0px); }
+  }
+  @keyframes cosignDecoded {
+    0%, 34% { opacity:0; transform:translateY(10px); }
+    54% { opacity:1; transform:translateY(0); }
+    88% { opacity:1; transform:translateY(0); }
+    95%, 100% { opacity:0; transform:translateY(10px); }
+  }
+  @keyframes cosignPulse {
+    0%, 100% { opacity:0.5; }
+    50% { opacity:1; }
+  }
+
+  /* ── Phones (≤600px) ── */
+  @media (max-width: 600px) {
+    /* 1. Header nav: keep only wordmark + primary CTA; hide GitHub and other nav items */
+    .hide-phone { display: none !important; }
+
+    /* 2. Sticky how-it-works: phone pins at top, beats scroll beneath */
+    .sticky-phone-col {
+      order: -1 !important;
+      top: 68px !important;
+      max-height: 55vh !important;
+      overflow: hidden;
+    }
+    .beats-col { order: 2 !important; }
+
+    /* 4. Touch targets: ≥44px hit height for header CTA and toggle buttons */
+    .header-cta { min-height: 44px !important; padding-top: 11px !important; padding-bottom: 11px !important; }
+    [data-toggle] { min-height: 44px !important; }
+
+    /* Motion: neutralize parallax transforms on phones */
+    [data-parallax] { transform: none !important; }
+  }
 </style>
 </head>
 <body>
 <div style="background:#08090B; color:#F4F5F3; font-family:'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; min-height:100vh; overflow-x:hidden;">
 
-  <header style="position:sticky; top:0; z-index:30; background:rgba(8,9,11,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,0.06);">
-    <div style="max-width:1200px; margin:0 auto; padding:15px clamp(20px,5vw,44px); display:flex; align-items:center; justify-content:space-between; gap:16px;">
+  <!-- HEADER -->
+  <header style="position:sticky; top:0; z-index:40; background:rgba(8,9,11,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div style="max-width:1200px; margin:0 auto; padding:14px clamp(20px,5vw,44px); display:flex; align-items:center; justify-content:space-between; gap:16px;">
       <a href="/" style="display:inline-flex; align-items:center; gap:9px; text-decoration:none;">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M19 6.2A8.5 8.5 0 1 0 19 17.8" stroke="#F4F5F3" stroke-width="2.6" stroke-linecap="round"></path><circle cx="18.4" cy="12" r="2.4" fill="#F2C26C"></circle></svg>
         <span style="font-size:18px; font-weight:600; letter-spacing:-0.4px;">cosign</span>
       </a>
-      <nav style="display:flex; align-items:center; gap:clamp(16px,3vw,30px);">
-        <a href="#work" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6);">How it works</a>
-        <a href="/privacy" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6);">Privacy</a>
-        <a href="https://testflight.apple.com/join/FPjmw416" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; font-family:'Geist Mono', monospace; font-size:12px; font-weight:500; color:rgba(244,245,243,0.6);"><span style="width:6px; height:6px; border-radius:999px; background:#F2C26C;"></span>public beta</a>
+      <nav style="display:flex; align-items:center; gap:clamp(14px,2.4vw,26px);">
+        <a href="#work" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6);" class="hide-narrow">How it works</a>
+        <a href="#trust" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6);" class="hide-narrow">Trust model</a>
+        <a href="#verify" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6);" class="hide-narrow">Verify</a>
+        <a href="https://github.com/hackshare/cosign" target="_blank" rel="noopener" class="hide-phone" style="text-decoration:none; font-size:14px; font-weight:500; color:rgba(244,245,243,0.6); display:inline-flex; align-items:center; gap:7px;"><svg width="15" height="15" viewBox="0 0 16 16" fill="rgba(244,245,243,0.6)"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.17.55-.38l-.01-1.34c-2.2.48-2.67-1.06-2.67-1.06-.36-.92-.88-1.16-.88-1.16-.72-.49.05-.48.05-.48.8.056 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.51.28-.87.5-1.07-1.76-.2-3.6-.88-3.6-3.9 0-.86.3-1.57.82-2.12-.08-.2-.36-1 .08-2.1 0 0 .67-.21 2.2.81a7.6 7.6 0 0 1 4 0c1.52-1.02 2.19-.81 2.19-.81.44 1.1.16 1.9.08 2.1.51.55.82 1.26.82 2.12 0 3.03-1.85 3.7-3.61 3.89.28.25.54.73.54 1.48l-.01 2.19c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"></path></svg>GitHub</a>
+        <a href="https://testflight.apple.com/join/FPjmw416" target="_blank" rel="noopener" class="header-cta" style="text-decoration:none; font-size:14px; font-weight:600; color:#1A1305; background:#F2C26C; padding:9px 16px; border-radius:11px;">Join the beta</a>
       </nav>
     </div>
   </header>
 
   <main>
 
-    <section style="max-width:1200px; margin:0 auto; padding:clamp(36px,6vw,76px) clamp(20px,5vw,44px) 0;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,420px), 1fr)); gap:clamp(28px,4vw,60px); align-items:center;">
+    <!-- HERO -->
+    <section style="max-width:1200px; margin:0 auto; padding:clamp(40px,6vw,88px) clamp(20px,5vw,44px) 0;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,430px), 1fr)); gap:clamp(30px,4vw,72px); align-items:center;">
         <div>
-          <h1 style="margin:0; font-size:clamp(40px,6.6vw,78px); line-height:0.97; font-weight:600; letter-spacing:-2.8px; max-width:13ch;">A native iOS signer for Solana Squads multisigs.</h1>
-          <p style="margin:26px 0 0; max-width:50ch; font-size:clamp(16px,2vw,19px); line-height:1.55; color:rgba(244,245,243,0.62);">Review and co-sign Squads v4 proposals from your phone, with your keys held on device. Every proposal is decoded and inspectable, so you always know what you are about to approve.</p>
-
-          <div style="margin-top:32px; max-width:440px; border:1px solid rgba(255,255,255,0.09); border-radius:16px; overflow:hidden; background:#0C0E12;">
-            <div style="display:flex; align-items:baseline; gap:16px; padding:13px 16px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:96px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Platform</span><span style="font-size:14px; font-weight:500;">Native iOS, built in SwiftUI</span></div>
-            <div style="display:flex; align-items:baseline; gap:16px; padding:13px 16px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:96px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Custody</span><span style="font-size:14px; font-weight:500;">Keys held on your device</span></div>
-            <div style="display:flex; align-items:center; gap:16px; padding:13px 16px;"><span style="width:96px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Release</span><span style="display:inline-flex; align-items:center; gap:9px; font-size:14px; font-weight:500; color:#F2C26C;"><span style="width:7px; height:7px; border-radius:999px; background:#F2C26C;"></span>Public TestFlight beta on devnet</span></div>
+          <div style="display:inline-flex; align-items:center; gap:9px; padding:6px 13px 6px 10px; border:1px solid rgba(255,255,255,0.1); border-radius:999px; font-size:12.5px; font-weight:500; color:rgba(244,245,243,0.7);"><span style="width:6px; height:6px; border-radius:999px; background:#F2C26C; animation:cosignPulse 2.4s ease-in-out infinite;"></span>Public TestFlight beta · Solana devnet</div>
+          <h1 style="margin:22px 0 0; font-size:clamp(44px,7vw,88px); line-height:0.94; font-weight:600; letter-spacing:-3px;">Know what<br>you sign.</h1>
+          <p style="margin:26px 0 0; max-width:47ch; font-size:clamp(16px,2vw,19px); line-height:1.55; color:rgba(244,245,243,0.62);">Squads multisig proposals arrive encoded, and most signers approve what they cannot read. Cosign is a native iOS signer that decodes every instruction into plain language, so you review the real action before you add your signature.</p>
+          <div style="margin-top:30px; display:flex; flex-wrap:wrap; align-items:center; gap:14px;">
+            <a href="https://testflight.apple.com/join/FPjmw416" target="_blank" rel="noopener" style="text-decoration:none; font-size:15px; font-weight:600; color:#1A1305; background:#F2C26C; padding:14px 24px; border-radius:13px; display:inline-flex; align-items:center; gap:9px;">Join the TestFlight beta<svg width="15" height="15" viewBox="0 0 16 16"><path d="M3 8h9M9 4l4 4-4 4" stroke="#1A1305" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+            <a href="https://github.com/hackshare/cosign" target="_blank" rel="noopener" style="text-decoration:none; font-size:15px; font-weight:500; color:#F4F5F3; padding:14px 20px; border:1px solid rgba(255,255,255,0.14); border-radius:13px; display:inline-flex; align-items:center; gap:9px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="#F4F5F3"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.17.55-.38l-.01-1.34c-2.2.48-2.67-1.06-2.67-1.06-.36-.92-.88-1.16-.88-1.16-.72-.49.05-.48.05-.48.8.056 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.51.28-.87.5-1.07-1.76-.2-3.6-.88-3.6-3.9 0-.86.3-1.57.82-2.12-.08-.2-.36-1 .08-2.1 0 0 .67-.21 2.2.81a7.6 7.6 0 0 1 4 0c1.52-1.02 2.19-.81 2.19-.81.44 1.1.16 1.9.08 2.1.51.55.82 1.26.82 2.12 0 3.03-1.85 3.7-3.61 3.89.28.25.54.73.54 1.48l-.01 2.19c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"></path></svg>View on GitHub</a>
           </div>
-
-          <div style="margin-top:24px; display:flex; flex-wrap:wrap; align-items:center; gap:18px;">
-            <a href="https://testflight.apple.com/join/FPjmw416" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-size:15px; font-weight:600; color:#1A1305; background:#F2C26C; padding:14px 24px; border-radius:13px; text-decoration:none;">Join the TestFlight beta</a>
-            <a href="#work" style="text-decoration:none; font-size:15px; font-weight:500; color:#F4F5F3; display:inline-flex; align-items:center; gap:8px;">See how it works<svg width="15" height="15" viewBox="0 0 16 16"><path d="M3 8h9M9 4l4 4-4 4" stroke="#F4F5F3" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
-          </div>
+          <div style="margin-top:20px; font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.36); line-height:1.6;">Native iOS · SwiftUI · Squads v4 · keys held on device</div>
         </div>
 
-        <div style="position:relative; min-height:clamp(440px,52vw,600px);">
-          <div class="phone hide-narrow" style="position:absolute; right:1%; top:1%; width:clamp(210px,21vw,252px); border-radius:42px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.10); padding:6px; transform:rotate(3.5deg); opacity:0.92;">
-            <img src="/assets/08-proposal-detail.png" alt="Cosign decoded proposal detail" style="width:100%; display:block; border-radius:37px;"/>
-          </div>
-          <div class="phone" style="position:absolute; left:clamp(0px,2vw,16px); top:clamp(30px,5vw,66px); width:clamp(258px,30vw,326px); border-radius:48px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px;">
-            <img src="/assets/10-proposal-signing-sheet.png" alt="Cosign sign sheet with hold to approve" style="width:100%; display:block; border-radius:40px;"/>
+        <!-- kinetic decode phone -->
+        <div style="display:flex; justify-content:center;">
+          <div class="phone" data-parallax="0.02" style="width:clamp(280px,32vw,344px); border-radius:48px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px;">
+            <div style="border-radius:40px; overflow:hidden; background:#08090B; position:relative;">
+              <div style="height:46px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 26px 7px;"><span style="font-size:13px; font-weight:600; font-variant-numeric:tabular-nums;">9:41</span><span style="display:flex; align-items:center; gap:6px;"><svg width="16" height="11" viewBox="0 0 18 12" fill="#F4F5F3"><rect x="0" y="8" width="3" height="4" rx="1"></rect><rect x="5" y="5" width="3" height="7" rx="1"></rect><rect x="10" y="2" width="3" height="10" rx="1"></rect><rect x="15" y="0" width="3" height="12" rx="1" opacity="0.4"></rect></svg><svg width="22" height="11" viewBox="0 0 26 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3" stroke="#F4F5F3" opacity="0.5"></rect><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#F4F5F3"></rect></svg></span></div>
+              <div style="padding:8px 20px 0; display:flex; align-items:center; justify-content:space-between;"><div style="font-family:'Geist Mono', monospace; font-size:11px; letter-spacing:0.4px; color:rgba(244,245,243,0.42);">Proposal 14 · Operations</div><span style="width:26px; height:26px; border-radius:999px; background:#0F1114; border:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center;"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="rgba(244,245,243,0.5)" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></div>
+
+              <div data-kinetic="1" style="position:relative; margin:14px 16px 0; height:290px; border-radius:16px; background:#0C0E12; border:1px solid rgba(255,255,255,0.07); overflow:hidden;">
+                <div data-kinetic-scan="1" style="position:absolute; left:0; right:0; top:14px; height:2px; background:linear-gradient(90deg, transparent, #F2C26C, transparent); box-shadow:0 0 12px 2px rgba(242,194,108,0.5); opacity:0; z-index:3; animation:cosignScan 7.5s cubic-bezier(.4,0,.2,1) infinite;"></div>
+
+                <div data-kinetic-raw="1" style="position:absolute; inset:0; padding:15px 16px; opacity:0; animation:cosignRaw 7.5s cubic-bezier(.4,0,.2,1) infinite;">
+                  <div style="display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:6px; background:rgba(255,255,255,0.05); font-family:'Geist Mono', monospace; font-size:9.5px; letter-spacing:0.6px; text-transform:uppercase; color:rgba(244,245,243,0.42);">Encoded instruction</div>
+                  <div style="margin-top:12px; font-family:'Geist Mono', monospace; font-size:11px; line-height:1.85; color:rgba(244,245,243,0.5); word-break:break-all;">program: Vote111111111111<br>data: 02 00 00 00 7c 9a f3 1b<br>a4 05 e2 00 3a d1 90 4f 8c<br>6b 21 ff 0e 55 c3 88 12 ad<br>accounts: 7cNd… · SqDs… · 11111…</div>
+                  <div style="margin-top:14px; display:flex; align-items:center; gap:7px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06);"><svg width="13" height="13" viewBox="0 0 16 16"><path d="M8 1.6l6 11H2l6-11z" stroke="rgba(244,245,243,0.4)" stroke-width="1.4" fill="none" stroke-linejoin="round"></path><path d="M8 6.4v3M8 11.2h.01" stroke="rgba(244,245,243,0.4)" stroke-width="1.4" stroke-linecap="round"></path></svg><span style="font-size:11px; color:rgba(244,245,243,0.42);">Unreadable without decoding</span></div>
+                </div>
+
+                <div data-kinetic-decoded="1" style="position:absolute; inset:0; padding:15px 16px; opacity:1; animation:cosignDecoded 7.5s cubic-bezier(.4,0,.2,1) infinite;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-size:16px; font-weight:600; letter-spacing:-0.3px;">SOL transfer</div><span style="display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:600; color:#F2A65C; background:rgba(242,166,92,0.12); padding:3px 8px; border-radius:6px;"><span style="width:5px; height:5px; border-radius:999px; background:#F2A65C;"></span>Review</span></div>
+                  <div style="margin-top:14px; display:flex; flex-direction:column; gap:0;">
+                    <div style="display:flex; align-items:baseline; gap:12px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.42);">Amount</span><span style="font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;">250 SOL</span></div>
+                    <div style="display:flex; align-items:baseline; gap:12px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.42);">To</span><span style="font-family:'Geist Mono', monospace; font-size:13px;">7cNd…xK29</span></div>
+                    <div style="display:flex; align-items:baseline; gap:12px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.42);">From</span><span style="font-size:13px; font-weight:500;">Operations · Vault 01</span></div>
+                    <div style="display:flex; align-items:center; gap:12px; padding:11px 0 0;"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.42);">Confidence</span><span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:#7CF2B0;"><svg width="13" height="13" viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>Decoded</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="padding:16px 16px 20px;"><div style="height:46px; border-radius:13px; background:#F2C26C; display:flex; align-items:center; justify-content:center; gap:8px; color:#1A1305; font-size:14px; font-weight:600;"><svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4" stroke="#1A1305" stroke-width="1.6" fill="none"></circle><path d="M5.6 8.2l1.7 1.7 3.1-3.4" stroke="#1A1305" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>Hold to approve</div></div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="work" style="max-width:1200px; margin:clamp(72px,11vw,150px) auto 0; padding:0 clamp(20px,5vw,44px);">
+    <!-- PROBLEM + BEFORE/AFTER TOGGLE -->
+    <section id="problem" style="max-width:1200px; margin:clamp(80px,12vw,170px) auto 0; padding:0 clamp(20px,5vw,44px);" data-reveal>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,360px), 1fr)); gap:clamp(32px,6vw,80px); align-items:center;">
         <div>
-          <div style="display:flex; align-items:baseline; gap:18px; border-top:1px solid rgba(255,255,255,0.14); padding-top:18px;">
-            <span style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9;">01</span>
-            <span style="font-size:15px; font-weight:500; color:#F4F5F3;">Decoded and inspectable</span>
-          </div>
-          <h3 style="margin:22px 0 0; font-size:clamp(26px,3.6vw,40px); font-weight:600; letter-spacing:-1.2px; line-height:1.05;">Know exactly what you are signing.</h3>
-          <p style="margin:16px 0 0; max-width:46ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Cosign decodes every instruction into plain language, with a severity and a confidence read on the data. You can open the raw fields when you want them. Nothing is hidden behind a blind signature.</p>
+          <div style="font-size:clamp(13px,1.4vw,15px); font-weight:600; color:#F2C26C; letter-spacing:-0.1px;">The problem</div>
+          <h2 style="margin:16px 0 0; font-size:clamp(28px,4.2vw,48px); font-weight:600; letter-spacing:-1.6px; line-height:1.04; max-width:16ch;">A signature on bytes you cannot read.</h2>
+          <p style="margin:18px 0 0; max-width:48ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">A Squads proposal is a serialized transaction. The Squads web app can decode it, but the moment you confirm on a hardware wallet you are back to approving a hash the device cannot explain. Cosign keeps the decoded action in front of you through to the signature, so approving stays a decision rather than a leap of faith.</p>
+          <div style="margin-top:22px; font-family:'Geist Mono', monospace; font-size:12.5px; color:rgba(244,245,243,0.42);">Toggle the panel to see the difference.</div>
         </div>
-        <div style="position:relative; min-height:clamp(440px,52vw,600px); display:flex; align-items:center; justify-content:center;">
-          <div class="phone hide-narrow" style="position:absolute; left:2%; top:4%; width:clamp(200px,21vw,244px); border-radius:42px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.10); padding:6px; transform:rotate(-4deg); opacity:0.9;">
-            <img src="/assets/38-proposal-idl-confidence.png" alt="Cosign proposal with IDL confidence" style="width:100%; display:block; border-radius:37px;"/>
+
+        <div data-toggle-group="1" style="position:relative;">
+          <div style="display:inline-flex; padding:3px; border-radius:11px; background:#0C0E12; border:1px solid rgba(255,255,255,0.09); margin-bottom:16px;">
+            <button data-toggle="raw" type="button" style="border:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; padding:8px 15px; border-radius:8px; background:#F2C26C; color:#1A1305;">As it arrives</button>
+            <button data-toggle="decoded" type="button" style="border:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; padding:8px 15px; border-radius:8px; background:transparent; color:rgba(244,245,243,0.62);">As Cosign shows it</button>
           </div>
-          <div class="phone" style="position:relative; width:clamp(252px,28vw,308px); border-radius:48px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px; transform:rotate(2deg);">
-            <img src="/assets/08-proposal-detail.png" alt="Cosign decoded proposal detail" style="width:100%; display:block; border-radius:40px;"/>
+          <div style="position:relative; min-height:296px;">
+            <div data-panel="raw" style="position:absolute; inset:0; opacity:1; transition:opacity .45s ease; border:1px solid rgba(255,255,255,0.09); border-radius:16px; background:#0C0E12; padding:20px; overflow:hidden;">
+              <div style="display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:6px; background:rgba(255,255,255,0.05); font-family:'Geist Mono', monospace; font-size:10px; letter-spacing:0.6px; text-transform:uppercase; color:rgba(244,245,243,0.42);">Raw proposal</div>
+              <div style="margin-top:14px; font-family:'Geist Mono', monospace; font-size:12px; line-height:1.9; color:rgba(244,245,243,0.5); word-break:break-all;">program: Vote1111111111111111111111<br>data: 02 00 00 00 7c 9a f3 1b a4 05 e2 00<br>3a d1 90 4f 8c 6b 21 ff 0e 55 c3 88 12 ad<br>7f b2 44 91 0c 6e 33 a0 d5 1e 8b<br>accounts: 7cNd…xK29 · SqDs…op3X · 1111…</div>
+              <div style="margin-top:16px; display:flex; align-items:center; gap:8px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06);"><svg width="15" height="15" viewBox="0 0 16 16"><path d="M8 1.6l6 11H2l6-11z" stroke="rgba(244,245,243,0.42)" stroke-width="1.4" fill="none" stroke-linejoin="round"></path><path d="M8 6.4v3M8 11.2h.01" stroke="rgba(244,245,243,0.42)" stroke-width="1.4" stroke-linecap="round"></path></svg><span style="font-size:13px; color:rgba(244,245,243,0.5);">You are asked to approve this.</span></div>
+            </div>
+            <div data-panel="decoded" style="position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .45s ease; border:1px solid rgba(124,242,176,0.24); border-radius:16px; background:#0C0E12; padding:20px; overflow:hidden;">
+              <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-size:18px; font-weight:600; letter-spacing:-0.3px;">SOL transfer</div><span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:#F2A65C; background:rgba(242,166,92,0.12); padding:4px 9px; border-radius:7px;"><span style="width:5px; height:5px; border-radius:999px; background:#F2A65C;"></span>Review</span></div>
+              <div style="margin-top:14px;">
+                <div style="display:flex; align-items:baseline; gap:14px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:88px; flex-shrink:0; font-size:13px; color:rgba(244,245,243,0.42);">Amount</span><span style="font-size:15px; font-weight:600; font-variant-numeric:tabular-nums;">250 SOL</span></div>
+                <div style="display:flex; align-items:baseline; gap:14px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:88px; flex-shrink:0; font-size:13px; color:rgba(244,245,243,0.42);">Recipient</span><span style="font-family:'Geist Mono', monospace; font-size:13.5px;">7cNd…xK29</span></div>
+                <div style="display:flex; align-items:baseline; gap:14px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:88px; flex-shrink:0; font-size:13px; color:rgba(244,245,243,0.42);">From vault</span><span style="font-size:14px; font-weight:500;">Operations · Vault 01</span></div>
+                <div style="display:flex; align-items:center; gap:14px; padding:12px 0 0;"><span style="width:88px; flex-shrink:0; font-size:13px; color:rgba(244,245,243,0.42);">Confidence</span><span style="display:inline-flex; align-items:center; gap:6px; font-size:13.5px; font-weight:600; color:#7CF2B0;"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>Decoded from the on-chain program</span></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section style="max-width:1200px; margin:clamp(64px,9vw,124px) auto 0; padding:0 clamp(20px,5vw,44px);">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,360px), 1fr)); gap:clamp(32px,6vw,80px); align-items:center;">
-        <div style="display:flex; align-items:center; justify-content:center;">
-          <div class="phone" style="width:clamp(258px,29vw,320px); border-radius:48px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px; transform:rotate(-2deg);">
-            <img src="/assets/10-proposal-signing-sheet.png" alt="Cosign sign sheet with threshold ring" style="width:100%; display:block; border-radius:40px;"/>
-          </div>
-        </div>
-        <div>
-          <div style="display:flex; align-items:baseline; gap:18px; border-top:1px solid rgba(255,255,255,0.14); padding-top:18px;">
-            <span style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9;">02</span>
-            <span style="font-size:15px; font-weight:500; color:#F4F5F3;">Co-sign to the threshold</span>
-          </div>
-          <h3 style="margin:22px 0 0; font-size:clamp(26px,3.6vw,40px); font-weight:600; letter-spacing:-1.2px; line-height:1.05;">Add your signature, watch the threshold close.</h3>
-          <p style="margin:16px 0 0; max-width:46ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">See who has approved and how many signatures remain. The threshold ring fills as co-signers sign, and Face ID confirms before anything is broadcast. Hold to approve keeps an accidental tap from spending anything.</p>
-        </div>
-      </div>
-    </section>
-
-    <section style="max-width:1200px; margin:clamp(64px,9vw,124px) auto 0; padding:0 clamp(20px,5vw,44px);">
+    <!-- ON-DEVICE DECODE -->
+    <section style="max-width:1200px; margin:clamp(80px,12vw,170px) auto 0; padding:0 clamp(20px,5vw,44px);" data-reveal>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,360px), 1fr)); gap:clamp(32px,6vw,80px); align-items:center;">
         <div>
-          <div style="display:flex; align-items:baseline; gap:18px; border-top:1px solid rgba(255,255,255,0.14); padding-top:18px;">
-            <span style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9;">03</span>
-            <span style="font-size:15px; font-weight:500; color:#F4F5F3;">Hardware signers</span>
-          </div>
-          <h3 style="margin:22px 0 0; font-size:clamp(26px,3.6vw,40px); font-weight:600; letter-spacing:-1.2px; line-height:1.05;">Bring your own hardware.</h3>
-          <p style="margin:16px 0 0; max-width:46ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Connect a Ledger over Bluetooth or a YubiKey over NFC or USB. The guided flow checks the device, confirms the address on the hardware itself, and only then adds it as a signer. Recovery phrases never touch the relay.</p>
-        </div>
-        <div style="position:relative; min-height:clamp(440px,52vw,600px); display:flex; align-items:center; justify-content:center;">
-          <div class="phone hide-narrow" style="position:absolute; right:3%; top:3%; width:clamp(206px,22vw,250px); border-radius:42px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.10); padding:6px; transform:rotate(4deg); opacity:0.92;">
-            <img src="/assets/35-add-yubikey.png" alt="Cosign add YubiKey" style="width:100%; display:block; border-radius:37px;"/>
-          </div>
-          <div class="phone" style="position:relative; width:clamp(252px,28vw,304px); border-radius:48px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px; transform:rotate(-3deg);">
-            <img src="/assets/32-add-signer-chooser.png" alt="Cosign add signer" style="width:100%; display:block; border-radius:40px;"/>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section style="max-width:1200px; margin:clamp(64px,9vw,124px) auto 0; padding:0 clamp(20px,5vw,44px);">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,360px), 1fr)); gap:clamp(32px,6vw,80px); align-items:center;">
-        <div style="position:relative; min-height:clamp(440px,52vw,600px); display:flex; align-items:center; justify-content:center;">
-          <div class="phone hide-narrow" style="position:absolute; left:3%; top:4%; width:clamp(204px,21vw,246px); border-radius:42px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.10); padding:6px; transform:rotate(-4deg); opacity:0.9;">
-            <img src="/assets/41-import-recovery-phrase.png" alt="Cosign import recovery phrase" style="width:100%; display:block; border-radius:37px;"/>
-          </div>
-          <div class="phone" style="position:relative; width:clamp(252px,28vw,304px); border-radius:48px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px; transform:rotate(2.5deg);">
-            <img src="/assets/37-signer-detail.png" alt="Cosign signer detail" style="width:100%; display:block; border-radius:40px;"/>
-          </div>
-        </div>
-        <div>
-          <div style="display:flex; align-items:baseline; gap:18px; border-top:1px solid rgba(255,255,255,0.14); padding-top:18px;">
-            <span style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9;">04</span>
-            <span style="font-size:15px; font-weight:500; color:#F4F5F3;">Self-custody</span>
-          </div>
-          <h3 style="margin:22px 0 0; font-size:clamp(26px,3.6vw,40px); font-weight:600; letter-spacing:-1.2px; line-height:1.05;">Your keys never leave the phone.</h3>
-          <p style="margin:16px 0 0; max-width:46ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Keys are generated and stored in the iOS Keychain or on your hardware signer. Import an existing wallet from its recovery phrase or a raw Solana secret key, behind Face ID, and manage each signer from one place. Cosign cannot move your funds.</p>
-        </div>
-      </div>
-    </section>
-
-    <section style="max-width:1200px; margin:clamp(64px,9vw,124px) auto 0; padding:0 clamp(20px,5vw,44px);">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,360px), 1fr)); gap:clamp(32px,6vw,80px); align-items:center;">
-        <div style="position:relative; min-height:clamp(440px,52vw,600px); display:flex; align-items:center; justify-content:center;">
-          <div class="phone hide-narrow" style="position:absolute; right:4%; top:4%; width:clamp(204px,21vw,246px); border-radius:42px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.10); padding:6px; transform:rotate(4deg); opacity:0.9;">
-            <img src="/assets/12-transaction-inspection.png" alt="Cosign transaction inspection" style="width:100%; display:block; border-radius:37px;"/>
-          </div>
-          <div class="phone" style="position:relative; width:clamp(252px,28vw,304px); border-radius:48px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px; transform:rotate(-2.5deg);">
-            <img src="/assets/11-proposal-receipt.png" alt="Cosign proposal receipt" style="width:100%; display:block; border-radius:40px;"/>
-          </div>
-        </div>
-        <div>
-          <div style="display:flex; align-items:baseline; gap:18px; border-top:1px solid rgba(255,255,255,0.14); padding-top:18px;">
-            <span style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9;">05</span>
-            <span style="font-size:15px; font-weight:500; color:#F4F5F3;">Verifiable receipt</span>
-          </div>
-          <h3 style="margin:22px 0 0; font-size:clamp(26px,3.6vw,40px); font-weight:600; letter-spacing:-1.2px; line-height:1.05;">A receipt you can check on-chain.</h3>
-          <p style="margin:16px 0 0; max-width:46ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">After a proposal executes, Cosign shows the signature and the decoded result, with a link to inspect the transaction on-chain. What you approved and what landed are the same thing, and you can prove it.</p>
-        </div>
-      </div>
-    </section>
-
-    <section style="max-width:1200px; margin:clamp(64px,9vw,124px) auto 0; padding:0 clamp(20px,5vw,44px);">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,360px), 1fr)); gap:clamp(32px,6vw,80px); align-items:center;">
-        <div>
-          <div style="display:flex; align-items:baseline; gap:18px; border-top:1px solid rgba(255,255,255,0.14); padding-top:18px;">
-            <span style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9;">06</span>
-            <span style="font-size:15px; font-weight:500; color:#F4F5F3;">Verifiable builds</span>
-          </div>
-          <h3 style="margin:22px 0 0; font-size:clamp(26px,3.6vw,40px); font-weight:600; letter-spacing:-1.2px; line-height:1.05;">See where your build came from.</h3>
-          <p style="margin:16px 0 0; max-width:46ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Every release build is signed, and the app shows that identity, its version, commit, and fingerprint, so you can confirm on device that you're running a signed build. A signed provenance chain, not a black box you have to trust.</p>
+          <div style="font-size:clamp(13px,1.4vw,15px); font-weight:600; color:#F2C26C;">On-device decode</div>
+          <h2 style="margin:16px 0 0; font-size:clamp(28px,4.2vw,44px); font-weight:600; letter-spacing:-1.4px; line-height:1.05;">The decode happens on your phone.</h2>
+          <p style="margin:16px 0 0; max-width:47ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Cosign reads the instruction bytes and works out the action locally, on the device. The relay only transports data and can run an optional simulation. It never decides what you are signing, so the plain-language action you approve is computed where your keys live.</p>
         </div>
         <div style="display:flex; justify-content:center;">
-          <div style="width:100%; max-width:420px; border:1px solid rgba(255,255,255,0.10); border-radius:18px; overflow:hidden; background:#0C0E12;">
+          <div style="width:100%; max-width:420px; border:1px solid rgba(255,255,255,0.1); border-radius:18px; background:#0C0E12; padding:20px;">
+            <div style="font-family:'Geist Mono', monospace; font-size:10px; letter-spacing:0.8px; color:rgba(244,245,243,0.42);">RELAY</div>
+            <div style="margin-top:8px; display:flex; align-items:center; gap:11px; padding:12px 14px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:#0A0B0D;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 9c3 2.5 13 2.5 16 0M4 15c3 2.5 13 2.5 16 0" stroke="rgba(244,245,243,0.6)" stroke-width="1.6" stroke-linecap="round"></path></svg><div style="flex:1; font-size:13px; color:rgba(244,245,243,0.62);">Transports data · optional simulation</div><span style="font-family:'Geist Mono', monospace; font-size:10px; color:rgba(244,245,243,0.36);">no keys</span></div>
+            <div style="display:flex; align-items:center; gap:8px; padding:10px 0 8px 4px; font-family:'Geist Mono', monospace; font-size:10.5px; color:rgba(244,245,243,0.36);"><svg width="12" height="16" viewBox="0 0 12 16"><path d="M6 1v11M6 13l-3.5-3.5M6 13l3.5-3.5" stroke="rgba(244,245,243,0.3)" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>instruction bytes</div>
+            <div style="border:1px solid rgba(242,194,108,0.3); border-radius:14px; padding:15px; background:rgba(242,194,108,0.04);">
+              <div style="font-family:'Geist Mono', monospace; font-size:10px; letter-spacing:0.8px; color:#F2C26C;">YOUR DEVICE</div>
+              <div style="margin-top:12px; display:flex; align-items:center; gap:10px;"><span style="font-family:'Geist Mono', monospace; font-size:11.5px; color:rgba(244,245,243,0.5); background:#0A0B0D; border:1px solid rgba(255,255,255,0.08); padding:6px 9px; border-radius:8px;">02 00 7c 9a f3…</span><svg width="20" height="14" viewBox="0 0 20 14" style="flex-shrink:0;"><path d="M2 7h13M12 3l4 4-4 4" stroke="#F2C26C" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13px; font-weight:600; color:#F4F5F3;">Send 250 SOL</span></div>
+              <div style="margin-top:12px; display:flex; align-items:center; gap:7px; font-size:12px; color:rgba(244,245,243,0.6);"><svg width="13" height="13" viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>Decoded locally, then signed with Face ID</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STICKY HOW-IT-WORKS -->
+    <section id="work" style="max-width:1200px; margin:clamp(80px,12vw,180px) auto 0; padding:0 clamp(20px,5vw,44px);">
+      <div style="border-top:1px solid rgba(255,255,255,0.12); padding-top:22px; display:flex; align-items:baseline; justify-content:space-between; gap:24px; flex-wrap:wrap;" data-reveal>
+        <h2 style="margin:0; font-size:clamp(28px,4.4vw,48px); font-weight:600; letter-spacing:-1.6px; line-height:1.02; max-width:15ch;">From encoded proposal to verifiable receipt.</h2>
+        <span style="font-family:'Geist Mono', monospace; font-size:13px; color:rgba(244,245,243,0.4);">how it works</span>
+      </div>
+
+      <div style="margin-top:clamp(32px,5vw,64px); display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,300px), 1fr)); gap:clamp(24px,4vw,64px); align-items:start;">
+        <div class="sticky-phone-col" style="position:sticky; top:96px; align-self:start; display:flex; justify-content:center; order:2;">
+          <div class="phone" style="position:relative; width:clamp(258px,27vw,300px); border-radius:46px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px;">
+            <div style="position:relative; border-radius:38px; overflow:hidden; aspect-ratio:293/634; background:#0C0E12;">
+              <img data-shot="0" src="/assets/08-proposal-detail.png" alt="Cosign decoded proposal detail" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:1; transition:opacity .6s ease;">
+              <img data-shot="1" src="/assets/10-proposal-signing-sheet.png" alt="Cosign sign sheet threshold ring" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .6s ease;">
+              <img data-shot="2" src="/assets/41-import-recovery-phrase.png" alt="Cosign import wallet behind Face ID" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .6s ease;">
+              <img data-shot="3" src="/assets/11-proposal-receipt.png" alt="Cosign verifiable receipt" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .6s ease;">
+            </div>
+          </div>
+        </div>
+
+        <div class="beats-col" style="order:1;">
+          <div data-beat="0" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+            <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:#F2C26C; font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">01</span><span data-beat-title style="font-size:15px; font-weight:500; color:#F4F5F3; transition:color .4s ease;">Decoded and inspectable</span></div>
+            <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Read the action, not the bytes.</h3>
+            <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Every instruction is decoded into plain language with a severity and a confidence read on the data. Open the raw fields whenever you want them. Nothing is hidden behind a blind signature.</p>
+          </div>
+
+          <div data-beat="1" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+            <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">02</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Co-sign to the threshold</span></div>
+            <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Add your signature, watch the threshold close.</h3>
+            <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">See who has approved and how many signatures remain. The threshold ring fills as co-signers sign, and Face ID confirms before anything is broadcast. Hold to approve keeps an accidental tap from spending anything.</p>
+          </div>
+
+          <div data-beat="2" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+            <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">03</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Self-custody</span></div>
+            <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Your keys stay on the device.</h3>
+            <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Keys are generated and held on your iPhone, in the iOS Keychain. Import an existing wallet from its recovery phrase or a raw Solana secret key, all behind Face ID. Cosign cannot move your funds.</p>
+            <p style="margin:14px 0 0; max-width:44ch; font-family:'Geist Mono', monospace; font-size:12px; line-height:1.6; color:rgba(244,245,243,0.36);">Hardware signer support is on the roadmap.</p>
+          </div>
+
+          <div data-beat="3" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+            <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">04</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Verifiable receipt</span></div>
+            <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">A receipt you can check on-chain.</h3>
+            <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">After a proposal executes, Cosign shows the signature and the decoded result, with a link to inspect the transaction on-chain. What you approved and what landed are the same thing, and you can prove it.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRUST BOUNDARY DIAGRAM -->
+    <section id="trust" style="max-width:1200px; margin:clamp(80px,12vw,180px) auto 0; padding:0 clamp(20px,5vw,44px);" data-reveal>
+      <div style="border-top:1px solid rgba(255,255,255,0.12); padding-top:22px; display:flex; align-items:baseline; justify-content:space-between; gap:24px; flex-wrap:wrap;">
+        <h2 style="margin:0; font-size:clamp(28px,4.4vw,48px); font-weight:600; letter-spacing:-1.6px; line-height:1.02; max-width:17ch;">Only your device can sign.</h2>
+        <span style="font-family:'Geist Mono', monospace; font-size:13px; color:rgba(244,245,243,0.4);">trust model</span>
+      </div>
+      <p style="margin:18px 0 0; max-width:58ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Cosign splits the work so the parts that matter stay with you. The relay helps you read the chain. It never holds keys and it cannot move funds. Signing happens only on your iPhone, and settlement happens only on Solana.</p>
+
+      <div style="margin-top:clamp(32px,5vw,52px); display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,270px), 1fr)); gap:16px; align-items:stretch;">
+        <div style="border:1px solid rgba(242,194,108,0.28); border-radius:18px; background:#0C0E12; padding:22px; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:11px;"><span style="width:38px; height:38px; border-radius:11px; background:rgba(242,194,108,0.12); display:flex; align-items:center; justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="6" y="2" width="12" height="20" rx="3" stroke="#F2C26C" stroke-width="1.7"></rect><path d="M10 5h4" stroke="#F2C26C" stroke-width="1.7" stroke-linecap="round"></path></svg></span><div><div style="font-size:16px; font-weight:600; letter-spacing:-0.3px;">Your iPhone</div><div style="font-family:'Geist Mono', monospace; font-size:11px; color:rgba(244,245,243,0.42);">holds keys · decodes · signs</div></div></div>
+          <div style="margin-top:16px; display:flex; flex-direction:column; gap:9px;">
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Keys generated and held in the Keychain</span></div>
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Signs transactions behind Face ID</span></div>
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Decodes the proposal locally, then signs</span></div>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgba(255,255,255,0.1); border-radius:18px; background:#0C0E12; padding:22px; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:11px;"><span style="width:38px; height:38px; border-radius:11px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4 8c3 3 13 3 16 0M4 16c3 3 13 3 16 0M4 12h16" stroke="rgba(244,245,243,0.7)" stroke-width="1.6" stroke-linecap="round"></path></svg></span><div><div style="font-size:16px; font-weight:600; letter-spacing:-0.3px;">The relay</div><div style="font-family:'Geist Mono', monospace; font-size:11px; color:rgba(244,245,243,0.42);">transports · simulates</div></div></div>
+          <div style="margin-top:16px; display:flex; flex-direction:column; gap:9px;">
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Transports data and offers optional simulation</span></div>
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><circle cx="8" cy="8" r="6.4" stroke="#F26464" stroke-width="1.6" fill="none"></circle><path d="M5.5 5.5l5 5" stroke="#F26464" stroke-width="1.6" stroke-linecap="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Holds no keys, takes no custody</span></div>
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><circle cx="8" cy="8" r="6.4" stroke="#F26464" stroke-width="1.6" fill="none"></circle><path d="M5.5 5.5l5 5" stroke="#F26464" stroke-width="1.6" stroke-linecap="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Cannot sign or move your funds</span></div>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgba(255,255,255,0.1); border-radius:18px; background:#0C0E12; padding:22px; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:11px;"><span style="width:38px; height:38px; border-radius:11px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M6 8h11l-3 3H6l3-3zM6 15h11l-3-3H6" stroke="rgba(244,245,243,0.7)" stroke-width="1.5" stroke-linejoin="round"></path></svg></span><div><div style="font-size:16px; font-weight:600; letter-spacing:-0.3px;">Solana</div><div style="font-family:'Geist Mono', monospace; font-size:11px; color:rgba(244,245,243,0.42);">settles · public</div></div></div>
+          <div style="margin-top:16px; display:flex; flex-direction:column; gap:9px;">
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Executes the signed transaction</span></div>
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">The multisig program enforces the threshold</span></div>
+            <div style="display:flex; align-items:flex-start; gap:9px;"><svg width="15" height="15" viewBox="0 0 16 16" style="margin-top:2px; flex-shrink:0;"><path d="M3.5 8.5L6.5 11.5 12.5 5" stroke="#7CF2B0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13.5px; line-height:1.45; color:rgba(244,245,243,0.72);">Public record anyone can verify</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:18px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.42);"><span style="display:inline-flex; align-items:center; gap:6px;"><span style="width:16px; height:2px; background:#F2C26C; display:inline-block;"></span>signing path, on your device only</span><span style="opacity:0.5;">·</span><span>the relay sits outside it</span></div>
+    </section>
+
+    <!-- VERIFIABLE BUILDS -->
+    <section id="verify" style="max-width:1200px; margin:clamp(80px,12vw,180px) auto 0; padding:0 clamp(20px,5vw,44px);" data-reveal>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,360px), 1fr)); gap:clamp(32px,6vw,80px); align-items:center;">
+        <div>
+          <div style="font-size:clamp(13px,1.4vw,15px); font-weight:600; color:#F2C26C;">Verifiable builds</div>
+          <h2 style="margin:16px 0 0; font-size:clamp(28px,4.2vw,44px); font-weight:600; letter-spacing:-1.4px; line-height:1.05;">Match the app against the public record.</h2>
+          <p style="margin:16px 0 0; max-width:47ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Every release is built in the open and signed, then published as a GitHub Release. The app shows its version, commit, and SHA-256 fingerprint, so you can match the build you are running against that published record, by eye or with a scan. Provenance you can check, not a black box you have to trust.</p>
+          <a href="https://github.com/hackshare/cosign/releases" target="_blank" rel="noopener" style="margin-top:22px; text-decoration:none; font-size:15px; font-weight:500; color:#F4F5F3; display:inline-flex; align-items:center; gap:9px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="#F4F5F3"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.17.55-.38l-.01-1.34c-2.2.48-2.67-1.06-2.67-1.06-.36-.92-.88-1.16-.88-1.16-.72-.49.05-.48.05-.48.8.056 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.51.28-.87.5-1.07-1.76-.2-3.6-.88-3.6-3.9 0-.86.3-1.57.82-2.12-.08-.2-.36-1 .08-2.1 0 0 .67-.21 2.2.81a7.6 7.6 0 0 1 4 0c1.52-1.02 2.19-.81 2.19-.81.44 1.1.16 1.9.08 2.1.51.55.82 1.26.82 2.12 0 3.03-1.85 3.7-3.61 3.89.28.25.54.73.54 1.48l-.01 2.19c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"></path></svg>See the releases on GitHub</a>
+        </div>
+        <div style="display:flex; justify-content:center;">
+          <div style="width:100%; max-width:420px; border:1px solid rgba(255,255,255,0.1); border-radius:18px; overflow:hidden; background:#0C0E12;">
             <div style="display:flex; align-items:center; gap:11px; padding:15px 18px; border-bottom:1px solid rgba(255,255,255,0.07);"><span style="width:30px; height:30px; border-radius:999px; background:rgba(124,242,176,0.14); display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 20 20"><path d="M5 10.5l3.2 3.2L15 7" stroke="#7CF2B0" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><div style="flex:1;"><div style="font-size:15px; font-weight:600; color:#7CF2B0; letter-spacing:-0.2px;">Verified build</div></div><span style="font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.42);">v0.1.0</span></div>
             <div style="display:flex; gap:16px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Release</span><span style="font-family:'Geist Mono', monospace; font-size:13px;">v0.1.0+1751312345</span></div>
             <div style="display:flex; gap:16px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.06);"><span style="width:74px; flex-shrink:0; font-size:12px; color:rgba(244,245,243,0.36);">Commit</span><span style="font-family:'Geist Mono', monospace; font-size:13px;">aca62f4c</span></div>
-            <div style="display:flex; gap:16px; align-items:center; padding:14px 18px;"><div style="flex:1; min-width:0;"><div style="font-size:12px; color:rgba(244,245,243,0.36); margin-bottom:6px;">Fingerprint · SHA-256</div><div style="font-family:'Geist Mono', monospace; font-size:12px; line-height:1.5; letter-spacing:0.3px; color:rgba(244,245,243,0.82); word-break:break-all;">aca62f4c9d3b71e0<wbr>4f2a8c61bd09e7<wbr>10f5a23c4e8b<wbr>90d172a6f3c5</div></div><div style="width:64px; height:64px; flex-shrink:0; border-radius:9px; background:#F4F5F3; padding:5px;"><svg width="100%" height="100%" viewBox="0 0 29 29" shape-rendering="crispEdges"><g fill="#08090B"><rect x="0" y="0" width="7" height="7"></rect><rect x="1" y="1" width="5" height="5" fill="#F4F5F3"></rect><rect x="2" y="2" width="3" height="3"></rect><rect x="22" y="0" width="7" height="7"></rect><rect x="23" y="1" width="5" height="5" fill="#F4F5F3"></rect><rect x="24" y="2" width="3" height="3"></rect><rect x="0" y="22" width="7" height="7"></rect><rect x="1" y="23" width="5" height="5" fill="#F4F5F3"></rect><rect x="2" y="24" width="3" height="3"></rect><rect x="9" y="0" width="1" height="1"></rect><rect x="11" y="0" width="1" height="1"></rect><rect x="14" y="0" width="1" height="1"></rect><rect x="18" y="0" width="1" height="1"></rect><rect x="8" y="2" width="1" height="1"></rect><rect x="10" y="2" width="1" height="1"></rect><rect x="13" y="2" width="1" height="1"></rect><rect x="19" y="2" width="1" height="1"></rect><rect x="9" y="4" width="1" height="1"></rect><rect x="12" y="4" width="1" height="1"></rect><rect x="17" y="4" width="1" height="1"></rect><rect x="20" y="4" width="1" height="1"></rect><rect x="8" y="6" width="1" height="1"></rect><rect x="11" y="6" width="1" height="1"></rect><rect x="15" y="6" width="1" height="1"></rect><rect x="18" y="6" width="1" height="1"></rect><rect x="2" y="8" width="1" height="1"></rect><rect x="4" y="8" width="1" height="1"></rect><rect x="9" y="8" width="1" height="1"></rect><rect x="11" y="8" width="1" height="1"></rect><rect x="13" y="8" width="1" height="1"></rect><rect x="16" y="8" width="1" height="1"></rect><rect x="19" y="8" width="1" height="1"></rect><rect x="22" y="8" width="1" height="1"></rect><rect x="24" y="8" width="1" height="1"></rect><rect x="26" y="8" width="1" height="1"></rect><rect x="28" y="8" width="1" height="1"></rect><rect x="1" y="10" width="1" height="1"></rect><rect x="5" y="10" width="1" height="1"></rect><rect x="8" y="10" width="1" height="1"></rect><rect x="10" y="10" width="1" height="1"></rect><rect x="14" y="10" width="1" height="1"></rect><rect x="18" y="10" width="1" height="1"></rect><rect x="21" y="10" width="1" height="1"></rect><rect x="23" y="10" width="1" height="1"></rect><rect x="27" y="10" width="1" height="1"></rect><rect x="3" y="12" width="1" height="1"></rect><rect x="6" y="12" width="1" height="1"></rect><rect x="9" y="12" width="1" height="1"></rect><rect x="12" y="12" width="1" height="1"></rect><rect x="15" y="12" width="1" height="1"></rect><rect x="17" y="12" width="1" height="1"></rect><rect x="20" y="12" width="1" height="1"></rect><rect x="25" y="12" width="1" height="1"></rect><rect x="28" y="12" width="1" height="1"></rect><rect x="8" y="14" width="1" height="1"></rect><rect x="11" y="14" width="1" height="1"></rect><rect x="14" y="14" width="1" height="1"></rect><rect x="16" y="14" width="1" height="1"></rect><rect x="19" y="14" width="1" height="1"></rect><rect x="22" y="14" width="1" height="1"></rect><rect x="24" y="14" width="1" height="1"></rect><rect x="27" y="14" width="1" height="1"></rect><rect x="1" y="16" width="1" height="1"></rect><rect x="4" y="16" width="1" height="1"></rect><rect x="9" y="16" width="1" height="1"></rect><rect x="12" y="16" width="1" height="1"></rect><rect x="15" y="16" width="1" height="1"></rect><rect x="18" y="16" width="1" height="1"></rect><rect x="21" y="16" width="1" height="1"></rect><rect x="26" y="16" width="1" height="1"></rect><rect x="28" y="16" width="1" height="1"></rect><rect x="10" y="18" width="1" height="1"></rect><rect x="13" y="18" width="1" height="1"></rect><rect x="17" y="18" width="1" height="1"></rect><rect x="20" y="18" width="1" height="1"></rect><rect x="23" y="18" width="1" height="1"></rect><rect x="25" y="18" width="1" height="1"></rect><rect x="9" y="20" width="1" height="1"></rect><rect x="11" y="20" width="1" height="1"></rect><rect x="14" y="20" width="1" height="1"></rect><rect x="16" y="20" width="1" height="1"></rect><rect x="19" y="20" width="1" height="1"></rect><rect x="22" y="20" width="1" height="1"></rect><rect x="24" y="20" width="1" height="1"></rect><rect x="26" y="20" width="1" height="1"></rect><rect x="9" y="22" width="1" height="1"></rect><rect x="12" y="22" width="1" height="1"></rect><rect x="15" y="22" width="1" height="1"></rect><rect x="18" y="22" width="1" height="1"></rect><rect x="21" y="22" width="1" height="1"></rect><rect x="24" y="22" width="1" height="1"></rect><rect x="27" y="22" width="1" height="1"></rect><rect x="8" y="24" width="1" height="1"></rect><rect x="10" y="24" width="1" height="1"></rect><rect x="13" y="24" width="1" height="1"></rect><rect x="16" y="24" width="1" height="1"></rect><rect x="19" y="24" width="1" height="1"></rect><rect x="22" y="24" width="1" height="1"></rect><rect x="25" y="24" width="1" height="1"></rect><rect x="28" y="24" width="1" height="1"></rect><rect x="9" y="26" width="1" height="1"></rect><rect x="11" y="26" width="1" height="1"></rect><rect x="14" y="26" width="1" height="1"></rect><rect x="17" y="26" width="1" height="1"></rect><rect x="20" y="26" width="1" height="1"></rect><rect x="23" y="26" width="1" height="1"></rect><rect x="26" y="26" width="1" height="1"></rect><rect x="10" y="28" width="1" height="1"></rect><rect x="13" y="28" width="1" height="1"></rect><rect x="16" y="28" width="1" height="1"></rect><rect x="21" y="28" width="1" height="1"></rect><rect x="24" y="28" width="1" height="1"></rect><rect x="27" y="28" width="1" height="1"></rect></g></svg></div></div>
+            <div style="display:flex; gap:16px; align-items:center; padding:14px 18px;"><div style="flex:1; min-width:0;"><div style="font-size:12px; color:rgba(244,245,243,0.36); margin-bottom:6px;">Fingerprint · SHA-256</div><div style="font-family:'Geist Mono', monospace; font-size:12px; line-height:1.5; letter-spacing:0.3px; color:rgba(244,245,243,0.82); word-break:break-all;">aca62f4c9d3b71e04f2a8c61bd09e710f5a23c4e8b90d172a6f3c5</div></div>
+              <div style="width:66px; height:66px; flex-shrink:0; border-radius:9px; background:#F4F5F3; padding:6px; display:grid; grid-template-columns:repeat(9,1fr); grid-template-rows:repeat(9,1fr); gap:1px;">
+                <span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span>
+                <span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span>
+                <span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span>
+                <span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span>
+                <span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span>
+                <span></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span>
+                <span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span>
+                <span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span><span></span>
+                <span style="background:#08090B;"></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span></span><span style="background:#08090B;"></span><span style="background:#08090B;"></span><span></span><span style="background:#08090B;"></span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section style="max-width:1200px; margin:clamp(76px,11vw,156px) auto 0; padding:0 clamp(20px,5vw,44px);">
-      <div style="border-top:1px solid rgba(255,255,255,0.12); padding-top:clamp(36px,5vw,56px); display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,320px), 1fr)); gap:clamp(28px,5vw,72px);">
-        <div>
-          <h2 style="margin:0; font-size:clamp(28px,4vw,46px); font-weight:600; letter-spacing:-1.8px; line-height:1.0; max-width:15ch;">The relay cannot move your funds.</h2>
-          <p style="margin:18px 0 0; max-width:44ch; font-size:15.5px; line-height:1.6; color:rgba(244,245,243,0.55);">Cosign is built so the parts that matter stay with you. The network helps you read; only your device can sign.</p>
-        </div>
-        <div style="border:1px solid rgba(255,255,255,0.09); border-radius:16px; overflow:hidden; background:#0C0E12;">
-          <div style="padding:18px 18px; border-bottom:1px solid rgba(255,255,255,0.06);"><div style="font-size:12px; color:rgba(244,245,243,0.36);">Keys</div><div style="margin-top:6px; font-size:16px; font-weight:600; letter-spacing:-0.2px;">On device, in the Keychain or on hardware</div><div style="margin-top:6px; font-size:14px; line-height:1.5; color:rgba(244,245,243,0.6);">Never uploaded. Approvals happen only on your iPhone.</div></div>
-          <div style="padding:18px 18px;"><div style="font-size:12px; color:rgba(244,245,243,0.36);">Relay</div><div style="margin-top:6px; font-size:16px; font-weight:600; letter-spacing:-0.2px;">A thin, verifiable client</div><div style="margin-top:6px; font-size:14px; line-height:1.5; color:rgba(244,245,243,0.6);">Proxies Solana RPC and decodes proposals. No keys, no custody. Verify every result against the public chain.</div></div>
-        </div>
-      </div>
-    </section>
-
-    <section style="max-width:1200px; margin:clamp(72px,10vw,140px) auto 0; padding:0 clamp(20px,5vw,44px);">
+    <!-- SIGN-OFF -->
+    <section style="max-width:1200px; margin:clamp(80px,11vw,150px) auto 0; padding:0 clamp(20px,5vw,44px);" data-reveal>
       <div style="border-top:1px solid rgba(255,255,255,0.12); padding-top:clamp(36px,5vw,56px); display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:36px;">
         <div>
-          <h2 style="margin:0; font-size:clamp(28px,4.2vw,44px); font-weight:600; letter-spacing:-1.6px; line-height:1.02; max-width:14ch;">Know what you sign.</h2>
-          <p style="margin:20px 0 0; max-width:46ch; font-size:16px; line-height:1.55; color:rgba(244,245,243,0.62);">The beta runs on Solana devnet, so you can connect signers, build proposals, and co-sign without real funds at risk.</p>
+          <h2 style="margin:0; font-size:clamp(32px,5.4vw,60px); font-weight:600; letter-spacing:-2.2px; line-height:0.98; max-width:13ch;">Know what you sign.</h2>
+          <p style="margin:20px 0 0; max-width:47ch; font-size:16px; line-height:1.55; color:rgba(244,245,243,0.62);">The beta runs on Solana devnet, so you can create squads, build proposals, and co-sign without real funds at risk.</p>
+          <div style="margin-top:26px; display:flex; flex-wrap:wrap; align-items:center; gap:14px;">
+            <a href="https://testflight.apple.com/join/FPjmw416" target="_blank" rel="noopener" style="text-decoration:none; font-size:15px; font-weight:600; color:#1A1305; background:#F2C26C; padding:14px 24px; border-radius:13px; display:inline-flex; align-items:center; gap:9px;">Join the TestFlight beta<svg width="15" height="15" viewBox="0 0 16 16"><path d="M3 8h9M9 4l4 4-4 4" stroke="#1A1305" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+            <a href="https://github.com/hackshare/cosign" target="_blank" rel="noopener" style="text-decoration:none; font-size:15px; font-weight:500; color:#F4F5F3; padding:14px 20px; border:1px solid rgba(255,255,255,0.14); border-radius:13px; display:inline-flex; align-items:center; gap:9px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="#F4F5F3"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.17.55-.38l-.01-1.34c-2.2.48-2.67-1.06-2.67-1.06-.36-.92-.88-1.16-.88-1.16-.72-.49.05-.48.05-.48.8.056 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.51.28-.87.5-1.07-1.76-.2-3.6-.88-3.6-3.9 0-.86.3-1.57.82-2.12-.08-.2-.36-1 .08-2.1 0 0 .67-.21 2.2.81a7.6 7.6 0 0 1 4 0c1.52-1.02 2.19-.81 2.19-.81.44 1.1.16 1.9.08 2.1.51.55.82 1.26.82 2.12 0 3.03-1.85 3.7-3.61 3.89.28.25.54.73.54 1.48l-.01 2.19c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"></path></svg>View on GitHub</a>
+          </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; min-width:230px;">
           <div style="display:flex; align-items:center; gap:11px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.14);">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M19 6.2A8.5 8.5 0 1 0 19 17.8" stroke="#F4F5F3" stroke-width="2.6" stroke-linecap="round"></path><circle cx="18.4" cy="12" r="2.4" fill="#F2C26C"></circle></svg>
             <span style="font-size:19px; font-weight:600; letter-spacing:-0.5px;">cosign</span>
           </div>
-          <div style="display:flex; align-items:center; gap:9px; font-family:'Geist Mono', monospace; font-size:12.5px; color:rgba(244,245,243,0.6);"><span style="width:7px; height:7px; border-radius:999px; background:#F2C26C;"></span>TestFlight beta on devnet</div>
-          <a href="https://testflight.apple.com/join/FPjmw416" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:#1A1305; background:#F2C26C; padding:13px 22px; border-radius:13px; text-decoration:none;">Join the TestFlight beta</a>
+          <div style="display:flex; align-items:center; gap:9px; font-family:'Geist Mono', monospace; font-size:12.5px; color:rgba(244,245,243,0.6);"><span style="width:7px; height:7px; border-radius:999px; background:#F2C26C;"></span>TestFlight beta · Solana devnet</div>
         </div>
       </div>
     </section>
@@ -227,6 +340,7 @@
         <span style="font-size:15px; font-weight:600; letter-spacing:-0.3px;">Cosign</span>
       </a>
       <div style="display:flex; align-items:center; gap:22px;">
+        <a href="https://github.com/hackshare/cosign" target="_blank" rel="noopener" style="text-decoration:none; font-size:13.5px; font-weight:500; color:rgba(244,245,243,0.6); display:inline-flex; align-items:center; gap:7px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="rgba(244,245,243,0.6)"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.17.55-.38l-.01-1.34c-2.2.48-2.67-1.06-2.67-1.06-.36-.92-.88-1.16-.88-1.16-.72-.49.05-.48.05-.48.8.056 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.51.28-.87.5-1.07-1.76-.2-3.6-.88-3.6-3.9 0-.86.3-1.57.82-2.12-.08-.2-.36-1 .08-2.1 0 0 .67-.21 2.2.81a7.6 7.6 0 0 1 4 0c1.52-1.02 2.19-.81 2.19-.81.44 1.1.16 1.9.08 2.1.51.55.82 1.26.82 2.12 0 3.03-1.85 3.7-3.61 3.89.28.25.54.73.54 1.48l-.01 2.19c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"></path></svg>GitHub</a>
         <a href="/privacy" style="text-decoration:none; font-size:13.5px; font-weight:500; color:rgba(244,245,243,0.6);">Privacy</a>
         <span style="font-family:'Geist Mono', monospace; font-size:12px; color:rgba(244,245,243,0.36);">Solana Squads multisig signer</span>
       </div>
@@ -234,5 +348,89 @@
   </footer>
 
 </div>
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    document.querySelectorAll('[data-kinetic-raw]').forEach(function(el){ el.style.animation='none'; el.style.opacity='0'; });
+    document.querySelectorAll('[data-kinetic-decoded]').forEach(function(el){ el.style.animation='none'; el.style.opacity='1'; el.style.transform='none'; });
+    document.querySelectorAll('[data-kinetic-scan]').forEach(function(el){ el.style.display='none'; });
+  }
+
+  var reveals = document.querySelectorAll('[data-reveal]');
+  if (reduce) {
+    reveals.forEach(function(el){ el.style.opacity='1'; el.style.transform='none'; });
+  } else if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.style.opacity='1'; e.target.style.transform='none'; io.unobserve(e.target); } });
+    }, { threshold:0.12, rootMargin:'0px 0px -6% 0px' });
+    reveals.forEach(function(el){
+      if(el.getAttribute('data-armed')) return;
+      el.setAttribute('data-armed','1');
+      el.style.transition = 'opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1)';
+      el.style.willChange = 'opacity, transform';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      io.observe(el);
+    });
+  }
+
+  var beats = document.querySelectorAll('[data-beat]');
+  var shots = document.querySelectorAll('[data-shot]');
+  if (beats.length && shots.length && 'IntersectionObserver' in window) {
+    var setActive = function(i){
+      shots.forEach(function(s){ s.style.opacity = (String(s.getAttribute('data-shot'))===String(i)) ? '1' : '0'; });
+      document.querySelectorAll('[data-beat]').forEach(function(b){
+        var on = String(b.getAttribute('data-beat'))===String(i);
+        var idx = b.querySelector('[data-beat-idx]');
+        var ttl = b.querySelector('[data-beat-title]');
+        if(idx) idx.style.color = on ? '#F2C26C' : 'rgba(244,245,243,0.2)';
+        if(ttl) ttl.style.color = on ? '#F4F5F3' : 'rgba(244,245,243,0.4)';
+      });
+    };
+    var bio = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ setActive(e.target.getAttribute('data-beat')); } });
+    }, { threshold:0.55 });
+    beats.forEach(function(b){ bio.observe(b); });
+    setActive(0);
+  }
+
+  document.querySelectorAll('[data-toggle-group]').forEach(function(wrap){
+    wrap.querySelectorAll('[data-toggle]').forEach(function(btn){
+      if(btn.getAttribute('data-wired')) return;
+      btn.setAttribute('data-wired','1');
+      btn.addEventListener('click', function(){
+        var mode = btn.getAttribute('data-toggle');
+        wrap.querySelectorAll('[data-panel]').forEach(function(p){
+          var on = p.getAttribute('data-panel')===mode;
+          p.style.opacity = on ? '1' : '0';
+          p.style.pointerEvents = on ? 'auto' : 'none';
+        });
+        wrap.querySelectorAll('[data-toggle]').forEach(function(b){
+          var on = b.getAttribute('data-toggle')===mode;
+          b.style.background = on ? '#F2C26C' : 'transparent';
+          b.style.color = on ? '#1A1305' : 'rgba(244,245,243,0.62)';
+        });
+      });
+    });
+  });
+
+  if (!reduce) {
+    var par = document.querySelectorAll('[data-parallax]');
+    if (par.length) {
+      var onScroll = function(){
+        var y = window.pageYOffset || 0;
+        document.querySelectorAll('[data-parallax]').forEach(function(p){
+          var s = parseFloat(p.getAttribute('data-parallax')) || 0.03;
+          p.style.transform = 'translateY(' + (-y*s).toFixed(1) + 'px)';
+        });
+      };
+      window.addEventListener('scroll', onScroll, { passive:true });
+      onScroll();
+    }
+  }
+})();
+</script>
 </body>
 </html>

@@ -42,7 +42,6 @@ struct ProposalCreationReviewSheet: View {
     let isSubmitting: Bool
     let errorMessage: String?
     let deviceStatusMessage: String?
-    @Binding var yubiKeyOptions: YubiKeySigningOptions
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @State private var footerHeight = CosignLayout.estimatedSheetStickyFooterHeight
@@ -177,13 +176,6 @@ struct ProposalCreationReviewSheet: View {
                 }
             }
 
-            if request.signer.type == .yubikey {
-                YubiKeySigningControls(
-                    options: $yubiKeyOptions,
-                    isDisabled: isSubmitting
-                )
-            }
-
             if let deviceStatusMessage {
                 VStack(alignment: .leading, spacing: 10) {
                     CosignSectionTitle(title: deviceStatusTitle)
@@ -214,79 +206,36 @@ struct ProposalCreationReviewSheet: View {
 
     @ViewBuilder
     private var signControl: some View {
-        if request.signer.type == .hotWallet {
-            CosignHoldActionButton(
-                title: CosignCopy.ProposalCreation.holdToSign,
-                glyph: .lock,
-                kind: .accent,
-                isLoading: isSubmitting,
-                isDisabled: !canConfirm,
-                onCommit: onConfirm
-            )
-            .accessibilityIdentifier("proposal-creation-hold-button")
-            Text(CosignCopy.ProposalCreation.holdHelpText)
-                .font(CosignTheme.FontStyle.monoSmall)
-                .foregroundStyle(CosignTheme.inkFaint)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-        } else {
-            Button {
-                onConfirm()
-            } label: {
-                HStack {
-                    if isSubmitting {
-                        ProgressView()
-                            .tint(CosignTheme.accentInk)
-                    }
-                    Text(signButtonTitle)
-                }
-            }
-            .buttonStyle(CosignButtonStyle(kind: .accent))
-            .disabled(!canConfirm)
-            .accessibilityIdentifier("proposal-creation-sign-button")
-        }
+        CosignHoldActionButton(
+            title: CosignCopy.ProposalCreation.holdToSign,
+            glyph: .lock,
+            kind: .accent,
+            isLoading: isSubmitting,
+            isDisabled: !canConfirm,
+            onCommit: onConfirm
+        )
+        .accessibilityIdentifier("proposal-creation-hold-button")
+        Text(CosignCopy.ProposalCreation.holdHelpText)
+            .font(CosignTheme.FontStyle.monoSmall)
+            .foregroundStyle(CosignTheme.inkFaint)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
     }
 
     private var canConfirm: Bool {
-        !isSubmitting && (request.signer.type != .yubikey || yubiKeyOptions.hasValidPINLength)
+        !isSubmitting
     }
 
     private var destinationTokenAccountCopyLabel: String {
         CosignCopy.ProposalCreation.copyDestinationTokenAccountAccessibilityLabel()
     }
 
-    @ViewBuilder
     private var hardwareContext: some View {
-        switch request.signer.type {
-        case .hotWallet:
-            EmptyView()
-        case .ledger:
-            VStack(alignment: .leading, spacing: 10) {
-                CosignSectionTitle(title: CosignCopy.ProposalCreation.hardwareTitle(for: request.signer.type))
-                CosignCard {
-                    Text(CosignCopy.ProposalCreation.hardwareContext(for: request.signer.type))
-                        .font(CosignTheme.FontStyle.caption)
-                        .foregroundStyle(CosignTheme.inkDim)
-                }
-            }
-        case .yubikey:
-            VStack(alignment: .leading, spacing: 10) {
-                CosignSectionTitle(title: CosignCopy.ProposalCreation.hardwareTitle(for: request.signer.type))
-                CosignCard {
-                    Text(CosignCopy.ProposalCreation.hardwareContext(for: request.signer.type))
-                        .font(CosignTheme.FontStyle.caption)
-                        .foregroundStyle(CosignTheme.inkDim)
-                }
-            }
-        }
+        EmptyView()
     }
 
     private var deviceStatusTitle: String {
-        CosignCopy.ProposalCreation.hardwareTitle(for: request.signer.type)
-    }
-
-    private var signButtonTitle: String {
-        CosignCopy.ProposalCreation.signButtonTitle(for: request.signer.type)
+        CosignCopy.ProposalSigning.signerLabel
     }
 }

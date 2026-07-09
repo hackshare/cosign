@@ -5,8 +5,6 @@ public typealias SolanaSignature = Data
 
 public enum SignerType: String, Codable, Sendable {
     case hotWallet
-    case ledger
-    case yubikey
 }
 
 public protocol Signer: Sendable {

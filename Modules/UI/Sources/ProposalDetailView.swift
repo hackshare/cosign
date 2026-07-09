@@ -30,7 +30,6 @@ public struct ProposalDetailView: View {
     @State var actionBroadcaster: ProposalActionBroadcaster?
     @State var broadcastFailure: BroadcastFailure?
     @State var pendingBroadcastRequest: ProposalSigningRequest?
-    @State var actionYubiKeyOptions = YubiKeySigningOptions()
     @State var submittedResult: ProposalSubmissionResult?
     @State var pendingExecuteSigner: ProposalActionSigner?
     @State var executionSignature: String?
@@ -99,7 +98,6 @@ public struct ProposalDetailView: View {
                 isSubmitting: isSubmittingAction,
                 errorMessage: actionErrorMessage,
                 deviceStatusMessage: actionDeviceStatusMessage,
-                yubiKeyOptions: $actionYubiKeyOptions,
                 onCancel: {
                     if !isSubmittingAction {
                         signingRequest = nil
@@ -365,7 +363,6 @@ extension ProposalDetailView {
     func beginSigning(action: SquadProposalAction, signer: ProposalActionSigner) {
         actionErrorMessage = nil
         actionDeviceStatusMessage = nil
-        actionYubiKeyOptions = YubiKeySigningOptions()
         signingRequest = ProposalSigningRequest(
             action: action,
             signer: signer,

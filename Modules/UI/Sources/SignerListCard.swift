@@ -163,18 +163,6 @@ struct SignerListCard: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        case .ledger:
-            return LinearGradient(
-                colors: [Color(hex: 0x8AA8FF), Color(hex: 0x0B142B)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        case .yubikey:
-            return LinearGradient(
-                colors: [Color(hex: 0x7CF2B0), Color(hex: 0x0F2018)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
         }
     }
 }

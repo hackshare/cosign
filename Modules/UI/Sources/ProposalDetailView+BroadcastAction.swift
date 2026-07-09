@@ -25,7 +25,6 @@ extension ProposalDetailView {
         do {
             let broadcaster = try await withResolvedProposalSigner(
                 request.signer,
-                yubiKeyOptions: request.signer.type == .yubikey ? actionYubiKeyOptions : nil,
                 deviceStatus: { actionDeviceStatusMessage = $0 },
                 operation: { signer in
                     try await squadsService.makeBroadcaster(

@@ -39,21 +39,7 @@ extension CosignCopy {
         static let approvedByUnknownValue = String(localized: "Threshold met", bundle: .module)
         static let localHotWalletTitle = String(localized: "Local hot wallet", bundle: .module)
         static let deviceCheckTitle = String(localized: "Device check", bundle: .module)
-        static let ledgerTitle = String(localized: "Ledger", bundle: .module)
-        static let yubiKeyTitle = String(localized: "YubiKey", bundle: .module)
-        static let scanningLedgerStatus = String(localized: "Scanning for Ledger devices...", bundle: .module)
-        static let verifyingLedgerAddressStatus = String(localized: "Verifying Ledger address...", bundle: .module)
-        static let confirmLedgerStatus = String(localized: "Confirm the transaction on your Ledger.", bundle: .module)
-        static let noLedgerDevicesError = String(localized: "No Ledger devices were found.", bundle: .module)
-        static let missingYubiKeyOptionsError = String(
-            localized: "YubiKey signing needs a connection choice and PIN.",
-            bundle: .module
-        )
         static let notBackedUpError = String(localized: "Back up this wallet before it can sign.", bundle: .module)
-
-        static func connectingLedgerStatus(deviceName: String) -> String {
-            String(localized: "Connecting to \(deviceName)...", bundle: .module)
-        }
 
         static func actionTitle(for action: SquadProposalAction, actionTitle: String) -> String {
             switch action {
@@ -120,10 +106,6 @@ extension CosignCopy {
             switch signerType {
             case .hotWallet:
                 hotWalletButtonTitle(for: action)
-            case .ledger:
-                String(localized: "Continue on Ledger", bundle: .module)
-            case .yubikey:
-                String(localized: "Sign with YubiKey", bundle: .module)
             }
         }
 
@@ -196,21 +178,8 @@ extension CosignCopy {
             }
         }
 
-        static func deviceContext(for signerType: SignerType) -> String {
-            switch signerType {
-            case .hotWallet:
-                String(localized: "The private key stays in the device Keychain.", bundle: .module)
-            case .ledger:
-                String(
-                    localized: "Review the action above before approving on your Ledger. The device may not show full Squads proposal context.",
-                    bundle: .module
-                )
-            case .yubikey:
-                String(
-                    localized: "Review the action above before tapping your YubiKey. The key signs the transaction message; Cosign provides the proposal context.",
-                    bundle: .module
-                )
-            }
+        static var deviceContext: String {
+            String(localized: "The private key stays in the device Keychain.", bundle: .module)
         }
 
         private static func hotWalletButtonTitle(for action: SquadProposalAction) -> String {

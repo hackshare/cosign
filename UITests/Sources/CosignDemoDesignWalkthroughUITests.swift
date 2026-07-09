@@ -456,8 +456,7 @@ final class SignerFlowUITests: DemoWalkthroughUITestCase {
             chooserName: "32-add-signer-chooser",
             name: "33-add-hot-wallet"
         )
-        captureAddSignerFresh(option: "ledger", screen: "screen.add-ledger", chooserName: nil, name: "34-add-ledger")
-        captureAddSignerFresh(option: "yubikey", screen: "screen.add-yubikey", chooserName: nil, name: "35-add-yubikey")
+
     }
 
     func testDemoImportWalletFlow() {
