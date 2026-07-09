@@ -63,4 +63,19 @@ public extension SquadsService {
         let response = try? await relay.prices(for: mints)
         return response?.prices ?? [:]
     }
+
+    /// Fetches prices and 24h change percentages from the relay and wraps them
+    /// in a `PriceSnapshot` stamped with the fetch time. On failure returns an
+    /// empty snapshot so callers can treat the expired freshness state uniformly.
+    func priceSnapshot(for mints: [String]) async -> PriceSnapshot {
+        guard !mints.isEmpty else {
+            return PriceSnapshot(prices: [:], changes: [:], fetchedAt: Date())
+        }
+        let response = try? await relay.prices(for: mints)
+        return PriceSnapshot(
+            prices: response?.prices ?? [:],
+            changes: response?.changes ?? [:],
+            fetchedAt: Date()
+        )
+    }
 }

@@ -4,7 +4,7 @@ import SwiftUI
 
 public struct VaultDetailView: View {
     @Environment(Coordinator.self) private var coordinator
-    @Environment(\.cosignDemoMode) private var demoMode
+    @Environment(\.cosignDemoMode) var demoMode
     @Environment(\.indexerEnvironment) private var indexerEnvironment
     @Environment(\.openURL) private var openURL
     @Environment(\.squadsService) private var squadsService
@@ -18,7 +18,7 @@ public struct VaultDetailView: View {
     @State private var errorMessage: String?
     @State private var copiedVaultAddress = false
     @State private var squadDisplayName: String?
-    @State private var prices: [String: Double]?
+    @State var priceSnapshot: PriceSnapshot?
 
     public init(squadAddress: String, vaultIndex: UInt8) {
         self.squadAddress = squadAddress
@@ -73,25 +73,28 @@ public struct VaultDetailView: View {
     }
 
     private func vaultContent(_ vault: VaultDetail) -> some View {
-        CosignScreen {
-            vaultNavigationHeader(vault)
-            vaultHeader(vault)
-            vaultBalanceHero(vault)
-            pricingNotice(for: vault)
-            vaultQuickActions(vault)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let freshness = priceSnapshot?.freshness(now: context.date)
+            CosignScreen {
+                vaultNavigationHeader(vault)
+                vaultHeader(vault)
+                vaultBalanceHero(vault, freshness: freshness)
+                pricingNotice(for: vault, freshness: freshness)
+                vaultQuickActions(vault)
 
-            CosignSegmentedTabs(
-                tabs: VaultAssetTab.allCases,
-                selection: $selectedTab,
-                style: .underline,
-                title: \.title
-            )
+                CosignSegmentedTabs(
+                    tabs: VaultAssetTab.allCases,
+                    selection: $selectedTab,
+                    style: .underline,
+                    title: \.title
+                )
 
-            switch selectedTab {
-            case .tokens:
-                tokensSection(vault)
-            case .nfts:
-                nftsSection(vault)
+                switch selectedTab {
+                case .tokens:
+                    tokensSection(vault, freshness: freshness ?? .fresh)
+                case .nfts:
+                    nftsSection(vault)
+                }
             }
         }
     }
@@ -137,40 +140,18 @@ public struct VaultDetailView: View {
         }
     }
 
-    private func vaultBalanceHero(_ vault: VaultDetail) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(CosignCopy.VaultDetail.balance.uppercased())
-                .font(CosignTheme.FontStyle.eyebrow)
-                .foregroundStyle(CosignTheme.inkFaint)
-
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                CosignAmountText(
-                    amount: vault.nativeBalanceLamports.map(solQuantity) ?? CosignCopy.SquadDetail.unavailable,
-                    size: 48
-                )
-                .minimumScaleFactor(0.58)
-                .lineLimit(1)
-                if vault.nativeBalanceLamports != nil {
-                    Text(CosignCopy.Vaults.solSymbol)
-                        .font(CosignTheme.FontStyle.titleL)
-                        .foregroundStyle(CosignTheme.inkDim)
-                        .baselineOffset(2)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if let estimatedUSD = vaultEstimatedUSD(vault) {
-                Text(estimatedUSD)
-                    .font(CosignTheme.FontStyle.monoSmall)
-                    .foregroundStyle(CosignTheme.inkFaint)
-            }
-        }
-    }
-
     @ViewBuilder
-    private func pricingNotice(for vault: VaultDetail) -> some View {
-        if demoMode == nil, prices == nil, vault.nativeBalanceLamports != nil || !vault.assets.isEmpty {
-            CosignPricingNotice()
+    private func pricingNotice(for vault: VaultDetail, freshness: PriceFreshness?) -> some View {
+        if demoMode == nil, vault.nativeBalanceLamports != nil || !vault.assets.isEmpty {
+            if let freshness {
+                if freshness.isExpired {
+                    CosignPricesExpiredBanner()
+                } else if priceSnapshot?.prices.isEmpty == true {
+                    CosignPricingNotice()
+                }
+            } else {
+                CosignPricingNotice()
+            }
         }
     }
 
@@ -240,51 +221,6 @@ public struct VaultDetailView: View {
 }
 
 private extension VaultDetailView {
-    @ViewBuilder
-    func tokensSection(_ vault: VaultDetail) -> some View {
-        let tokens = tokens(in: vault)
-        if tokens.isEmpty, vault.nativeBalanceLamports == nil {
-            CosignEmptyState(key: .emptyTokens)
-        } else {
-            VStack(alignment: .leading, spacing: 10) {
-                CosignSectionTitle(
-                    title: CosignCopy.VaultDetail.holdingsTitle(
-                        assetCount: tokens.count + (vault.nativeBalanceLamports == nil ? 0 : 1)
-                    ),
-                    trailing: CosignCopy.VaultDetail.usdValueColumn
-                )
-                VStack(spacing: 0) {
-                    if let nativeBalanceLamports = vault.nativeBalanceLamports {
-                        NativeTokenRow(
-                            lamports: nativeBalanceLamports,
-                            trailingValue: usdTrailing(usdValueText(lamports: nativeBalanceLamports, prices: prices))
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                    }
-
-                    ForEach(Array(tokens.enumerated()), id: \.element.id) { index, asset in
-                        if index > 0 || vault.nativeBalanceLamports != nil {
-                            Divider()
-                                .overlay(CosignTheme.line)
-                                .padding(.leading, 14)
-                        }
-                        FungibleAssetRow(
-                            asset: asset,
-                            trailingValue: usdTrailing(usdValueText(asset: asset, prices: prices))
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                    }
-                }
-
-                if tokens.isEmpty {
-                    CosignEmptyState(key: .emptyTokens)
-                }
-            }
-        }
-    }
-
     var watchedAccounts: [String] {
         guard let vault else {
             return []
@@ -327,7 +263,7 @@ private extension VaultDetailView {
             self.vault = vault
             squadDisplayName = detail.displayName
             errorMessage = nil
-            await loadPrices(for: vault)
+            await loadPriceSnapshot(for: vault)
         } catch {
             if vault == nil {
                 errorMessage = String(describing: error)
@@ -342,21 +278,16 @@ private extension VaultDetailView {
         )
     }
 
-    /// Live USD prices for the vault's mints. Demo builds keep their illustrative
-    /// model (prices stays nil → demo fallback in the USD helpers).
-    private func loadPrices(for vault: VaultDetail) async {
-        guard demoMode == nil else {
-            return
-        }
+    private func loadPriceSnapshot(for vault: VaultDetail) async {
         let mints = [cosignWrappedSolMint] + vault.assets.map(\.id)
-        prices = await squadsService.prices(for: mints)
-    }
-
-    func vaultEstimatedUSD(_ vault: VaultDetail) -> String? {
-        guard let nativeBalanceLamports = vault.nativeBalanceLamports else {
-            return nil
+        var snapshot = await squadsService.priceSnapshot(for: mints)
+        #if DEBUG
+        if let ageSeconds = CosignDemoMode.priceAgeSeconds(), demoMode != nil {
+            let shiftedAt = snapshot.fetchedAt.addingTimeInterval(-Double(ageSeconds))
+            snapshot = PriceSnapshot(prices: snapshot.prices, changes: snapshot.changes, fetchedAt: shiftedAt)
         }
-        return estimatedUSDText(lamports: nativeBalanceLamports, prices: prices)
+        #endif
+        priceSnapshot = snapshot
     }
 
     func openVaultInExplorer(_ vault: VaultDetail) {

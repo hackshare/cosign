@@ -43,6 +43,19 @@ public struct CosignDemoMode: Equatable, Sendable {
         arguments.contains("--cosign-demo-reset")
     }
 
+    #if DEBUG
+    /// Seconds to subtract from a demo price snapshot's `fetchedAt` so UI tests
+    /// can force the freshness ladder into stale (≥120 s) or expired (>900 s)
+    /// without waiting for real time to elapse. Only honoured in DEBUG builds.
+    public static func priceAgeSeconds(
+        arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> Int? {
+        let prefix = "--price-age-seconds="
+        guard let arg = arguments.first(where: { $0.hasPrefix(prefix) }) else { return nil }
+        return Int(arg.dropFirst(prefix.count))
+    }
+    #endif
+
     private static func demoMode(from value: String?) -> CosignDemoMode? {
         guard let value else {
             return nil

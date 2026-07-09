@@ -673,6 +673,28 @@ final class DevnetWalkthroughUITests: DemoWalkthroughUITestCase {
     }
 }
 
+// MARK: - Pricing: deltas + freshness ladder
+
+final class PricingUITests: DemoWalkthroughUITestCase {
+    func testVaultDeltaCaptures() {
+        launchDemo(profile: "appstore")
+        openFirstVault()
+        capture("83-vault-deltas")
+    }
+
+    func testPriceFreshnessCaptures() {
+        app.launchArguments = [
+            "--cosign-demo=appstore",
+            "--cosign-demo-reset",
+            "--ui-testing",
+            "--price-age-seconds=300"
+        ]
+        app.launch()
+        openFirstVault()
+        capture("84-price-freshness")
+    }
+}
+
 // MARK: - File-scope utilities
 
 private func scrollToButton(_ identifier: String, in app: XCUIApplication, maxAttempts: Int = 4) {

@@ -132,6 +132,8 @@ extension CosignCopy {
         static let history = "History"
         static let usdValueColumn = "USD value"
         static let usdUnavailable = "—"
+        static let priceUnavailable = "Price unavailable"
+        static let pricesUnavailableBannerTitle = "Prices unavailable"
         static let openInExplorerAccessibilityLabel = "Open Vault in Explorer"
 
         static func missingVaultMessage(index: UInt8) -> String {
@@ -144,6 +146,21 @@ extension CosignCopy {
 
         static func holdingsTitle(assetCount: Int) -> String {
             "Holdings · \(assetCount) assets"
+        }
+
+        /// Stale-age label. Returns "· Nm old" (U+00B7 middle dot).
+        static func minutesOld(_ minutes: Int) -> String {
+            "\u{00B7} \(minutes)m old"
+        }
+
+        /// Delta label for the 24h price change. Returns "▲ X.X%" (mint),
+        /// "▼ X.X%" (red), or "0.0%" (flat / rounds to zero). No em dashes.
+        static func priceChange24h(_ pct: Double) -> String {
+            let formatted = String(format: "%.1f", Swift.abs(pct))
+            if formatted == "0.0" {
+                return "0.0%"
+            }
+            return pct > 0 ? "\u{25B2} \(formatted)%" : "\u{25BC} \(formatted)%"
         }
     }
 

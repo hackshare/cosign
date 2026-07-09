@@ -19,3 +19,16 @@ struct CosignPricingNotice: View {
         }
     }
 }
+
+/// Shown when the entire price feed is expired (>15 min since last fetch).
+/// Replaces per-row "Price unavailable" text — the banner communicates the
+/// whole-feed state so individual rows show em-dashes instead.
+struct CosignPricesExpiredBanner: View {
+    var body: some View {
+        CosignInlineBanner(tone: .amber) {
+            Text(CosignCopy.VaultDetail.pricesUnavailableBannerTitle)
+                .font(CosignTheme.FontStyle.body)
+                .foregroundStyle(CosignTheme.ink)
+        }
+    }
+}

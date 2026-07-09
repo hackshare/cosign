@@ -2,6 +2,8 @@ import Indexer
 import Squads
 import SwiftUI
 
+// MARK: - Tabs
+
 enum SquadDetailTab: CaseIterable, Identifiable {
     case vaults
     case proposals
@@ -36,7 +38,8 @@ struct SingleVaultDetailSection: View {
 
     let squadAddress: String
     let vault: VaultDetail
-    var prices: [String: Double]?
+    var priceSnapshot: PriceSnapshot?
+    var freshness: PriceFreshness
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -65,13 +68,12 @@ struct SingleVaultDetailSection: View {
                 CosignCard(padding: 0) {
                     VStack(spacing: 0) {
                         if let nativeBalanceLamports = vault.nativeBalanceLamports {
-                            NativeTokenRow(
-                                lamports: nativeBalanceLamports,
-                                trailingValue: usdTrailing(usdValueText(
-                                    lamports: nativeBalanceLamports,
-                                    prices: prices
-                                ))
-                            )
+                            NativeTokenRow(lamports: nativeBalanceLamports) {
+                                holdingsPriceView(
+                                    usd: solUSDValue(lamports: nativeBalanceLamports),
+                                    change24h: liveChange24h(for: cosignWrappedSolMint)
+                                )
+                            }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                         }
@@ -81,10 +83,12 @@ struct SingleVaultDetailSection: View {
                                     .overlay(CosignTheme.line)
                                     .padding(.leading, 14)
                             }
-                            FungibleAssetRow(
-                                asset: asset,
-                                trailingValue: usdTrailing(usdValueText(asset: asset, prices: prices))
-                            )
+                            FungibleAssetRow(asset: asset) {
+                                holdingsPriceView(
+                                    usd: assetUSDValue(asset: asset),
+                                    change24h: liveChange24h(for: asset.id)
+                                )
+                            }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                         }
@@ -94,6 +98,33 @@ struct SingleVaultDetailSection: View {
         } else {
             CosignEmptyState(key: .emptyTokens)
         }
+    }
+
+    // MARK: - Price helpers
+
+    /// True when the whole feed is expired — the global banner already signals
+    /// this state, so per-row "Price unavailable" text is suppressed (usd → nil).
+    private var isGlobalExpired: Bool {
+        freshness.isExpired
+    }
+
+    private func solUSDValue(lamports: UInt64) -> Double? {
+        guard !isGlobalExpired, let snapshot = priceSnapshot else { return nil }
+        return usdValue(lamports: lamports, snapshot: snapshot)
+    }
+
+    private func assetUSDValue(asset: DASAsset) -> Double? {
+        guard !isGlobalExpired, let snapshot = priceSnapshot else { return nil }
+        return usdValue(asset: asset, snapshot: snapshot)
+    }
+
+    private func liveChange24h(for mint: String) -> Double? {
+        guard !isGlobalExpired else { return nil }
+        return priceSnapshot?.change24h(for: mint)
+    }
+
+    private func holdingsPriceView(usd: Double?, change24h: Double?) -> some View {
+        PriceValueView(usd: usd, change24h: change24h, freshness: freshness)
     }
 
     @ViewBuilder
