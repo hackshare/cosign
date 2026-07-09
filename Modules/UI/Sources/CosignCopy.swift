@@ -1,3 +1,4 @@
+import Foundation
 import Indexer
 import Provenance
 
@@ -5,141 +6,174 @@ public enum CosignCopy {}
 
 extension CosignCopy {
     public enum Common {
-        static let appName = "cosign"
-        public static let devnetSeedSignerLabel = "Devnet signer"
+        static let appName = String(localized: "cosign", bundle: .module)
+        public static let devnetSeedSignerLabel = String(localized: "Devnet signer", bundle: .module)
 
         static func buildBadgeAccessibility(_ environment: String) -> String {
-            "\(environment) build"
+            String(localized: "\(environment) build", bundle: .module)
         }
 
-        static let back = "Back"
-        static let cancel = "Cancel"
-        static let copy = "Copy"
-        static let copied = "Copied"
-        static let close = "Close"
-        static let dismiss = "Dismiss"
-        static let done = "Done"
-        static let explorer = "Explorer"
-        static let inspect = "Inspect"
-        static let sent = "Sent"
-        static let search = "Search"
-        static let clearSearchAccessibilityLabel = "Clear search"
-        static let copyAddressAccessibilityLabel = "Copy address"
-        static let noSelectorMatchesTitle = "No matches"
-        static let noSelectorMatchesMessage = "Try a different search."
-        static let noSelectorOptionsTitle = "Nothing to choose"
-        static let noSelectorOptionsMessage = "There are no available options for this selection."
-        static let selectorLoadingTitle = "Loading options"
-        static let selectorLoadingMessage = "Available choices will appear here."
-        static let selectorErrorTitle = "Unable to load options"
-        static let selectorRetryAction = "Try again"
+        static let back = String(localized: "Back", bundle: .module)
+        static let cancel = String(localized: "Cancel", bundle: .module)
+        static let copy = String(localized: "Copy", bundle: .module)
+        static let copied = String(localized: "Copied", bundle: .module)
+        static let close = String(localized: "Close", bundle: .module)
+        static let dismiss = String(localized: "Dismiss", bundle: .module)
+        static let done = String(localized: "Done", bundle: .module)
+        static let explorer = String(localized: "Explorer", bundle: .module)
+        static let inspect = String(localized: "Inspect", bundle: .module)
+        static let sent = String(localized: "Sent", bundle: .module)
+        static let search = String(localized: "Search", bundle: .module)
+        static let clearSearchAccessibilityLabel = String(localized: "Clear search", bundle: .module)
+        static let copyAddressAccessibilityLabel = String(localized: "Copy address", bundle: .module)
+        static let noSelectorMatchesTitle = String(localized: "No matches", bundle: .module)
+        static let noSelectorMatchesMessage = String(localized: "Try a different search.", bundle: .module)
+        static let noSelectorOptionsTitle = String(localized: "Nothing to choose", bundle: .module)
+        static let noSelectorOptionsMessage = String(
+            localized: "There are no available options for this selection.",
+            bundle: .module
+        )
+        static let selectorLoadingTitle = String(localized: "Loading options", bundle: .module)
+        static let selectorLoadingMessage = String(localized: "Available choices will appear here.", bundle: .module)
+        static let selectorErrorTitle = String(localized: "Unable to load options", bundle: .module)
+        static let selectorRetryAction = String(localized: "Try again", bundle: .module)
         static func copyAvailableAccessibility(value: String, action: String) -> String {
-            "\(value). \(action) available from context menu."
+            String(localized: "\(value). \(action) available from context menu.", bundle: .module)
         }
     }
 
     enum Empty {
-        static let emptyActivityTitle = "No activity yet"
-        static let emptyActivityMessage = "Executed proposals and signatures from this Squad will appear here."
-        static let emptySignerActivityTitle = "No signatures recorded yet"
+        static let emptyActivityTitle = String(localized: "No activity yet", bundle: .module)
+        static let emptyActivityMessage = String(
+            localized: "Executed proposals and signatures from this Squad will appear here.",
+            bundle: .module
+        )
+        static let emptySignerActivityTitle = String(localized: "No signatures recorded yet", bundle: .module)
         static let emptySignerActivityMessage =
-            "Proposals you sign, reject, or execute will appear here across all Squads."
-        static let emptyNFTsTitle = "No NFTs"
-        static let emptyNFTsMessage = "NFTs received by this vault will appear here."
-        static let emptyProposalsTitle = "All clear"
-        static let emptyProposalsMessage = "No pending proposals."
-        static let emptySquadsTitle = "No squads yet"
+            String(
+                localized: "Proposals you sign, reject, or execute will appear here across all Squads.",
+                bundle: .module
+            )
+        static let emptyNFTsTitle = String(localized: "No NFTs", bundle: .module)
+        static let emptyNFTsMessage = String(
+            localized: "NFTs received by this vault will appear here.",
+            bundle: .module
+        )
+        static let emptyProposalsTitle = String(localized: "All clear", bundle: .module)
+        static let emptyProposalsMessage = String(localized: "No pending proposals.", bundle: .module)
+        static let emptySquadsTitle = String(localized: "No squads yet", bundle: .module)
         static let emptySquadsMessage =
-            "Create a Squad to hold funds and co-sign proposals, or share your address so an admin can add you to theirs."
-        static let emptyTokensTitle = "No SPL tokens"
-        static let emptyTokensMessage = "SPL and Token-2022 holdings will appear here when received."
-        static let emptyVaultsTitle = "This Squad has no vaults"
+            String(
+                localized: "Create a Squad to hold funds and co-sign proposals, or share your address so an admin can add you to theirs.",
+                bundle: .module
+            )
+        static let emptyTokensTitle = String(localized: "No SPL tokens", bundle: .module)
+        static let emptyTokensMessage = String(
+            localized: "SPL and Token-2022 holdings will appear here when received.",
+            bundle: .module
+        )
+        static let emptyVaultsTitle = String(localized: "This Squad has no vaults", bundle: .module)
         static let emptyVaultsMessage =
-            "A vault is required to hold assets and route transfers. Create one or wait for an admin to add one."
-        static let noSignersTitle = "No signers yet"
+            String(
+                localized: "A vault is required to hold assets and route transfers. Create one or wait for an admin to add one.",
+                bundle: .module
+            )
+        static let noSignersTitle = String(localized: "No signers yet", bundle: .module)
         static let noSignersMessage =
-            "Add a hot wallet or connect a hardware key to start signing."
-        static let noLocalSignerTitle = "No signer for this Squad"
+            String(localized: "Add a hot wallet or connect a hardware key to start signing.", bundle: .module)
+        static let noLocalSignerTitle = String(localized: "No signer for this Squad", bundle: .module)
         static let noLocalSignerMessage =
-            "None of your on-device signers are members of this Squad. Connect or create one whose address is a member."
-        static let noRelayInspectionTitle = "Inspection unavailable"
+            String(
+                localized: "None of your on-device signers are members of this Squad. Connect or create one whose address is a member.",
+                bundle: .module
+            )
+        static let noRelayInspectionTitle = String(localized: "Inspection unavailable", bundle: .module)
         static let noRelayInspectionMessage =
-            "Cosign relay is required for richer proposal inspection. Local decoders ran but found no match for this instruction."
-        static let addSignerAction = "Add signer"
-        static let configureRelayAction = "Configure relay"
-        static let copyAddressAction = "Copy address"
-        static let recentActivityAction = "Recent activity"
-        static let viewMembersAction = "View members"
+            String(
+                localized: "Cosign relay is required for richer proposal inspection. Local decoders ran but found no match for this instruction.",
+                bundle: .module
+            )
+        static let addSignerAction = String(localized: "Add signer", bundle: .module)
+        static let configureRelayAction = String(localized: "Configure relay", bundle: .module)
+        static let copyAddressAction = String(localized: "Copy address", bundle: .module)
+        static let recentActivityAction = String(localized: "Recent activity", bundle: .module)
+        static let viewMembersAction = String(localized: "View members", bundle: .module)
     }
 
     enum Pricing {
-        static let unavailableTitle = "USD pricing unavailable"
+        static let unavailableTitle = String(localized: "USD pricing unavailable", bundle: .module)
         static let standardRPCMessage =
-            "Connected via standard RPC. Balances are exact; USD values are em-dashes until a Cosign relay is configured."
-        static let relayNoQuotesTitle = "Relay returned no quotes"
+            String(
+                localized: "Connected via standard RPC. Balances are exact; USD values are em-dashes until a Cosign relay is configured.",
+                bundle: .module
+            )
+        static let relayNoQuotesTitle = String(localized: "Relay returned no quotes", bundle: .module)
         static let relayPricingPendingMessage =
-            "The relay is reachable but did not return prices for the assets in this vault. USD values render as em-dashes."
+            String(
+                localized: "The relay is reachable but did not return prices for the assets in this vault. USD values render as em-dashes.",
+                bundle: .module
+            )
     }
 
     public enum Network {}
 
     enum Settings {
-        static let sectionTitle = "Settings"
-        static let screenTitle = "Settings"
-        static let signersSection = "Signers"
-        static let signersTitle = "Signers"
-        static let signersSubtitle = "Manage keys stored on this device."
-        static let connectionSection = "Connection & build"
-        static let networkTitle = "Network"
-        static let networkSubtitle = "Relay connection"
-        static let buildVerificationTitle = "Build verification"
-        static let buildVerificationSubtitle = "Signed build identity"
-        static let aboutSection = "About"
-        static let aboutTitle = "About Cosign"
-        static let aboutSubtitle = "Version, source, and privacy"
+        static let sectionTitle = String(localized: "Settings", bundle: .module)
+        static let screenTitle = String(localized: "Settings", bundle: .module)
+        static let signersSection = String(localized: "Signers", bundle: .module)
+        static let signersTitle = String(localized: "Signers", bundle: .module)
+        static let signersSubtitle = String(localized: "Manage keys stored on this device.", bundle: .module)
+        static let connectionSection = String(localized: "Connection & build", bundle: .module)
+        static let networkTitle = String(localized: "Network", bundle: .module)
+        static let networkSubtitle = String(localized: "Relay connection", bundle: .module)
+        static let buildVerificationTitle = String(localized: "Build verification", bundle: .module)
+        static let buildVerificationSubtitle = String(localized: "Signed build identity", bundle: .module)
+        static let aboutSection = String(localized: "About", bundle: .module)
+        static let aboutTitle = String(localized: "About Cosign", bundle: .module)
+        static let aboutSubtitle = String(localized: "Version, source, and privacy", bundle: .module)
 
         static func networkStatus(for status: NetworkHealthStatus) -> String {
             switch status {
             case .healthy:
-                "Connected"
+                String(localized: "Connected", bundle: .module)
             case .webSocketDown:
-                "Live updates paused"
+                String(localized: "Live updates paused", bundle: .module)
             case .offline:
-                "Offline"
+                String(localized: "Offline", bundle: .module)
             }
         }
 
         static func buildStatus(for state: BuildProvenanceState) -> String {
             switch state {
             case .verified:
-                "Verified"
+                String(localized: "Verified", bundle: .module)
             case .developmentBuild:
-                "Development build"
+                String(localized: "Development build", bundle: .module)
             case .failed:
-                "Verification failed"
+                String(localized: "Verification failed", bundle: .module)
             }
         }
     }
 
     enum About {
-        static let appName = "Cosign"
-        static let tagline = "A verifiable signer for Squads v4 multisigs."
-        static let versionLabel = "Version"
-        static let buildLabel = "Build"
-        static let emptyValue = "—"
-        static let linksSection = "Links"
-        static let sourceTitle = "Source code"
+        static let appName = String(localized: "Cosign", bundle: .module)
+        static let tagline = String(localized: "A verifiable signer for Squads v4 multisigs.", bundle: .module)
+        static let versionLabel = String(localized: "Version", bundle: .module)
+        static let buildLabel = String(localized: "Build", bundle: .module)
+        static let emptyValue = String(localized: "—", bundle: .module)
+        static let linksSection = String(localized: "Links", bundle: .module)
+        static let sourceTitle = String(localized: "Source code", bundle: .module)
         static let sourceSubtitle = "github.com/hackshare/cosign"
-        static let privacyTitle = "Privacy"
-        static let privacySubtitle = "How Cosign handles your data"
+        static let privacyTitle = String(localized: "Privacy", bundle: .module)
+        static let privacySubtitle = String(localized: "How Cosign handles your data", bundle: .module)
     }
 
     enum Demo {
-        static let operationsSignerLabel = "Operations"
-        static let treasurySignerLabel = "Treasury"
-        static let localDevnetSignerLabel = "Local devnet"
-        static let emptyPortfolioSignerLabel = "Empty portfolio"
-        static let noVaultsSignerLabel = "No-vault member"
-        static let detachedSignerLabel = "Detached signer"
+        static let operationsSignerLabel = String(localized: "Operations", bundle: .module)
+        static let treasurySignerLabel = String(localized: "Treasury", bundle: .module)
+        static let localDevnetSignerLabel = String(localized: "Local devnet", bundle: .module)
+        static let emptyPortfolioSignerLabel = String(localized: "Empty portfolio", bundle: .module)
+        static let noVaultsSignerLabel = String(localized: "No-vault member", bundle: .module)
+        static let detachedSignerLabel = String(localized: "Detached signer", bundle: .module)
     }
 }

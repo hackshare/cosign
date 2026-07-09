@@ -19,7 +19,8 @@ public enum TargetFactory {
         name: String,
         sources: SourceFilesList,
         resources: ResourceFileElements? = nil,
-        dependencies: [TargetDependency] = []
+        dependencies: [TargetDependency] = [],
+        settings: Settings? = nil
     ) -> Target {
         .target(
             name: name,
@@ -29,7 +30,8 @@ public enum TargetFactory {
             deploymentTargets: deploymentTarget,
             sources: sources,
             resources: resources,
-            dependencies: dependencies
+            dependencies: dependencies,
+            settings: settings
         )
     }
 

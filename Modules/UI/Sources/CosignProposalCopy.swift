@@ -4,27 +4,27 @@ import Squads
 
 extension CosignCopy {
     enum ProposalSigning {
-        static let cancelSigningAccessibilityLabel = "Cancel signing"
-        static let highRiskConfirmationTitle = "High-risk confirmation"
-        static let proposalLabel = "Proposal"
-        static let signerLabel = "Signer"
-        static let signingAsLabel = "Signing as"
-        static let afterSigningLabel = "After this"
-        static let actionOneLabel = "Action 1"
-        static let actionTwoLabel = "Action 2"
-        static let approvedByLabel = "Approved by"
-        static let effectLabel = "Effect"
-        static let networkFeeLabel = "Network fee"
-        static let approvalActionDetail = "Counts as 1 approval"
-        static let executeAfterApprovalDetail = "Auto-broadcasts on success"
-        static let networkFeeEstimateDetail = "Estimate · paid by the signer"
+        static let cancelSigningAccessibilityLabel = String(localized: "Cancel signing", bundle: .module)
+        static let highRiskConfirmationTitle = String(localized: "High-risk confirmation", bundle: .module)
+        static let proposalLabel = String(localized: "Proposal", bundle: .module)
+        static let signerLabel = String(localized: "Signer", bundle: .module)
+        static let signingAsLabel = String(localized: "Signing as", bundle: .module)
+        static let afterSigningLabel = String(localized: "After this", bundle: .module)
+        static let actionOneLabel = String(localized: "Action 1", bundle: .module)
+        static let actionTwoLabel = String(localized: "Action 2", bundle: .module)
+        static let approvedByLabel = String(localized: "Approved by", bundle: .module)
+        static let effectLabel = String(localized: "Effect", bundle: .module)
+        static let networkFeeLabel = String(localized: "Network fee", bundle: .module)
+        static let approvalActionDetail = String(localized: "Counts as 1 approval", bundle: .module)
+        static let executeAfterApprovalDetail = String(localized: "Auto-broadcasts on success", bundle: .module)
+        static let networkFeeEstimateDetail = String(localized: "Estimate · paid by the signer", bundle: .module)
 
         static func priceAsOf(_ date: Date) -> String {
-            "price as of \(date.formatted(.dateTime.hour().minute()))"
+            String(localized: "price as of \(date.formatted(.dateTime.hour().minute()))", bundle: .module)
         }
 
         static func networkFeeEstimate(lamports: UInt64, solPrice: Double?) -> String {
-            let sol = "~\(solQuantity(lamports)) SOL"
+            let sol = String(localized: "~\(solQuantity(lamports)) SOL", bundle: .module)
             guard let solPrice, solPrice > 0 else {
                 return sol
             }
@@ -33,35 +33,38 @@ extension CosignCopy {
             return "\(sol) ≈ \(fiat)"
         }
 
-        static let rejectEffectValue = "Counts as 1 reject vote"
-        static let cancelEffectValue = "Marks proposal cancelled"
-        static let cancelEffectDetail = "No further votes are accepted"
-        static let approvedByUnknownValue = "Threshold met"
-        static let localHotWalletTitle = "Local hot wallet"
-        static let deviceCheckTitle = "Device check"
-        static let ledgerTitle = "Ledger"
-        static let yubiKeyTitle = "YubiKey"
-        static let scanningLedgerStatus = "Scanning for Ledger devices..."
-        static let verifyingLedgerAddressStatus = "Verifying Ledger address..."
-        static let confirmLedgerStatus = "Confirm the transaction on your Ledger."
-        static let noLedgerDevicesError = "No Ledger devices were found."
-        static let missingYubiKeyOptionsError = "YubiKey signing needs a connection choice and PIN."
-        static let notBackedUpError = "Back up this wallet before it can sign."
+        static let rejectEffectValue = String(localized: "Counts as 1 reject vote", bundle: .module)
+        static let cancelEffectValue = String(localized: "Marks proposal cancelled", bundle: .module)
+        static let cancelEffectDetail = String(localized: "No further votes are accepted", bundle: .module)
+        static let approvedByUnknownValue = String(localized: "Threshold met", bundle: .module)
+        static let localHotWalletTitle = String(localized: "Local hot wallet", bundle: .module)
+        static let deviceCheckTitle = String(localized: "Device check", bundle: .module)
+        static let ledgerTitle = String(localized: "Ledger", bundle: .module)
+        static let yubiKeyTitle = String(localized: "YubiKey", bundle: .module)
+        static let scanningLedgerStatus = String(localized: "Scanning for Ledger devices...", bundle: .module)
+        static let verifyingLedgerAddressStatus = String(localized: "Verifying Ledger address...", bundle: .module)
+        static let confirmLedgerStatus = String(localized: "Confirm the transaction on your Ledger.", bundle: .module)
+        static let noLedgerDevicesError = String(localized: "No Ledger devices were found.", bundle: .module)
+        static let missingYubiKeyOptionsError = String(
+            localized: "YubiKey signing needs a connection choice and PIN.",
+            bundle: .module
+        )
+        static let notBackedUpError = String(localized: "Back up this wallet before it can sign.", bundle: .module)
 
         static func connectingLedgerStatus(deviceName: String) -> String {
-            "Connecting to \(deviceName)..."
+            String(localized: "Connecting to \(deviceName)...", bundle: .module)
         }
 
         static func actionTitle(for action: SquadProposalAction, actionTitle: String) -> String {
             switch action {
             case .approveAndExecute:
-                "Approve and execute \(lowercasedFirstWord(actionTitle))"
+                String(localized: "Approve and execute \(lowercasedFirstWord(actionTitle))", bundle: .module)
             case .execute:
-                "Execute \(lowercasedFirstWord(actionTitle))"
+                String(localized: "Execute \(lowercasedFirstWord(actionTitle))", bundle: .module)
             case .reject:
-                "Reject \(lowercasedFirstWord(actionTitle))"
+                String(localized: "Reject \(lowercasedFirstWord(actionTitle))", bundle: .module)
             case .cancel:
-                "Cancel \(lowercasedFirstWord(actionTitle))"
+                String(localized: "Cancel \(lowercasedFirstWord(actionTitle))", bundle: .module)
             case .approve:
                 actionTitle
             }
@@ -70,15 +73,15 @@ extension CosignCopy {
         static func actionSubtitle(for action: SquadProposalAction, actionSubtitle: String?) -> String {
             switch action {
             case .approveAndExecute:
-                "Two transactions broadcast in sequence"
+                String(localized: "Two transactions broadcast in sequence", bundle: .module)
             case .execute:
-                "Threshold met · ready to execute"
+                String(localized: "Threshold met · ready to execute", bundle: .module)
             case .reject:
-                "Records a rejection vote"
+                String(localized: "Records a rejection vote", bundle: .module)
             case .cancel:
-                "Cancelling is irreversible"
+                String(localized: "Cancelling is irreversible", bundle: .module)
             case .approve:
-                actionSubtitle ?? "Records one approval"
+                actionSubtitle ?? String(localized: "Records one approval", bundle: .module)
             }
         }
 
@@ -88,11 +91,11 @@ extension CosignCopy {
         ) -> String? {
             switch action {
             case .approveAndExecute:
-                "FINAL SIGNER · WILL EXECUTE"
+                String(localized: "FINAL SIGNER · WILL EXECUTE", bundle: .module)
             case .approve where approvalWouldReachThreshold:
-                "FINAL SIGNER · READY TO EXECUTE"
+                String(localized: "FINAL SIGNER · READY TO EXECUTE", bundle: .module)
             case .execute:
-                "EXECUTES APPROVED TX"
+                String(localized: "EXECUTES APPROVED TX", bundle: .module)
             case .approve, .reject, .cancel:
                 nil
             }
@@ -100,17 +103,17 @@ extension CosignCopy {
 
         static func approveProposalTitle(proposalIndex: UInt64?) -> String {
             guard let proposalIndex else {
-                return "Approve proposal"
+                return String(localized: "Approve proposal", bundle: .module)
             }
-            return "Approve proposal #\(proposalIndex)"
+            return String(localized: "Approve proposal #\(proposalIndex)", bundle: .module)
         }
 
         static func executeActionTitle(actionTitle: String) -> String {
-            "Execute \(lowercasedFirstWord(actionTitle))"
+            String(localized: "Execute \(lowercasedFirstWord(actionTitle))", bundle: .module)
         }
 
         static func approvedByValue(approvals: Int, threshold: Int) -> String {
-            "\(approvals) of \(threshold) members"
+            String(localized: "\(approvals) of \(threshold) members", bundle: .module)
         }
 
         static func buttonTitle(for action: SquadProposalAction, signerType: SignerType) -> String {
@@ -118,39 +121,39 @@ extension CosignCopy {
             case .hotWallet:
                 hotWalletButtonTitle(for: action)
             case .ledger:
-                "Continue on Ledger"
+                String(localized: "Continue on Ledger", bundle: .module)
             case .yubikey:
-                "Sign with YubiKey"
+                String(localized: "Sign with YubiKey", bundle: .module)
             }
         }
 
         static func holdButtonTitle(for action: SquadProposalAction) -> String {
             switch action {
             case .approve:
-                "Hold to approve"
+                String(localized: "Hold to approve", bundle: .module)
             case .approveAndExecute:
-                "Hold to approve & execute"
+                String(localized: "Hold to approve & execute", bundle: .module)
             case .reject:
-                "Hold to reject"
+                String(localized: "Hold to reject", bundle: .module)
             case .cancel:
-                "Hold to cancel"
+                String(localized: "Hold to cancel", bundle: .module)
             case .execute:
-                "Hold to execute"
+                String(localized: "Hold to execute", bundle: .module)
             }
         }
 
         static func holdHelpText(for action: SquadProposalAction) -> String {
             switch action {
             case .approve:
-                "Hold for 1.5s to prevent accidental approvals."
+                String(localized: "Hold for 1.5s to prevent accidental approvals.", bundle: .module)
             case .approveAndExecute:
-                "Hold for 1.5s to prevent accidental approval and execution."
+                String(localized: "Hold for 1.5s to prevent accidental approval and execution.", bundle: .module)
             case .execute:
-                "Hold for 1.5s to prevent accidental execution."
+                String(localized: "Hold for 1.5s to prevent accidental execution.", bundle: .module)
             case .reject:
-                "Hold for 1.5s to prevent accidental rejection."
+                String(localized: "Hold for 1.5s to prevent accidental rejection.", bundle: .module)
             case .cancel:
-                "Hold for 1.5s to prevent accidental cancellation."
+                String(localized: "Hold for 1.5s to prevent accidental cancellation.", bundle: .module)
             }
         }
 
@@ -160,20 +163,24 @@ extension CosignCopy {
         ) -> String {
             switch action {
             case .approveAndExecute:
-                "Approve, then execute"
+                String(localized: "Approve, then execute", bundle: .module)
             case .approve:
-                approvalWouldReachThreshold ? "Ready to execute" : "Approval recorded"
+                if approvalWouldReachThreshold {
+                    String(localized: "Ready to execute", bundle: .module)
+                } else {
+                    String(localized: "Approval recorded", bundle: .module)
+                }
             case .reject:
-                "Rejection recorded"
+                String(localized: "Rejection recorded", bundle: .module)
             case .cancel:
-                "Cancellation recorded"
+                String(localized: "Cancellation recorded", bundle: .module)
             case .execute:
-                "Transaction executed"
+                String(localized: "Transaction executed", bundle: .module)
             }
         }
 
         static func highRiskConfirmationPrompt(_ phrase: String) -> String {
-            "Type \(phrase) to enable signing."
+            String(localized: "Type \(phrase) to enable signing.", bundle: .module)
         }
 
         static func highRiskConfirmationPhrase(proposalIndex: UInt64?) -> String {
@@ -183,35 +190,41 @@ extension CosignCopy {
         static func fallbackSubtitle(for action: SquadProposalAction) -> String {
             switch action {
             case .approveAndExecute:
-                "Approve, then execute"
+                String(localized: "Approve, then execute", bundle: .module)
             case .approve, .execute, .reject, .cancel:
-                "Squads proposal action"
+                String(localized: "Squads proposal action", bundle: .module)
             }
         }
 
         static func deviceContext(for signerType: SignerType) -> String {
             switch signerType {
             case .hotWallet:
-                "The private key stays in the device Keychain."
+                String(localized: "The private key stays in the device Keychain.", bundle: .module)
             case .ledger:
-                "Review the action above before approving on your Ledger. The device may not show full Squads proposal context."
+                String(
+                    localized: "Review the action above before approving on your Ledger. The device may not show full Squads proposal context.",
+                    bundle: .module
+                )
             case .yubikey:
-                "Review the action above before tapping your YubiKey. The key signs the transaction message; Cosign provides the proposal context."
+                String(
+                    localized: "Review the action above before tapping your YubiKey. The key signs the transaction message; Cosign provides the proposal context.",
+                    bundle: .module
+                )
             }
         }
 
         private static func hotWalletButtonTitle(for action: SquadProposalAction) -> String {
             switch action {
             case .approve:
-                "Approve"
+                String(localized: "Approve", bundle: .module)
             case .approveAndExecute:
-                "Approve & Execute"
+                String(localized: "Approve & Execute", bundle: .module)
             case .execute:
-                "Execute"
+                String(localized: "Execute", bundle: .module)
             case .reject:
-                "Reject"
+                String(localized: "Reject", bundle: .module)
             case .cancel:
-                "Cancel proposal"
+                String(localized: "Cancel proposal", bundle: .module)
             }
         }
 
@@ -226,170 +239,30 @@ extension CosignCopy {
 }
 
 extension CosignCopy {
-    enum ProposalCreation {
-        static let signTransferTitle = "Sign Transfer"
-        static let createProposalSubtitle = "Create proposal"
-        static let reviewSectionTitle = "Review"
-        static let signerSectionTitle = "Signer"
-        static let transferSectionTitle = "Transfer"
-        static let tokenAccountsSectionTitle = "Token Accounts"
-        static let proposalSubmittedTitle = "Proposal submitted"
-        static let proposalSubmittedMessage =
-            "Transfer proposal created. It still needs Squad approval before funds can move."
-        static let proposalLabel = "Proposal"
-        static let statusLabel = "Status"
-        static let outcomeLabel = "Outcome"
-        static let proposalCreatedOutcome = "Create proposal"
-        static let proposalCreatedOutcomeDetail =
-            "No assets move until the Squad approves and executes this proposal."
-        static let submittedSignatureTitle = "Create proposal"
-        static let signatureSectionTitle = "Signature"
-        static let transactionSignatureTitle = "Transaction signature"
-        static let addressesSectionTitle = "On-chain accounts"
-        static let proposalAccountTitle = "Proposal account"
-        static let transactionAccountTitle = "Transaction account"
-        static let vaultAddressTitle = "Vault address"
-        static let openProposalTitle = "Open Proposal"
-        static let signerLabel = "Signer"
-        static let signerTypeLabel = "Type"
-        static let vaultLabel = "Vault"
-        static let signerAddressTitle = "Signer address"
-        static let assetLabel = "Asset"
-        static let amountLabel = "Amount"
-        static let memoLabel = "Memo"
-        static let programLabel = "Program"
-        static let baseUnitsLabel = "Base units"
-        static let mintTitle = "Mint"
-        static let sourceTokenAccountTitle = "Source token account"
-        static let destinationTokenAccountTitle = "Destination token account"
-        static let holdToSign = "Hold to sign"
-        static let holdHelpText = "Hold for 1.5s to prevent accidental proposal creation."
-        static let hotWalletSignTitle = "Sign"
-        static let recipientTitle = "Recipient"
-        static let recipientOwnerTitle = "Recipient owner"
-        static let solAssetSymbol = "SOL"
-        static let systemProgramTitle = "System Program"
-        static let associatedTokenAccountProgramTitle = "Associated Token Account Program"
-        static let tokenProgramTitle = "Token Program"
-        static let splTokenProgramTitle = "SPL Token Program"
-        static let token2022ProgramTitle = "Token-2022 Program"
-
-        static let reviewContext =
-            "You are signing proposal creation. The vault transfer still requires Squad approval and execution."
-
-        static func copyTransactionSignatureAccessibilityLabel() -> String {
-            "Copy Transaction Signature"
-        }
-
-        static func copyProposalAddressAccessibilityLabel() -> String {
-            "Copy Proposal Address"
-        }
-
-        static func copyTransactionAddressAccessibilityLabel() -> String {
-            "Copy Transaction Address"
-        }
-
-        static func copyVaultAddressAccessibilityLabel() -> String {
-            "Copy Vault Address"
-        }
-
-        static func copySignerAddressAccessibilityLabel() -> String {
-            "Copy Signer Address"
-        }
-
-        static func copyRecipientAddressAccessibilityLabel() -> String {
-            "Copy Recipient Address"
-        }
-
-        static func copyMintAddressAccessibilityLabel() -> String {
-            "Copy Mint Address"
-        }
-
-        static func copySourceTokenAccountAccessibilityLabel() -> String {
-            "Copy Source Token Account"
-        }
-
-        static func copyDestinationTokenAccountAccessibilityLabel() -> String {
-            "Copy Destination Token Account"
-        }
-
-        static func transferSummary(amount: String) -> String {
-            "Transfer \(amount)"
-        }
-
-        static func tokenTransferSummary(amount: String, createsRecipientAccount: Bool) -> String {
-            if createsRecipientAccount {
-                return "\(transferSummary(amount: amount)) and create recipient token account if needed"
-            }
-            return transferSummary(amount: amount)
-        }
-
-        static func createTransferLabel(isTokenTransfer: Bool) -> String {
-            isTokenTransfer ? "Create token transfer" : "Create SOL transfer"
-        }
-
-        static func createRecipientTokenAccountSummary() -> String {
-            "Create recipient token account if needed"
-        }
-
-        static func vaultDisplayName(index: UInt8) -> String {
-            "Vault \(index)"
-        }
-
-        static func signButtonTitle(for signerType: SignerType) -> String {
-            switch signerType {
-            case .hotWallet:
-                hotWalletSignTitle
-            case .ledger:
-                ProposalSigning.buttonTitle(for: .approve, signerType: .ledger)
-            case .yubikey:
-                ProposalSigning.buttonTitle(for: .approve, signerType: .yubikey)
-            }
-        }
-
-        static func hardwareTitle(for signerType: SignerType) -> String {
-            switch signerType {
-            case .hotWallet:
-                ProposalSigning.deviceCheckTitle
-            case .ledger:
-                ProposalSigning.ledgerTitle
-            case .yubikey:
-                ProposalSigning.yubiKeyTitle
-            }
-        }
-
-        static func hardwareContext(for signerType: SignerType) -> String {
-            switch signerType {
-            case .hotWallet:
-                ProposalSigning.deviceContext(for: .hotWallet)
-            case .ledger:
-                "Review the action above before approving on your Ledger. The device may not show full Squads proposal context."
-            case .yubikey:
-                "Review the action above before tapping your YubiKey. The key signs the proposal transaction; Cosign provides the transfer context."
-            }
-        }
-    }
-}
-
-extension CosignCopy {
     enum BroadcastError {
         static let maxAttempts = 3
 
-        static let retryableTitle = "Couldn't broadcast"
-        static let terminalTitle = "Still can't reach the network"
+        static let retryableTitle = String(localized: "Couldn't broadcast", bundle: .module)
+        static let terminalTitle = String(localized: "Still can't reach the network", bundle: .module)
 
-        static let signatureSafeLine = "Your signature is saved on this device. It is not lost."
+        static let signatureSafeLine = String(
+            localized: "Your signature is saved on this device. It is not lost.",
+            bundle: .module
+        )
         static let idempotencyCaption =
-            "Retrying re-sends the same signed transaction. Safe to retry, the network ignores duplicates."
-        static let reasonLabel = "Reason"
+            String(
+                localized: "Retrying re-sends the same signed transaction. Safe to retry, the network ignores duplicates.",
+                bundle: .module
+            )
+        static let reasonLabel = String(localized: "Reason", bundle: .module)
 
-        static let retryPrimary = "Retry broadcast"
-        static let retrySecondary = "Dismiss"
-        static let terminalPrimary = "Done"
-        static let terminalSecondary = "Try broadcast again"
+        static let retryPrimary = String(localized: "Retry broadcast", bundle: .module)
+        static let retrySecondary = String(localized: "Dismiss", bundle: .module)
+        static let terminalPrimary = String(localized: "Done", bundle: .module)
+        static let terminalSecondary = String(localized: "Try broadcast again", bundle: .module)
 
         static func reasonValue(reason: String, attempt: Int) -> String {
-            "\(reason) \u{00B7} attempt \(attempt) of \(maxAttempts)"
+            String(localized: "\(reason) \u{00B7} attempt \(attempt) of \(maxAttempts)", bundle: .module)
         }
     }
 }

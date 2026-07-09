@@ -1,82 +1,115 @@
 import Foundation
 
 extension CosignCopy.Ledger {
-    static let connectChromeTitle = "Connect Ledger"
+    static let connectChromeTitle = String(localized: "Connect Ledger", bundle: .module)
 
-    static let checklistEyebrow = "Hardware signer"
-    static let checklistTitle = "Before we scan"
-    static let checklistSubtitle = "Get your Ledger ready, then start the Bluetooth scan."
-    static let checklistStepUnlock = "Unlock your Ledger with its PIN"
-    static let checklistStepSolanaApp = "Open the Solana app on the device"
-    static let checklistStepBluetooth = "Turn Bluetooth on"
-    static let checklistStepProximity = "Hold the device near your phone"
+    static let checklistEyebrow = String(localized: "Hardware signer", bundle: .module)
+    static let checklistTitle = String(localized: "Before we scan", bundle: .module)
+    static let checklistSubtitle = String(
+        localized: "Get your Ledger ready, then start the Bluetooth scan.",
+        bundle: .module
+    )
+    static let checklistStepUnlock = String(localized: "Unlock your Ledger with its PIN", bundle: .module)
+    static let checklistStepSolanaApp = String(localized: "Open the Solana app on the device", bundle: .module)
+    static let checklistStepBluetooth = String(localized: "Turn Bluetooth on", bundle: .module)
+    static let checklistStepProximity = String(localized: "Hold the device near your phone", bundle: .module)
     static let privacyNote =
-        "Cosign never sees your recovery phrase — the Ledger signs on-device and returns only the signature."
-    static let startScanButton = "Start scan"
-    static let labelFieldTitle = "Label"
+        String(
+            localized: "Cosign never sees your recovery phrase — the Ledger signs on-device and returns only the signature.",
+            bundle: .module
+        )
+    static let startScanButton = String(localized: "Start scan", bundle: .module)
+    static let labelFieldTitle = String(localized: "Label", bundle: .module)
 
-    static let searchingTitle = "Searching for devices…"
-    static let searchingSubtitle = "Keep the Ledger unlocked and nearby"
-    static let connectButton = "Connect"
+    static let searchingTitle = String(localized: "Searching for devices…", bundle: .module)
+    static let searchingSubtitle = String(localized: "Keep the Ledger unlocked and nearby", bundle: .module)
+    static let connectButton = String(localized: "Connect", bundle: .module)
 
-    static let verifyEyebrow = "Step 4 of 4"
-    static let verifyTitle = "Confirm on your Ledger"
-    static let verifySubtitle = "Check the address on the device screen matches the one below, then approve."
-    static let addressFieldTitle = "Address"
-    static let waitingForApproval = "Waiting for approval on device"
+    static let verifyEyebrow = String(localized: "Step 4 of 4", bundle: .module)
+    static let verifyTitle = String(localized: "Confirm on your Ledger", bundle: .module)
+    static let verifySubtitle = String(
+        localized: "Check the address on the device screen matches the one below, then approve.",
+        bundle: .module
+    )
+    static let addressFieldTitle = String(localized: "Address", bundle: .module)
+    static let waitingForApproval = String(localized: "Waiting for approval on device", bundle: .module)
     static let verifyCautionNote =
-        "Reject on the device if the address does not match exactly — never approve a mismatch."
+        String(
+            localized: "Reject on the device if the address does not match exactly — never approve a mismatch.",
+            bundle: .module
+        )
 
-    static let readyTitle = "Ledger connected"
-    static let readySubtitle = "This signer is ready to approve proposals."
-    static let hardwareTag = "HARDWARE"
+    static let readyTitle = String(localized: "Ledger connected", bundle: .module)
+    static let readySubtitle = String(localized: "This signer is ready to approve proposals.", bundle: .module)
+    static let hardwareTag = String(localized: "HARDWARE", bundle: .module)
 
     static func foundSectionTitle(count: Int) -> String {
-        "Found · \(count)"
+        String(localized: "Found · \(count)", bundle: .module)
     }
 
     static func connectingTitle(deviceName: String) -> String {
-        "Connecting to \(deviceName)…"
+        String(localized: "Connecting to \(deviceName)…", bundle: .module)
     }
 
     static func deviceSubtitle(rssi: Int) -> String {
-        "Bluetooth signer · \(rssi) dBm"
+        String(localized: "Bluetooth signer · \(rssi) dBm", bundle: .module)
     }
 
     enum Recovery {
-        static let bluetoothOffTitle = "Bluetooth is off"
-        static let bluetoothOffMessage = "Cosign needs Bluetooth to reach the Ledger."
-        static let bluetoothOffAction = "Open Settings"
+        static let bluetoothOffTitle = String(localized: "Bluetooth is off", bundle: .module)
+        static let bluetoothOffMessage = String(
+            localized: "Cosign needs Bluetooth to reach the Ledger.",
+            bundle: .module
+        )
+        static let bluetoothOffAction = String(localized: "Open Settings", bundle: .module)
 
-        static let permissionDeniedTitle = "Bluetooth permission denied"
-        static let permissionDeniedMessage = "The app was denied Bluetooth access."
-        static let permissionDeniedAction = "Allow in Settings"
+        static let permissionDeniedTitle = String(localized: "Bluetooth permission denied", bundle: .module)
+        static let permissionDeniedMessage = String(localized: "The app was denied Bluetooth access.", bundle: .module)
+        static let permissionDeniedAction = String(localized: "Allow in Settings", bundle: .module)
 
-        static let deviceLockedTitle = "Device is locked"
-        static let deviceLockedMessage = "Unlock the Ledger with its PIN to continue."
-        static let deviceLockedAction = "Retry scan"
+        static let deviceLockedTitle = String(localized: "Device is locked", bundle: .module)
+        static let deviceLockedMessage = String(
+            localized: "Unlock the Ledger with its PIN to continue.",
+            bundle: .module
+        )
+        static let deviceLockedAction = String(localized: "Retry scan", bundle: .module)
 
-        static let solanaAppTitle = "Solana app not open"
-        static let solanaAppMessage = "Open the Solana app on the device, not the dashboard or another app."
-        static let solanaAppAction = "Retry"
+        static let solanaAppTitle = String(localized: "Solana app not open", bundle: .module)
+        static let solanaAppMessage = String(
+            localized: "Open the Solana app on the device, not the dashboard or another app.",
+            bundle: .module
+        )
+        static let solanaAppAction = String(localized: "Retry", bundle: .module)
 
-        static let lostConnectionTitle = "Out of range / lost connection"
-        static let lostConnectionMessage = "The device moved too far or went to sleep."
-        static let lostConnectionAction = "Reconnect"
+        static let lostConnectionTitle = String(localized: "Out of range / lost connection", bundle: .module)
+        static let lostConnectionMessage = String(
+            localized: "The device moved too far or went to sleep.",
+            bundle: .module
+        )
+        static let lostConnectionAction = String(localized: "Reconnect", bundle: .module)
 
-        static let timedOutTitle = "Timed out"
-        static let timedOutMessage = "No response from the device in time."
-        static let timedOutAction = "Try again"
+        static let timedOutTitle = String(localized: "Timed out", bundle: .module)
+        static let timedOutMessage = String(localized: "No response from the device in time.", bundle: .module)
+        static let timedOutAction = String(localized: "Try again", bundle: .module)
 
-        static let noDevicesTitle = "No Ledger found"
-        static let noDevicesMessage = "No Ledger was in range. Keep it unlocked and nearby, then try again."
-        static let noDevicesAction = "Try again"
+        static let noDevicesTitle = String(localized: "No Ledger found", bundle: .module)
+        static let noDevicesMessage = String(
+            localized: "No Ledger was in range. Keep it unlocked and nearby, then try again.",
+            bundle: .module
+        )
+        static let noDevicesAction = String(localized: "Try again", bundle: .module)
 
-        static let mismatchTitle = "Address mismatch"
-        static let mismatchMessage = "The device returned a different address. Never approve a mismatch."
-        static let mismatchAction = "Start over"
+        static let mismatchTitle = String(localized: "Address mismatch", bundle: .module)
+        static let mismatchMessage = String(
+            localized: "The device returned a different address. Never approve a mismatch.",
+            bundle: .module
+        )
+        static let mismatchAction = String(localized: "Start over", bundle: .module)
 
-        static let alreadyAddedTitle = "Already added"
-        static let alreadyAddedMessage = "This Ledger address is already a signer on this device."
+        static let alreadyAddedTitle = String(localized: "Already added", bundle: .module)
+        static let alreadyAddedMessage = String(
+            localized: "This Ledger address is already a signer on this device.",
+            bundle: .module
+        )
     }
 }
