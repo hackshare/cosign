@@ -112,11 +112,14 @@ func appTarget(
 
 let project = Project(
     name: "Cosign",
-    options: .options(automaticSchemesOptions: .enabled(targetSchemesGrouping: .byNameSuffix(
-        build: ["Implementation", "Interface", "Mocks", "Testing"],
-        test: ["Tests", "IntegrationTests", "UITests", "SnapshotTests"],
-        run: ["App", "Example"]
-    ))),
+    options: .options(
+        automaticSchemesOptions: .enabled(targetSchemesGrouping: .byNameSuffix(
+            build: ["Implementation", "Interface", "Mocks", "Testing"],
+            test: ["Tests", "IntegrationTests", "UITests", "SnapshotTests"],
+            run: ["App", "Example"]
+        )),
+        developmentRegion: "en"
+    ),
     packages: [
         .remote(
             url: "https://github.com/Yubico/yubikit-swift.git",
@@ -225,10 +228,12 @@ let project = Project(
             ]
         ),
 
-        // UI: SwiftUI views.
+        // UI: SwiftUI views. SWIFT_EMIT_LOC_STRINGS extracts this module's
+        // String(localized:) calls into Localizable.xcstrings at build time.
         TargetFactory.framework(
             name: "UI",
             sources: ["Modules/UI/Sources/**"],
+            resources: ["Modules/UI/Resources/**"],
             dependencies: [
                 .target(name: "Core"),
                 .target(name: "CosignCore"),
@@ -237,7 +242,8 @@ let project = Project(
                 .target(name: "Provenance"),
                 .target(name: "Signers"),
                 .target(name: "Squads")
-            ]
+            ],
+            settings: .settings(base: ["SWIFT_EMIT_LOC_STRINGS": "YES"])
         ),
 
         // The iOS app. Note: also depends directly on the CosignCore.xcframework

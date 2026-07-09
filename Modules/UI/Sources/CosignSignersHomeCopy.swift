@@ -1,44 +1,49 @@
+import Foundation
+
 extension CosignCopy {
     enum SignerHome {
         static func signedHere(_ count: Int) -> String {
-            "\(count) signed here"
+            String(localized: "\(count) signed here", bundle: .module)
         }
 
-        static let approvedStatus = "Approved"
+        static let approvedStatus = String(localized: "Approved", bundle: .module)
 
         static func awaitingMore(_ remaining: Int) -> String {
-            "awaiting \(remaining) more"
+            String(localized: "awaiting \(remaining) more", bundle: .module)
         }
     }
 }
 
 extension CosignCopy.Signers {
-    static let searchAccessibilityLabel = "Search Signers"
+    static let searchAccessibilityLabel = String(localized: "Search Signers", bundle: .module)
 
     static func homeSubtitle(signerCount: Int, squadCount: Int?) -> String {
         let signers = paddedCount(signerCount)
         guard let squadCount else {
             return countSubtitle(count: signerCount)
         }
-        return "\(signers) signer\(signerCount == 1 ? "" : "s") · \(squadCount) squad\(squadCount == 1 ? "" : "s")"
+        return String(
+            localized: "\(signers) signer\(signerCount == 1 ? "" : "s") · \(squadCount) squad\(squadCount == 1 ? "" : "s")",
+            bundle: .module
+        )
     }
 
     static func proposalsAwaitingTitle(count: Int) -> String {
-        "\(count) proposal\(count == 1 ? "" : "s") awaiting you"
+        String(localized: "\(count) proposal\(count == 1 ? "" : "s") awaiting you", bundle: .module)
     }
 
     static func proposalsAwaitingSubtitle(signerLabels: [String]) -> String {
         guard !signerLabels.isEmpty else {
-            return "Across your signers"
+            return String(localized: "Across your signers", bundle: .module)
         }
-        return "Across \(formattedNameList(signerLabels))"
+        return String(localized: "Across \(formattedNameList(signerLabels))", bundle: .module)
     }
 
     static func memberOfSquadsTitle(count: Int) -> String {
-        "Member of · \(count) squad\(count == 1 ? "" : "s")"
+        String(localized: "Member of · \(count) squad\(count == 1 ? "" : "s")", bundle: .module)
     }
 
-    static let pendingColumnTitle = "Pending"
+    static let pendingColumnTitle = String(localized: "Pending", bundle: .module)
 
     private static func paddedCount(_ count: Int) -> String {
         count < 10 ? "0\(count)" : "\(count)"
@@ -51,9 +56,9 @@ extension CosignCopy.Signers {
         case 1:
             names[0]
         case 2:
-            "\(names[0]) and \(names[1])"
+            String(localized: "\(names[0]) and \(names[1])", bundle: .module)
         default:
-            "\(names[0]) and \(names.count - 1) more"
+            String(localized: "\(names[0]) and \(names.count - 1) more", bundle: .module)
         }
     }
 }

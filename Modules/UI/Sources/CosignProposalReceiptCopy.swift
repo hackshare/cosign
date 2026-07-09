@@ -1,52 +1,53 @@
+import Foundation
 import Squads
 
 extension CosignCopy {
     enum ProposalReceipt {
-        static let outcomeLabel = "Outcome"
-        static let statusLabel = "Status"
-        static let slotLabel = "Slot"
-        static let feeLabel = "Fee"
-        static let blockTimeLabel = "Block time"
-        static let confirmationLabel = "Confirmation"
+        static let outcomeLabel = String(localized: "Outcome", bundle: .module)
+        static let statusLabel = String(localized: "Status", bundle: .module)
+        static let slotLabel = String(localized: "Slot", bundle: .module)
+        static let feeLabel = String(localized: "Fee", bundle: .module)
+        static let blockTimeLabel = String(localized: "Block time", bundle: .module)
+        static let confirmationLabel = String(localized: "Confirmation", bundle: .module)
 
         static func feeValue(lamports: UInt64) -> String {
-            "\(solQuantity(lamports)) SOL"
+            String(localized: "\(solQuantity(lamports)) SOL", bundle: .module)
         }
 
-        static let factsTitle = "What happened"
-        static let confirmedBadge = "CONFIRMED"
-        static let viewProposal = "View proposal"
-        static let broadcastLabel = "Broadcast"
-        static let signaturesTitle = "Signatures"
-        static let signatureLabel = "Signature"
+        static let factsTitle = String(localized: "What happened", bundle: .module)
+        static let confirmedBadge = String(localized: "CONFIRMED", bundle: .module)
+        static let viewProposal = String(localized: "View proposal", bundle: .module)
+        static let broadcastLabel = String(localized: "Broadcast", bundle: .module)
+        static let signaturesTitle = String(localized: "Signatures", bundle: .module)
+        static let signatureLabel = String(localized: "Signature", bundle: .module)
 
         static func title(for action: SquadProposalAction) -> String {
             switch action {
             case .approve:
-                "Approved & broadcast"
+                String(localized: "Approved & broadcast", bundle: .module)
             case .approveAndExecute:
-                "Approved & executed"
+                String(localized: "Approved & executed", bundle: .module)
             case .execute:
-                "Executed"
+                String(localized: "Executed", bundle: .module)
             case .reject:
-                "Reject recorded"
+                String(localized: "Reject recorded", bundle: .module)
             case .cancel:
-                "Proposal cancelled"
+                String(localized: "Proposal cancelled", bundle: .module)
             }
         }
 
         static func outcome(for action: SquadProposalAction) -> String {
             switch action {
             case .approve:
-                "Approve"
+                String(localized: "Approve", bundle: .module)
             case .approveAndExecute:
-                "Approve and execute"
+                String(localized: "Approve and execute", bundle: .module)
             case .execute:
-                "Execute"
+                String(localized: "Execute", bundle: .module)
             case .reject:
-                "Reject"
+                String(localized: "Reject", bundle: .module)
             case .cancel:
-                "Cancel"
+                String(localized: "Cancel", bundle: .module)
             }
         }
 
@@ -56,18 +57,27 @@ extension CosignCopy {
             broadcastCount: Int,
             proposalIndex: UInt64?
         ) -> String {
-            let proposal = proposalIndex.map { "Proposal #\($0) · " } ?? ""
+            let proposal = proposalIndex.map { String(localized: "Proposal #\($0) · ", bundle: .module) } ?? ""
             return switch action {
             case .approve:
-                "\(proposal)status \(displayLabel(status)) · \(broadcastValue(broadcastCount))"
+                String(
+                    localized: "\(proposal)status \(displayLabel(status)) · \(broadcastValue(broadcastCount))",
+                    bundle: .module
+                )
             case .approveAndExecute:
-                "\(proposal)threshold met · \(broadcastValue(broadcastCount))"
+                String(localized: "\(proposal)threshold met · \(broadcastValue(broadcastCount))", bundle: .module)
             case .execute:
-                "\(proposal)status \(displayLabel(status)) · \(broadcastValue(broadcastCount))"
+                String(
+                    localized: "\(proposal)status \(displayLabel(status)) · \(broadcastValue(broadcastCount))",
+                    bundle: .module
+                )
             case .reject:
-                "\(proposal)reject vote broadcast · status \(displayLabel(status))"
+                String(localized: "\(proposal)reject vote broadcast · status \(displayLabel(status))", bundle: .module)
             case .cancel:
-                "\(proposal)status \(displayLabel(status)) · no further votes accepted"
+                String(
+                    localized: "\(proposal)status \(displayLabel(status)) · no further votes accepted",
+                    bundle: .module
+                )
             }
         }
 
@@ -76,7 +86,7 @@ extension CosignCopy {
         }
 
         static func broadcastValue(_ count: Int) -> String {
-            "\(count) \(count == 1 ? "transaction" : "transactions")"
+            String(localized: "\(count) \(count == 1 ? "transaction" : "transactions")", bundle: .module)
         }
 
         static func broadcastDetail(for signatures: [ProposalSubmissionSignature]) -> String? {
@@ -90,26 +100,32 @@ extension CosignCopy {
         static func outcomeDetail(for action: SquadProposalAction) -> String? {
             switch action {
             case .approve:
-                "Approval recorded; execution is separate unless threshold rules already ran it."
+                String(
+                    localized: "Approval recorded; execution is separate unless threshold rules already ran it.",
+                    bundle: .module
+                )
             case .approveAndExecute:
-                "Approval was sent first, followed by execution."
+                String(localized: "Approval was sent first, followed by execution.", bundle: .module)
             case .execute:
-                "The approved transaction was sent on chain."
+                String(localized: "The approved transaction was sent on chain.", bundle: .module)
             case .reject:
-                "No assets move; this records a rejection vote."
+                String(localized: "No assets move; this records a rejection vote.", bundle: .module)
             case .cancel:
-                "The proposal is closed to further voting."
+                String(localized: "The proposal is closed to further voting.", bundle: .module)
             }
         }
 
-        static let partialTitle = "Approval recorded"
-        static let partialSubtitle = "Your approval landed and is counted toward the threshold. Execution did not broadcast, so the transfer has not run yet. You can execute it later."
-        static let partialActionSectionTitle = "This action"
-        static let partialStepApprove = "Approve"
-        static let partialStepExecute = "Execute"
-        static let partialApproveDone = "Done"
-        static let partialExecutePending = "Pending"
-        static let partialExecuteDetail = "Not broadcast \u{00B7} ready to run"
-        static let partialFinishExecution = "Finish execution"
+        static let partialTitle = String(localized: "Approval recorded", bundle: .module)
+        static let partialSubtitle = String(
+            localized: "Your approval landed and is counted toward the threshold. Execution did not broadcast, so the transfer has not run yet. You can execute it later.",
+            bundle: .module
+        )
+        static let partialActionSectionTitle = String(localized: "This action", bundle: .module)
+        static let partialStepApprove = String(localized: "Approve", bundle: .module)
+        static let partialStepExecute = String(localized: "Execute", bundle: .module)
+        static let partialApproveDone = String(localized: "Done", bundle: .module)
+        static let partialExecutePending = String(localized: "Pending", bundle: .module)
+        static let partialExecuteDetail = String(localized: "Not broadcast \u{00B7} ready to run", bundle: .module)
+        static let partialFinishExecution = String(localized: "Finish execution", bundle: .module)
     }
 }

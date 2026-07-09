@@ -1,75 +1,102 @@
 import Foundation
 
 extension CosignCopy.YubiKey {
-    static let connectChromeTitle = "Connect YubiKey"
-    static let confirmChromeTitle = "Confirm"
+    static let connectChromeTitle = String(localized: "Connect YubiKey", bundle: .module)
+    static let confirmChromeTitle = String(localized: "Confirm", bundle: .module)
 
-    static let tapEyebrow = "Hardware signer"
-    static let tapTitle = "Tap your YubiKey"
-    static let tapSubtitle = "Hold the key to the top of your phone, or insert it into the port."
-    static let listeningNFC = "Listening for NFC…"
-    static let listeningWired = "Insert and hold your key"
-    static let useWiredButton = "Use USB instead"
-    static let useNFCButton = "Tap over NFC instead"
-    static let continueButton = "Continue"
-    static let labelFieldTitle = "Label"
+    static let tapEyebrow = String(localized: "Hardware signer", bundle: .module)
+    static let tapTitle = String(localized: "Tap your YubiKey", bundle: .module)
+    static let tapSubtitle = String(
+        localized: "Hold the key to the top of your phone, or insert it into the port.",
+        bundle: .module
+    )
+    static let listeningNFC = String(localized: "Listening for NFC…", bundle: .module)
+    static let listeningWired = String(localized: "Insert and hold your key", bundle: .module)
+    static let useWiredButton = String(localized: "Use USB instead", bundle: .module)
+    static let useNFCButton = String(localized: "Tap over NFC instead", bundle: .module)
+    static let continueButton = String(localized: "Continue", bundle: .module)
+    static let labelFieldTitle = String(localized: "Label", bundle: .module)
 
-    static let pinEyebrow = "Step 2 of 3"
-    static let pinTitle = "Enter PIN"
-    static let pinDeleteLabel = "Delete"
-    static let pinDeleteAccessibility = "Delete digit"
+    static let pinEyebrow = String(localized: "Step 2 of 3", bundle: .module)
+    static let pinTitle = String(localized: "Enter PIN", bundle: .module)
+    static let pinDeleteLabel = String(localized: "Delete", bundle: .module)
+    static let pinDeleteAccessibility = String(localized: "Delete digit", bundle: .module)
 
-    static let touchEyebrow = "Step 3 of 3"
-    static let touchTitle = "Touch your YubiKey"
-    static let touchSubtitle = "Touch the gold disc to prove you are present and approve the address."
-    static let waitingForTouch = "Waiting for touch…"
+    static let touchEyebrow = String(localized: "Step 3 of 3", bundle: .module)
+    static let touchTitle = String(localized: "Touch your YubiKey", bundle: .module)
+    static let touchSubtitle = String(
+        localized: "Touch the gold disc to prove you are present and approve the address.",
+        bundle: .module
+    )
+    static let waitingForTouch = String(localized: "Waiting for touch…", bundle: .module)
 
-    static let readyTitle = "YubiKey connected"
-    static let readySubtitle = "This signer is ready to approve proposals."
-    static let hardwareTag = "HARDWARE"
+    static let readyTitle = String(localized: "YubiKey connected", bundle: .module)
+    static let readySubtitle = String(localized: "This signer is ready to approve proposals.", bundle: .module)
+    static let hardwareTag = String(localized: "HARDWARE", bundle: .module)
 
     static func pinAttemptsRemaining(_ count: Int) -> String {
-        "\(count) attempt\(count == 1 ? "" : "s") remaining before the key locks."
+        String(localized: "\(count) attempt\(count == 1 ? "" : "s") remaining before the key locks.", bundle: .module)
     }
 
     enum Recovery {
-        static let wrongPINTitle = "Wrong PIN"
-        static let wrongPINAction = "Re-enter PIN"
+        static let wrongPINTitle = String(localized: "Wrong PIN", bundle: .module)
+        static let wrongPINAction = String(localized: "Re-enter PIN", bundle: .module)
 
-        static let pinLockedTitle = "Key locked"
-        static let pinLockedMessage = "Too many wrong PINs. Reset the PIN with your PUK using YubiKey Manager."
-        static let pinLockedAction = "Start over"
+        static let pinLockedTitle = String(localized: "Key locked", bundle: .module)
+        static let pinLockedMessage = String(
+            localized: "Too many wrong PINs. Reset the PIN with your PUK using YubiKey Manager.",
+            bundle: .module
+        )
+        static let pinLockedAction = String(localized: "Start over", bundle: .module)
 
-        static let noKeyTitle = "No key detected"
-        static let noKeyMessage = "NFC found no key, or the port is empty."
-        static let noKeyAction = "Tap again"
+        static let noKeyTitle = String(localized: "No key detected", bundle: .module)
+        static let noKeyMessage = String(localized: "NFC found no key, or the port is empty.", bundle: .module)
+        static let noKeyAction = String(localized: "Tap again", bundle: .module)
 
-        static let nfcUnavailableTitle = "NFC unavailable"
-        static let nfcUnavailableMessage = "This device can't reach the key over NFC. Insert it over USB instead."
-        static let nfcUnavailableAction = "Use USB"
+        static let nfcUnavailableTitle = String(localized: "NFC unavailable", bundle: .module)
+        static let nfcUnavailableMessage = String(
+            localized: "This device can't reach the key over NFC. Insert it over USB instead.",
+            bundle: .module
+        )
+        static let nfcUnavailableAction = String(localized: "Use USB", bundle: .module)
 
-        static let touchTimedOutTitle = "Touch timed out"
-        static let touchTimedOutMessage = "No touch registered in time."
-        static let touchTimedOutAction = "Retry"
+        static let touchTimedOutTitle = String(localized: "Touch timed out", bundle: .module)
+        static let touchTimedOutMessage = String(localized: "No touch registered in time.", bundle: .module)
+        static let touchTimedOutAction = String(localized: "Retry", bundle: .module)
 
-        static let lostConnectionTitle = "Connection lost"
-        static let lostConnectionMessage = "The key moved away or the session ended before it finished."
-        static let lostConnectionAction = "Reconnect"
+        static let lostConnectionTitle = String(localized: "Connection lost", bundle: .module)
+        static let lostConnectionMessage = String(
+            localized: "The key moved away or the session ended before it finished.",
+            bundle: .module
+        )
+        static let lostConnectionAction = String(localized: "Reconnect", bundle: .module)
 
-        static let notProvisionedTitle = "No signing key on this YubiKey"
+        static let notProvisionedTitle = String(localized: "No signing key on this YubiKey", bundle: .module)
         static let notProvisionedMessage =
-            "Slot 9C has no Ed25519 key. Provision one with YubiKey Manager, then start over."
-        static let notProvisionedAction = "Start over"
+            String(
+                localized: "Slot 9C has no Ed25519 key. Provision one with YubiKey Manager, then start over.",
+                bundle: .module
+            )
+        static let notProvisionedAction = String(localized: "Start over", bundle: .module)
 
-        static let mismatchTitle = "Address mismatch"
-        static let mismatchMessage = "The key returned a different address. Never approve a mismatch."
-        static let mismatchAction = "Start over"
+        static let mismatchTitle = String(localized: "Address mismatch", bundle: .module)
+        static let mismatchMessage = String(
+            localized: "The key returned a different address. Never approve a mismatch.",
+            bundle: .module
+        )
+        static let mismatchAction = String(localized: "Start over", bundle: .module)
 
-        static let alreadyAddedTitle = "Already added"
-        static let alreadyAddedMessage = "This YubiKey address is already a signer on this device."
+        static let alreadyAddedTitle = String(localized: "Already added", bundle: .module)
+        static let alreadyAddedMessage = String(
+            localized: "This YubiKey address is already a signer on this device.",
+            bundle: .module
+        )
 
         static func wrongPINMessage(retriesRemaining: Int) -> String {
-            "\(retriesRemaining) attempt\(retriesRemaining == 1 ? "" : "s") remaining before the key locks itself."
+            String(
+                localized: "\(retriesRemaining) attempt\(retriesRemaining == 1 ? "" : "s") remaining before the key locks itself.",
+                bundle: .module
+            )
         }
     }
 }
