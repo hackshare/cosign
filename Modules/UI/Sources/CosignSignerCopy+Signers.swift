@@ -38,6 +38,18 @@ extension CosignCopy {
             String(localized: "Remove \"\(label)\"", bundle: .module)
         }
 
+        static func removeSquadMembershipNote(count: Int) -> String {
+            count == 1
+                ? String(
+                    localized: "This signer is a member of 1 Squad. Removing it here does not change the Squad on-chain; you can re-add the signer later.",
+                    bundle: .module
+                )
+                : String(
+                    localized: "This signer is a member of \(count) Squads. Removing it here does not change those Squads on-chain; you can re-add the signer later.",
+                    bundle: .module
+                )
+        }
+
         static func removeMessage(for type: SignerType) -> String {
             switch type {
             case .hotWallet:

@@ -16,7 +16,6 @@ public struct VaultDetailView: View {
     @State private var selectedTab: VaultAssetTab = .tokens
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var copiedVaultAddress = false
     @State private var squadDisplayName: String?
     @State var priceSnapshot: PriceSnapshot?
 
@@ -126,17 +125,12 @@ public struct VaultDetailView: View {
     private func vaultHeader(_ vault: VaultDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             CosignSectionTitle(title: vaultHeaderTitle(vault))
-            ZStack(alignment: .leading) {
-                Text(cosignShortAddress(vault.ref.address, prefix: 4, suffix: 4))
-                    .font(.system(size: 13, weight: .regular, design: .monospaced))
-                    .foregroundStyle(CosignTheme.inkDim)
-                    .lineLimit(1)
-                    .opacity(copiedVaultAddress ? 0 : 1)
-                if copiedVaultAddress {
-                    CosignCopiedValueFeedback(value: vault.ref.address)
-                        .transition(.opacity)
-                }
-            }
+            CosignAddressText(
+                address: vault.ref.address,
+                displayAddress: cosignShortAddress(vault.ref.address, prefix: 4, suffix: 4),
+                size: 13,
+                color: CosignTheme.inkDim
+            )
         }
     }
 
@@ -302,12 +296,5 @@ private extension VaultDetailView {
 
     func copyVaultAddress(_ address: String) {
         copyToPasteboard(address)
-        copiedVaultAddress = true
-        Task {
-            try? await Task.sleep(for: .milliseconds(1600))
-            await MainActor.run {
-                copiedVaultAddress = false
-            }
-        }
     }
 }

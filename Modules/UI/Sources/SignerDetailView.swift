@@ -58,7 +58,6 @@ public struct SignerDetailView: View {
     private func signerIdentityCard(_ signer: RegisteredSigner, address: String) -> some View {
         CosignCard(radius: CosignTheme.Radius.hero) {
             VStack(spacing: 0) {
-                CosignKeyValueRow(label: CosignCopy.SignerDetail.labelRowTitle, value: signer.label)
                 CosignKeyValueRow(
                     label: CosignCopy.SignerDetail.typeRowTitle,
                     value: signer.importedWithoutPhrase
@@ -238,10 +237,11 @@ public struct SignerDetailView: View {
     }
 
     private func removeMessage(for signer: RegisteredSigner) -> String {
-        if signer.importedWithoutPhrase {
-            return CosignCopy.SignerDetail.removeImportedMessage
-        }
-        return CosignCopy.Signers.removeMessage(for: signer.type)
+        let base = signer.importedWithoutPhrase
+            ? CosignCopy.SignerDetail.removeImportedMessage
+            : CosignCopy.Signers.removeMessage(for: signer.type)
+        guard !squadRows.isEmpty else { return base }
+        return base + "\n\n" + CosignCopy.Signers.removeSquadMembershipNote(count: squadRows.count)
     }
 
     private func signerHeaderTitle(for signer: RegisteredSigner) -> String {

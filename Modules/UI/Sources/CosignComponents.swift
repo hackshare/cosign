@@ -1,3 +1,4 @@
+import Indexer
 import SwiftUI
 
 struct CosignAddressBlock: View {
@@ -222,14 +223,15 @@ struct CosignLoadingCard: View {
 }
 
 struct CosignNetworkFooter: View {
-    let text: String
+    let environment: String
+    let status: NetworkHealthStatus
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             Circle()
-                .fill(CosignTheme.accent)
+                .fill(tone)
                 .frame(width: 5, height: 5)
-            Text(text)
+            Text(CosignCopy.Network.connectionFooter(environment: environment, status: status))
                 .font(.system(size: 11, weight: .regular, design: .monospaced))
                 .foregroundStyle(CosignTheme.inkFaint)
                 .tracking(CosignTheme.Tracking.label)
@@ -237,6 +239,17 @@ struct CosignNetworkFooter: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
+    }
+
+    private var tone: Color {
+        switch status {
+        case .healthy:
+            CosignTheme.mint
+        case .webSocketDown:
+            CosignTheme.riskAmber
+        case .offline:
+            CosignTheme.riskRed
+        }
     }
 }
 
