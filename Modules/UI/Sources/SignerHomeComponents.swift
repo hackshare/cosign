@@ -107,12 +107,30 @@ struct SignerHomeRecentActivityRow: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
+    private enum ActivityStatus {
+        case approved, executed, failed
+    }
+
+    private var activityStatus: ActivityStatus {
+        if item.error != nil { return .failed }
+        if item.kind == "approve" { return .approved }
+        return .executed
+    }
+
     private var statusLabel: String {
-        item.error == nil ? CosignCopy.Activity.executedStatus : CosignCopy.Activity.failedStatus
+        switch activityStatus {
+        case .approved: CosignCopy.SignerHome.approvedStatus
+        case .executed: CosignCopy.Activity.executedStatus
+        case .failed: CosignCopy.Activity.failedStatus
+        }
     }
 
     private var statusColor: Color {
-        item.error == nil ? CosignTheme.inkFaint : CosignTheme.riskRed
+        switch activityStatus {
+        case .approved: CosignTheme.mint
+        case .executed: CosignTheme.inkFaint
+        case .failed: CosignTheme.riskRed
+        }
     }
 
     private var relativeTimestamp: String {

@@ -1,5 +1,157 @@
 import SwiftUI
 
+// MARK: - Partial approve-execute receipt
+
+struct PartialReceiptHeadline: View {
+    var body: some View {
+        CosignCard(radius: CosignTheme.Radius.hero, padding: 22) {
+            HStack(alignment: .top, spacing: 14) {
+                CosignGlyphView(glyph: .check, size: 26, color: CosignTheme.mint)
+                    .frame(width: 54, height: 54)
+                    .background(CosignTheme.mint.opacity(0.12), in: .circle)
+                    .overlay {
+                        Circle().stroke(CosignTheme.mint.opacity(0.24), lineWidth: 1)
+                    }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(CosignCopy.ProposalReceipt.partialTitle)
+                        .font(CosignTheme.FontStyle.titleL)
+                        .foregroundStyle(CosignTheme.ink)
+                    Text(CosignCopy.ProposalReceipt.partialSubtitle)
+                        .font(CosignTheme.FontStyle.body)
+                        .foregroundStyle(CosignTheme.inkDim)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+}
+
+struct ReceiptTwoStepCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CosignSectionTitle(title: CosignCopy.ProposalReceipt.partialActionSectionTitle)
+            CosignCard(padding: 0) {
+                VStack(spacing: 0) {
+                    ReceiptTwoStepRow(
+                        label: CosignCopy.ProposalReceipt.partialStepApprove,
+                        chipLabel: CosignCopy.ProposalReceipt.partialApproveDone,
+                        chipColor: CosignTheme.mint,
+                        detail: nil,
+                        isLast: false
+                    )
+                    ReceiptTwoStepRow(
+                        label: CosignCopy.ProposalReceipt.partialStepExecute,
+                        chipLabel: CosignCopy.ProposalReceipt.partialExecutePending,
+                        chipColor: CosignTheme.riskAmber,
+                        detail: CosignCopy.ProposalReceipt.partialExecuteDetail,
+                        isLast: true
+                    )
+                }
+            }
+        }
+    }
+}
+
+struct ReceiptTwoStepRow: View {
+    let label: String
+    let chipLabel: String
+    let chipColor: Color
+    var detail: String?
+    var isLast: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center) {
+                Text(label)
+                    .font(CosignTheme.FontStyle.body)
+                    .foregroundStyle(CosignTheme.ink)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 3) {
+                    ReceiptStepChip(label: chipLabel, color: chipColor)
+                    if let detail {
+                        Text(detail)
+                            .font(CosignTheme.FontStyle.caption)
+                            .foregroundStyle(CosignTheme.inkDim)
+                    }
+                }
+            }
+            .padding(.horizontal, CosignFactLayout.horizontalPadding)
+            .padding(.vertical, CosignFactLayout.verticalPadding)
+
+            if !isLast {
+                Divider()
+                    .overlay(CosignTheme.line)
+                    .padding(.leading, CosignFactLayout.horizontalPadding)
+            }
+        }
+    }
+}
+
+struct ReceiptStepChip: View {
+    let label: String
+    let color: Color
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .foregroundStyle(color)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .background(color.opacity(0.14), in: .capsule)
+    }
+}
+
+struct ReceiptPartialFooter: View {
+    let onFinishExecution: () -> Void
+    let onDone: () -> Void
+
+    var body: some View {
+        CosignStickyFooter {
+            HStack(spacing: 10) {
+                Button(CosignCopy.ProposalReceipt.partialFinishExecution, action: onFinishExecution)
+                    .buttonStyle(CosignButtonStyle(kind: .accent, height: CosignButtonHeight.stacked))
+                Button(CosignCopy.Common.done, action: onDone)
+                    .buttonStyle(CosignButtonStyle(kind: .secondary, height: CosignButtonHeight.stacked))
+            }
+        }
+    }
+}
+
+// MARK: - Signature icon helpers (used by ProposalSubmissionSheet)
+
+struct ReceiptSignatureIconButton: View {
+    let title: String
+    let glyph: CosignGlyph
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ReceiptSignatureIconLabel(glyph: glyph)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
+struct ReceiptSignatureIconLabel: View {
+    let glyph: CosignGlyph
+
+    var body: some View {
+        CosignGlyphView(glyph: glyph, size: 14, color: CosignTheme.inkDim)
+            .frame(width: 34, height: 34)
+            .background(CosignTheme.surface2, in: .circle)
+            .overlay {
+                Circle().stroke(CosignTheme.line, lineWidth: 1)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+// MARK: - General receipt components
+
 struct CosignSuccessReceipt: View {
     let title: String
     let message: String

@@ -366,3 +366,26 @@ extension CosignCopy {
         }
     }
 }
+
+extension CosignCopy {
+    enum BroadcastError {
+        static let maxAttempts = 3
+
+        static let retryableTitle = "Couldn't broadcast"
+        static let terminalTitle = "Still can't reach the network"
+
+        static let signatureSafeLine = "Your signature is saved on this device. It is not lost."
+        static let idempotencyCaption =
+            "Retrying re-sends the same signed transaction. Safe to retry, the network ignores duplicates."
+        static let reasonLabel = "Reason"
+
+        static let retryPrimary = "Retry broadcast"
+        static let retrySecondary = "Dismiss"
+        static let terminalPrimary = "Done"
+        static let terminalSecondary = "Try broadcast again"
+
+        static func reasonValue(reason: String, attempt: Int) -> String {
+            "\(reason) \u{00B7} attempt \(attempt) of \(maxAttempts)"
+        }
+    }
+}

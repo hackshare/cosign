@@ -7,6 +7,7 @@ public final class SquadsService: @unchecked Sendable {
     let indexer: HeliusDASClient
     let relay: any RelayClient
     let demoFixture: CosignDemoFixture?
+    let demoBroadcastMode: DemoBroadcastMode?
     private let membershipCache = ReadThroughCache<String, [SquadSummary]>(defaultTTL: 30)
     private let membersCache = ReadThroughCache<String, [SquadMember]>(defaultTTL: 60)
     private let detailCache = ReadThroughCache<String, SquadDetail>(defaultTTL: 30)
@@ -18,11 +19,13 @@ public final class SquadsService: @unchecked Sendable {
         environment: IndexerEnvironment,
         indexer: HeliusDASClient? = nil,
         demoFixture: CosignDemoFixture? = nil,
+        demoBroadcastMode: DemoBroadcastMode? = nil,
         healthReporter: NetworkHealthReporter? = nil
     ) {
         rpcURL = environment.effectiveRPCURL.absoluteString
         relay = environment.relay
         self.demoFixture = demoFixture
+        self.demoBroadcastMode = demoBroadcastMode
         self.indexer = indexer ?? HeliusDASClient(
             rpcURL: environment.effectiveRPCURL,
             healthReporter: healthReporter

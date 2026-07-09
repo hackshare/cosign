@@ -42,6 +42,7 @@ struct CosignApp: App {
                 .environment(\.squadsService, SquadsService(
                     environment: environment,
                     demoFixture: demoFixture,
+                    demoBroadcastMode: demoBroadcastMode(for: demoMode),
                     healthReporter: networkSettings.networkHealth.reporter()
                 ))
                 .environment(\.cosignDemoMode, demoMode)
@@ -56,5 +57,15 @@ struct CosignApp: App {
             webSocketURL: nil,
             explorerRPCURL: IndexerEnvironment.devnetRPCURL
         )
+    }
+
+    private func demoBroadcastMode(for mode: CosignDemoMode?) -> DemoBroadcastMode? {
+        guard mode != nil else { return nil }
+        switch CosignDemoMode.broadcastFailureMode() {
+        case .retryable: return .retryable
+        case .terminal: return .terminal
+        case .executeOnly: return .executeOnly
+        case nil: return nil
+        }
     }
 }

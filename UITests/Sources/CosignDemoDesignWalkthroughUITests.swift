@@ -16,8 +16,8 @@ class DemoWalkthroughUITestCase: XCTestCase {
 
     // MARK: Navigation helpers
 
-    fileprivate func launchDemo(profile: String) {
-        app.launchArguments = ["--cosign-demo=\(profile)", "--cosign-demo-reset", "--ui-testing"]
+    fileprivate func launchDemo(profile: String, extraArgs: [String] = []) {
+        app.launchArguments = ["--cosign-demo=\(profile)", "--cosign-demo-reset", "--ui-testing"] + extraArgs
         app.launch()
     }
 
@@ -98,6 +98,14 @@ class DemoWalkthroughUITestCase: XCTestCase {
         let element = app.descendants(matching: .any)[identifier]
         XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
         element.press(forDuration: duration)
+    }
+
+    /// Taps any element (not restricted to button type) matching the identifier.
+    /// Useful for elements whose SwiftUI type doesn't map to UIKit's button trait.
+    fileprivate func tapElement(_ identifier: String) {
+        let element = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(element.waitForExistence(timeout: 60), "Missing element \(identifier)")
+        element.tap()
     }
 
     fileprivate func typeText(_ identifier: String, _ text: String) {
@@ -533,6 +541,84 @@ final class SignerFlowUITests: DemoWalkthroughUITestCase {
     }
 }
 
+// MARK: - Broadcast-failure demo flows
+
+final class BroadcastFailureFlowUITests: DemoWalkthroughUITestCase {
+    /// Captures the retryable broadcast-error sheet (attempt 1), then taps Retry
+    /// and verifies the receipt appears on success.
+    func testDemoBroadcastFailureRetryable() {
+        launchDemo(profile: "appstore", extraArgs: ["--broadcast-failure"])
+        openFirstSquadProposals()
+
+        tapButton("proposal-preview-row-1")
+        waitForScreen("screen.proposal-detail")
+        tapButton("proposal-sticky-action-approveAndExecute")
+        waitForElement("proposal-signing-hold-button")
+        longPressButton("proposal-signing-hold-button", duration: 1.8)
+        waitForScreen("screen.broadcast-error")
+        capture("83-broadcast-error-retryable")
+
+        // Title-based lookup is reliable for sheet buttons with custom button styles.
+        tapFirstButton(CosignUITestCopy.retryBroadcast)
+        waitForText("Approved & executed")
+    }
+
+    /// Captures the terminal broadcast-error sheet by retrying until attempt 3.
+    func testDemoBroadcastFailureTerminal() {
+        launchDemo(profile: "appstore", extraArgs: ["--broadcast-failure-terminal"])
+        openFirstSquadProposals()
+
+        tapButton("proposal-preview-row-1")
+        waitForScreen("screen.proposal-detail")
+        tapButton("proposal-sticky-action-approveAndExecute")
+        waitForElement("proposal-signing-hold-button")
+        longPressButton("proposal-signing-hold-button", duration: 1.8)
+        waitForScreen("screen.broadcast-error")
+
+        // Retry twice to reach attempt 3 (the terminal threshold).
+        tapFirstButton(CosignUITestCopy.retryBroadcast)
+        RunLoop.current.run(until: Date().addingTimeInterval(1.0))
+        tapFirstButton(CosignUITestCopy.retryBroadcast)
+        waitForText(CosignUITestCopy.stillCantReachNetwork)
+        capture("84-broadcast-error-terminal")
+    }
+}
+
+// MARK: - Partial-receipt capture
+
+final class PartialReceiptUITests: DemoWalkthroughUITestCase {
+    /// Captures the partial-broadcast receipt: approve lands, execute does not broadcast,
+    /// user dismisses the broadcast-error sheet and sees "Approval recorded".
+    func testDemoPartialBroadcastReceipt() {
+        launchDemo(profile: "appstore", extraArgs: ["--broadcast-failure-execute-only"])
+        openFirstSquadProposals()
+
+        tapButton("proposal-preview-row-1")
+        waitForScreen("screen.proposal-detail")
+        tapButton("proposal-sticky-action-approveAndExecute")
+        waitForElement("proposal-signing-hold-button")
+        longPressButton("proposal-signing-hold-button", duration: 1.8)
+        waitForScreen("screen.broadcast-error")
+        tapFirstButton(CosignUITestCopy.dismissBroadcastError)
+        waitForScreen("screen.partial-receipt")
+        capture("85-partial-receipt")
+    }
+}
+
+// MARK: - Signing-tally capture
+
+final class SigningTallyUITests: DemoWalkthroughUITestCase {
+    /// Captures the signer-home identity header with the mint "N signed here" chip
+    /// and the Approved recent-activity row from the Operations squad.
+    func testDemoSigningTallyCapture() {
+        launchDemo(profile: "appstore", extraArgs: ["--signing-tally-seed=7"])
+        waitForScreen("screen.signers")
+        tapButton("signer-row-0")
+        waitForScreen("screen.signer-home")
+        capture("86-signer-home-tally")
+    }
+}
+
 // MARK: - Devnet live-relay walkthrough
 
 final class DevnetWalkthroughUITests: DemoWalkthroughUITestCase {
@@ -626,4 +712,7 @@ private enum CosignUITestCopy {
     static let close = "Close"
     static let clearRecipientAddress = "Clear Recipient Address"
     static let demoRecipient = "EEotmEULbaiQdvxKAswEAiHNB7nuhA6LV5ypbM9NNHbM"
+    static let retryBroadcast = "Retry broadcast"
+    static let stillCantReachNetwork = "Still can't reach the network"
+    static let dismissBroadcastError = "Dismiss"
 }
