@@ -12,6 +12,7 @@ public struct SignersListView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.cosignDemoMode) private var demoMode
     @Environment(\.squadsService) private var squadsService
+    @Environment(NetworkHealth.self) private var networkHealth: NetworkHealth?
     @Query(sort: \RegisteredSigner.createdAt, order: .forward)
     private var signers: [RegisteredSigner]
 
@@ -294,15 +295,22 @@ private extension SignersListView {
     }
 
     var networkFooter: some View {
-        CosignNetworkFooter(text: networkFooterText)
+        CosignNetworkFooter(environment: footerEnvironment, status: footerStatus)
     }
 
-    var networkFooterText: String {
+    var footerEnvironment: String {
         if demoMode?.usesMarketingNetworkFooter == true {
-            return CosignCopy.Network.demoEnhancedFooter
+            return "mainnet"
         }
         let buildEnvironment = CosignBuildEnvironment.current().environmentName
-        return CosignCopy.Network.pinnedFooter(buildEnvironment.isEmpty ? "relay" : buildEnvironment)
+        return buildEnvironment.isEmpty ? "network" : buildEnvironment
+    }
+
+    var footerStatus: NetworkHealthStatus {
+        if demoMode?.usesMarketingNetworkFooter == true {
+            return .healthy
+        }
+        return networkHealth?.status ?? .healthy
     }
 
     var envBadge: (label: String, tone: EnvBadgeTone)? {

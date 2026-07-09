@@ -118,7 +118,11 @@ public struct ProposalDetailView: View {
             ProposalSubmissionSheet(
                 result: result,
                 squadAddress: squadAddress,
-                onDone: { submittedResult = nil; pendingExecuteSigner = nil },
+                onDone: {
+                    submittedResult = nil
+                    pendingExecuteSigner = nil
+                    coordinator.replaceCurrent(with: .activity(squad: squadAddress))
+                },
                 onFinishExecution: result.kind == .partialApproveExecuted ? {
                     let signer = pendingExecuteSigner
                     submittedResult = nil

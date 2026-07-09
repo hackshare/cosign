@@ -32,8 +32,7 @@ public struct SelfHostedRelayView: View {
 
             EndpointDetailsSection(
                 title: CosignCopy.Network.savedEndpointSection,
-                info: networkSettings.rpcURLInfo,
-                relayEnhanced: isRelayPinned
+                info: networkSettings.rpcURLInfo
             )
 
             VStack(spacing: 10) {
@@ -125,10 +124,6 @@ public struct SelfHostedRelayView: View {
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )
-    }
-
-    private var isRelayPinned: Bool {
-        CosignBuildEnvironment.current().relayURL != nil
     }
 
     private var hasChanges: Bool {

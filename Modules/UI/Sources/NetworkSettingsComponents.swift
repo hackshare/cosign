@@ -4,7 +4,6 @@ import SwiftUI
 struct EndpointDetailsSection: View {
     let title: String
     let info: RPCURLInfo
-    var relayEnhanced = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -13,8 +12,7 @@ struct EndpointDetailsSection: View {
                 VStack(spacing: 0) {
                     CosignKeyValueRow(
                         label: CosignCopy.Network.provider,
-                        value: CosignCopy.Network.providerName(info.provider),
-                        valueAccentSuffix: relayEnhanced ? CosignCopy.Network.relayEnhancedSuffix : nil
+                        value: CosignCopy.Network.providerName(info.provider)
                     )
                     CosignKeyValueRow(
                         label: CosignCopy.Network.cluster,

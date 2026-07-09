@@ -14,11 +14,11 @@ public extension CosignCopy.Network {
 
     static let connectionStatesSection = String(localized: "Connection states", bundle: .module)
     static let connectedStateName = String(localized: "Connected", bundle: .module)
-    static let connectedStateDetail = String(localized: "Live updates streaming from the relay.", bundle: .module)
+    static let connectedStateDetail = String(localized: "Live updates streaming.", bundle: .module)
     static let pausedStateName = String(localized: "Live updates paused", bundle: .module)
     static let pausedStateDetail = String(localized: "Reconnecting. Showing the last data received.", bundle: .module)
     static let offlineStateName = String(localized: "Offline", bundle: .module)
-    static let offlineStateDetail = String(localized: "Can't reach the relay. Showing saved data.", bundle: .module)
+    static let offlineStateDetail = String(localized: "Can't reach the network. Showing saved data.", bundle: .module)
 
     static let selfHostedRowTitle = String(localized: "Use a self-hosted relay", bundle: .module)
     static let selfHostedRowSubtitle = String(
@@ -64,11 +64,22 @@ public extension CosignCopy.Network {
     static let credentialsIncluded = String(localized: "Included", bundle: .module)
     static let credentialsNoneDetected = String(localized: "None detected", bundle: .module)
 
-    static let demoEnhancedFooter = String(localized: "mainnet · helius · relay enhanced", bundle: .module)
-    static let relayEnhancedSuffix = String(localized: "· relay enhanced", bundle: .module)
+    /// The home connection footer: environment plus a coarse three-state rollup
+    /// (connected / limited / offline). Relay-neutral, no provider name; the
+    /// paused state rolls up to "limited".
+    static func connectionWord(for status: NetworkHealthStatus) -> String {
+        switch status {
+        case .healthy:
+            String(localized: "connected", bundle: .module)
+        case .webSocketDown:
+            String(localized: "limited", bundle: .module)
+        case .offline:
+            String(localized: "offline", bundle: .module)
+        }
+    }
 
-    static func pinnedFooter(_ environment: String) -> String {
-        String(localized: "\(environment) · relay enhanced", bundle: .module)
+    static func connectionFooter(environment: String, status: NetworkHealthStatus) -> String {
+        String(localized: "\(environment) · \(connectionWord(for: status))", bundle: .module)
     }
 
     static func relayClusterName(_ environment: String) -> String {
@@ -92,7 +103,7 @@ public extension CosignCopy.Network {
     static func statusDetail(for status: NetworkHealthStatus) -> String {
         switch status {
         case .healthy:
-            String(localized: "Live updates on", bundle: .module)
+            connectedStateDetail
         case .webSocketDown:
             pausedStateDetail
         case .offline:

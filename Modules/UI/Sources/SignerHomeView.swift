@@ -11,6 +11,7 @@ public struct SignerHomeView: View {
     @Environment(\.cosignDemoMode) var demoMode
     @Environment(\.indexerEnvironment) var indexerEnvironment
     @Environment(\.squadsService) var squadsService
+    @Environment(NetworkHealth.self) var networkHealth: NetworkHealth?
     @Query(sort: \RegisteredSigner.createdAt, order: .forward)
     private var signers: [RegisteredSigner]
 
@@ -262,15 +263,22 @@ public struct SignerHomeView: View {
     }
 
     private var networkFooter: some View {
-        CosignNetworkFooter(text: networkFooterText)
+        CosignNetworkFooter(environment: footerEnvironment, status: footerStatus)
     }
 
-    private var networkFooterText: String {
+    private var footerEnvironment: String {
         if demoMode?.usesMarketingNetworkFooter == true {
-            return CosignCopy.Network.demoEnhancedFooter
+            return "mainnet"
         }
         let buildEnvironment = CosignBuildEnvironment.current().environmentName
-        return CosignCopy.Network.pinnedFooter(buildEnvironment.isEmpty ? "relay" : buildEnvironment)
+        return buildEnvironment.isEmpty ? "network" : buildEnvironment
+    }
+
+    private var footerStatus: NetworkHealthStatus {
+        if demoMode?.usesMarketingNetworkFooter == true {
+            return .healthy
+        }
+        return networkHealth?.status ?? .healthy
     }
 }
 

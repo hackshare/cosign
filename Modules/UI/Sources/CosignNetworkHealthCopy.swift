@@ -27,7 +27,7 @@ extension CosignCopy {
         static func detail(for status: NetworkHealthStatus) -> String {
             switch status {
             case .webSocketDown:
-                String(localized: "Reconnecting — refreshing on a timer.", bundle: .module)
+                String(localized: "Reconnecting, refreshing on a timer.", bundle: .module)
             case .offline:
                 String(localized: "Showing saved data.", bundle: .module)
             case .healthy:

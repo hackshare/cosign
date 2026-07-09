@@ -22,8 +22,10 @@ public struct NetworkHealthReporter: Sendable {
 }
 
 /// The dominant degraded mode. The app talks only to the relay, so any failed
-/// relay/RPC request means no chain data — `offline`. WebSocket failure only
-/// means live push is paused and polling has taken over.
+/// relay or RPC request means no chain data: `offline`. WebSocket failure only
+/// means live push is paused and polling has taken over. A relay-enhanced-only
+/// fault with core data still live raises no status; the affected value
+/// self-signals through the freshness ladder or decode confidence instead.
 public enum NetworkHealthStatus: Equatable, Sendable {
     case healthy
     case webSocketDown
