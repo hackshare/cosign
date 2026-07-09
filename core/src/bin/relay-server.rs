@@ -6,6 +6,7 @@ use std::{
     io::{self, Read, Write},
     net::{IpAddr, SocketAddr, TcpListener, TcpStream},
     path::PathBuf,
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
 
@@ -17,6 +18,7 @@ use cosign_core::{
     types::{self, ConfigActionInfo, DecodedInstruction, ProposalCompanionRef, ProposalDetail},
 };
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use solana_client::client_error::reqwest;
 use solana_sdk::{
     address_lookup_table::instruction::ProgramInstruction as AddressLookupTableInstruction,
@@ -736,6 +738,10 @@ fn handle_request_with_client(
 
     if request.method == "GET" && request.path == "/cosign/v1/prices" {
         return prices_response(request.query.as_deref());
+    }
+
+    if request.method == "GET" && request.path == "/cosign/v1/release" {
+        return release_response();
     }
 
     if request.method != "GET" {
@@ -4705,6 +4711,112 @@ fn jupiter_usd_price(body: &Value, mint: &str) -> Option<f64> {
     price
         .as_f64()
         .or_else(|| price.as_str().and_then(|value| value.parse().ok()))
+}
+
+// TTL-cached latest-release data. Populated on first request and refreshed after
+// the TTL expires. Avoids hitting the unauthenticated GitHub API on every page load
+// (rate limit: 60 req/hr/IP). The cache is process-global and initialised lazily.
+static RELEASE_CACHE: OnceLock<Mutex<Option<(Value, Instant)>>> = OnceLock::new();
+const RELEASE_CACHE_TTL: Duration = Duration::from_secs(7 * 60);
+
+fn release_response() -> HttpResponse {
+    let cache = RELEASE_CACHE.get_or_init(|| Mutex::new(None));
+    {
+        let guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((ref cached, fetched_at)) = *guard
+            && fetched_at.elapsed() < RELEASE_CACHE_TTL
+        {
+            return json_response(200, cached.clone());
+        }
+    }
+    match fetch_release_data() {
+        Ok(release_json) => {
+            let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+            *guard = Some((release_json.clone(), Instant::now()));
+            json_response(200, release_json)
+        }
+        Err(_) => json_response(502, json!({"kind": "release", "error": "unavailable"})),
+    }
+}
+
+/// Fetches the latest tagged GitHub release for hackshare/cosign, downloads the
+/// BuildClaim.json release asset, and returns a JSON blob with version/tag/commit/
+/// fingerprint fields. The fingerprint is sha256(raw BuildClaim.json bytes), which
+/// the app computes locally from the same asset to verify the build.
+fn fetch_release_data() -> Result<Value, String> {
+    let client = reqwest::blocking::Client::builder()
+        .no_proxy()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client
+        .get("https://api.github.com/repos/hackshare/cosign/releases/latest")
+        .header("User-Agent", "cosign-relay")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "GitHub API returned {}",
+            response.status().as_u16()
+        ));
+    }
+
+    let release: Value = response.json().map_err(|e| e.to_string())?;
+    let html_url = release["html_url"]
+        .as_str()
+        .ok_or("missing html_url")?
+        .to_owned();
+
+    let assets = release["assets"].as_array().ok_or("missing assets")?;
+    let asset = assets
+        .iter()
+        .find(|a| a["name"].as_str() == Some("BuildClaim.json"))
+        .ok_or("BuildClaim.json asset not found")?;
+    let download_url = asset["browser_download_url"]
+        .as_str()
+        .ok_or("missing browser_download_url")?
+        .to_owned();
+
+    let bytes_response = client
+        .get(&download_url)
+        .header("User-Agent", "cosign-relay")
+        .send()
+        .map_err(|e| e.to_string())?;
+    let bytes = bytes_response.bytes().map_err(|e| e.to_string())?;
+
+    // Fingerprint over the exact published bytes — the app verifier hashes the
+    // same asset so both sides produce identical hex without re-serialising.
+    let fingerprint: String = Sha256::digest(&bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+
+    let claim: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    let version = claim["version"]
+        .as_str()
+        .ok_or("missing version")?
+        .to_owned();
+    let tag = claim["tag"].as_str().ok_or("missing tag")?.to_owned();
+    let commit = claim["commitSha"]
+        .as_str()
+        .ok_or("missing commitSha")?
+        .to_owned();
+    let build = claim["build"].as_str().ok_or("missing build")?.to_owned();
+    let commit_short = commit[..8.min(commit.len())].to_owned();
+
+    Ok(json!({
+        "kind": "release",
+        "version": version,
+        "tag": tag,
+        "build": build,
+        "commit": commit,
+        "commitShort": commit_short,
+        "fingerprint": fingerprint,
+        "releaseUrl": html_url,
+    }))
 }
 
 fn member_squads_json_response(member: &Pubkey, squads: &[types::MultisigSummary]) -> HttpResponse {
