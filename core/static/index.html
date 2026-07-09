@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cosign</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="description" content="A native iOS signer for Solana Squads multisigs. Know what you sign before you approve it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,7 +65,14 @@
 </style>
 </head>
 <body>
-<div style="background:#08090B; color:#F4F5F3; font-family:'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; min-height:100vh; overflow-x:hidden;">
+<div style="background:#08090B; color:#F4F5F3; font-family:'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; min-height:100vh; overflow-x:clip;">
+
+  <!-- ROOT overflow-x:clip (NOT hidden): clip prevents horizontal overflow without creating a scroll
+       container, so position:sticky in the how-it-works section resolves against the viewport and
+       pins correctly. Never change this back to overflow-x:hidden or overflow:hidden on the root
+       (or on any ancestor of the sticky phone) — hidden forces overflow-y to compute to auto, makes
+       the element a scroll container, and the sticky phone silently scrolls away in real browsers
+       (Chrome/Safari) even though it looks fine in a scaled preview. -->
 
   <!-- HEADER -->
   <header style="position:sticky; top:0; z-index:40; background:rgba(8,9,11,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,0.06);">
@@ -199,7 +207,7 @@
       </div>
 
       <div style="margin-top:clamp(32px,5vw,64px); display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,300px), 1fr)); gap:clamp(24px,4vw,64px); align-items:start;">
-        <div class="sticky-phone-col" style="position:sticky; top:96px; align-self:start; display:flex; justify-content:center; order:2;">
+        <div class="sticky-phone-col" style="position:sticky; top:0; align-self:start; height:100vh; display:flex; align-items:center; justify-content:center; order:2;">
           <div class="phone" style="position:relative; width:clamp(258px,27vw,300px); border-radius:46px; background:#0A0B0D; border:1px solid rgba(255,255,255,0.14); padding:8px;">
             <div style="position:relative; border-radius:38px; overflow:hidden; aspect-ratio:293/634; background:#0C0E12;">
               <img data-shot="0" src="/assets/08-proposal-detail.png" alt="Cosign decoded proposal detail" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:1; transition:opacity .6s ease;">
@@ -211,30 +219,32 @@
         </div>
 
         <div class="beats-col" style="order:1;">
-          <div data-beat="0" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="0" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:#F2C26C; font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">01</span><span data-beat-title style="font-size:15px; font-weight:500; color:#F4F5F3; transition:color .4s ease;">Decoded and inspectable</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Read the action, not the bytes.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Every instruction is decoded into plain language with a severity and a confidence read on the data. Open the raw fields whenever you want them. Nothing is hidden behind a blind signature.</p>
           </div>
 
-          <div data-beat="1" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="1" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">02</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Co-sign to the threshold</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Add your signature, watch the threshold close.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">See who has approved and how many signatures remain. The threshold ring fills as co-signers sign, and Face ID confirms before anything is broadcast. Hold to approve keeps an accidental tap from spending anything.</p>
           </div>
 
-          <div data-beat="2" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="2" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">03</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Self-custody</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">Your keys stay on the device.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">Keys are generated and held on your iPhone, in the iOS Keychain. Import an existing wallet from its recovery phrase or a raw Solana secret key, all behind Face ID. Cosign cannot move your funds.</p>
             <p style="margin:14px 0 0; max-width:44ch; font-family:'Geist Mono', monospace; font-size:12px; line-height:1.6; color:rgba(244,245,243,0.36);">Hardware signer support is on the roadmap.</p>
           </div>
 
-          <div data-beat="3" style="min-height:clamp(340px,58vh,520px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
+          <div data-beat="3" style="min-height:clamp(480px,100vh,880px); display:flex; flex-direction:column; justify-content:center; padding:20px 0;">
             <div style="display:flex; align-items:baseline; gap:16px;"><span data-beat-idx style="font-size:clamp(30px,3.4vw,44px); font-weight:600; letter-spacing:-1.5px; color:rgba(244,245,243,0.2); font-variant-numeric:tabular-nums; line-height:0.9; transition:color .4s ease;">04</span><span data-beat-title style="font-size:15px; font-weight:500; color:rgba(244,245,243,0.4); transition:color .4s ease;">Verifiable receipt</span></div>
             <h3 style="margin:20px 0 0; font-size:clamp(24px,3.4vw,36px); font-weight:600; letter-spacing:-1.1px; line-height:1.06;">A receipt you can check on-chain.</h3>
             <p style="margin:15px 0 0; max-width:44ch; font-size:16.5px; line-height:1.6; color:rgba(244,245,243,0.62);">After a proposal executes, Cosign shows the signature and the decoded result, with a link to inspect the transaction on-chain. What you approved and what landed are the same thing, and you can prove it.</p>
           </div>
+
+          <div aria-hidden="true" style="min-height:clamp(60px,20vh,180px);"></div>
         </div>
       </div>
     </section>
@@ -376,9 +386,12 @@
     });
   }
 
+  // sticky how-it-works cross-fade — deterministic ratio-based: tracks every beat's intersection
+  // ratio and activates the most-visible one, rather than last-wins (old threshold:0.55 approach).
   var beats = document.querySelectorAll('[data-beat]');
   var shots = document.querySelectorAll('[data-shot]');
   if (beats.length && shots.length && 'IntersectionObserver' in window) {
+    var ratios = {}, current = null;
     var setActive = function(i){
       shots.forEach(function(s){ s.style.opacity = (String(s.getAttribute('data-shot'))===String(i)) ? '1' : '0'; });
       document.querySelectorAll('[data-beat]').forEach(function(b){
@@ -390,10 +403,13 @@
       });
     };
     var bio = new IntersectionObserver(function(es){
-      es.forEach(function(e){ if(e.isIntersecting){ setActive(e.target.getAttribute('data-beat')); } });
-    }, { threshold:0.55 });
+      es.forEach(function(e){ ratios[e.target.getAttribute('data-beat')] = e.isIntersecting ? e.intersectionRatio : 0; });
+      var bestI = null, bestR = -1;
+      Object.keys(ratios).forEach(function(k){ if(ratios[k] > bestR){ bestR = ratios[k]; bestI = k; } });
+      if(bestI !== null && bestR > 0 && bestI !== current){ current = bestI; setActive(bestI); }
+    }, { threshold:[0,0.15,0.3,0.45,0.6,0.75,0.9,1] });
     beats.forEach(function(b){ bio.observe(b); });
-    setActive(0);
+    current = '0'; setActive(0);
   }
 
   document.querySelectorAll('[data-toggle-group]').forEach(function(wrap){

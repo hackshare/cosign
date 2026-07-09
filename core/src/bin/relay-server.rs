@@ -83,6 +83,8 @@ const DEFAULT_RPC_ALLOWED_METHODS: &[&str] = &[
 const LANDING_HTML: &str = include_str!("../../static/index.html");
 #[cfg(feature = "landing")]
 const PRIVACY_HTML: &str = include_str!("../../static/privacy.html");
+#[cfg(feature = "landing")]
+const FAVICON_SVG: &str = include_str!("../../static/favicon.svg");
 
 // Product screenshots used by the landing page, served from /assets/*.png and
 // baked into the binary so the page stays self-contained.
@@ -702,6 +704,16 @@ fn handle_request_with_client(
     #[cfg(feature = "landing")]
     if request.method == "GET" && request.path == "/privacy" {
         return html_response(200, PRIVACY_HTML.to_string());
+    }
+
+    #[cfg(feature = "landing")]
+    if request.method == "GET" && request.path == "/favicon.svg" {
+        return HttpResponse {
+            status: 200,
+            reason: reason_phrase(200),
+            content_type: "image/svg+xml; charset=utf-8",
+            body: FAVICON_SVG.as_bytes().to_vec(),
+        };
     }
 
     #[cfg(feature = "landing")]
