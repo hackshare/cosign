@@ -17,8 +17,6 @@ struct ProposalActionSigner: Identifiable {
 
 enum ProposalActionSignerStorage: Equatable {
     case hotWallet(keychainAccount: String)
-    case ledger
-    case yubikey
 }
 
 struct ProposalSigningRequest: Identifiable {

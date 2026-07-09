@@ -6,20 +6,6 @@ import Signers
 import SwiftUI
 
 extension SignerDetailView {
-    var yubiKeySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            CosignSectionTitle(title: CosignCopy.SignerDiagnostics.yubiKeySectionTitle)
-            CosignCard {
-                YubiKeyTransportSelector(selection: $yubiKeyTransport, isDisabled: isTesting)
-
-                Text(CosignCopy.SignerDiagnostics.yubiKeyMessage)
-                    .font(CosignTheme.FontStyle.caption)
-                    .foregroundStyle(CosignTheme.inkDim)
-                    .padding(.top, 8)
-            }
-        }
-    }
-
     func diagnosticSection(_ signer: RegisteredSigner) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             CosignSectionTitle(title: CosignCopy.SignerDiagnostics.diagnosticsSectionTitle)
@@ -30,7 +16,7 @@ extension SignerDetailView {
                     }
                 } label: {
                     HStack {
-                        Text(diagnosticButtonTitle(for: signer.type))
+                        Text(CosignCopy.SignerDiagnostics.buttonTitle(for: signer.type))
                         Spacer()
                         if isTesting {
                             ProgressView()
@@ -94,25 +80,13 @@ extension SignerDetailView {
         }
 
         do {
-            diagnosticResult = try await runDiagnostic(profile)
+            diagnosticResult = try await testHotWallet(profile)
         } catch {
             diagnosticResult = SignerDiagnosticResult(
                 title: CosignCopy.SignerDiagnostics.testFailedTitle,
                 message: diagnosticMessage(for: error),
                 isSuccess: false
             )
-        }
-    }
-
-    @MainActor
-    func runDiagnostic(_ profile: SignerDiagnosticProfile) async throws -> SignerDiagnosticResult {
-        switch profile.type {
-        case .hotWallet:
-            try await testHotWallet(profile)
-        case .ledger:
-            try await testLedger(profile)
-        case .yubikey:
-            try await testYubiKey(profile)
         }
     }
 
@@ -140,93 +114,12 @@ extension SignerDetailView {
             isSuccess: true
         )
     }
-
-    @MainActor
-    func testLedger(_ profile: SignerDiagnosticProfile) async throws -> SignerDiagnosticResult {
-        let transport = CoreBluetoothLedgerTransport()
-        defer {
-            transport.disconnect()
-        }
-
-        diagnosticStatusMessage = CosignCopy.Ledger.scanningStatus()
-        let devices = try await transport.scan(timeout: 8)
-        guard let device = devices.first else {
-            throw SignerDiagnosticError.noLedgerDevices
-        }
-
-        diagnosticStatusMessage = CosignCopy.Ledger.connectingStatus(deviceName: device.name)
-        try await transport.connect(to: device)
-
-        diagnosticStatusMessage = CosignCopy.SignerDiagnostics.verifyingAddressStatus
-        let configuration = try await LedgerSignerPreflight.verifySolanaAppAndAddress(
-            expectedPubkey: profile.pubkey,
-            transport: transport
-        )
-        let blindSigning = configuration.blindSigningEnabled
-            ? CosignCopy.SignerDiagnostics.blindSigningEnabled
-            : CosignCopy.SignerDiagnostics.blindSigningDisabled
-
-        return SignerDiagnosticResult(
-            title: CosignCopy.SignerDiagnostics.ledgerReadyTitle,
-            message: CosignCopy.SignerDiagnostics.ledgerReadyMessage(
-                deviceName: device.name,
-                version: configuration.version,
-                blindSigning: blindSigning
-            ),
-            isSuccess: true
-        )
-    }
-
-    @MainActor
-    func testYubiKey(_ profile: SignerDiagnosticProfile) async throws -> SignerDiagnosticResult {
-        diagnosticStatusMessage = CosignCopy.YubiKey.connectingStatus(transport: yubiKeyTransport.statusLabel)
-        let publicKey = try await YubiKeyPIVRegistration.readEd25519PublicKey(
-            preference: yubiKeyTransport.connectionPreference(
-                alertMessage: CosignCopy.SignerDiagnostics.yubiKeyTestPrompt
-            )
-        )
-        guard publicKey.pubkey == profile.pubkey else {
-            throw SignerDiagnosticError.addressMismatch(
-                expected: profile.address,
-                actual: CosignCore.base58(publicKey.pubkey)
-            )
-        }
-
-        var details = [
-            CosignCopy.SignerDiagnostics.sourceDetail(displayLabel(publicKey.source.rawValue))
-        ]
-        if let generatedOnYubiKey = publicKey.generatedOnYubiKey {
-            details.append(CosignCopy.SignerDiagnostics.keyOriginDetail(generatedOnYubiKey: generatedOnYubiKey))
-        }
-
-        return SignerDiagnosticResult(
-            title: CosignCopy.SignerDiagnostics.yubiKeyReadyTitle,
-            message: CosignCopy.SignerDiagnostics.yubiKeyReadyMessage(details: details.joined(separator: " ")),
-            isSuccess: true
-        )
-    }
-}
-
-func diagnosticButtonTitle(for type: SignerType) -> String {
-    switch type {
-    case .hotWallet:
-        CosignCopy.SignerDiagnostics.buttonTitle(for: .hotWallet)
-    case .ledger:
-        CosignCopy.SignerDiagnostics.buttonTitle(for: .ledger)
-    case .yubikey:
-        CosignCopy.SignerDiagnostics.buttonTitle(for: .yubikey)
-    }
 }
 
 func diagnosticMessage(for error: any Error) -> String {
-    if error is YubiKeyPIVRegistrationError || error is YubiKeySignerError {
-        return yubiKeySetupNotice(for: error).message
-    }
-
     if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
         return description
     }
-
     return String(describing: error)
 }
 
@@ -247,8 +140,6 @@ struct SignerDiagnosticResult {
 enum SignerDiagnosticError: LocalizedError {
     case missingHotWalletKeychainReference
     case invalidHotWalletSignature
-    case noLedgerDevices
-    case addressMismatch(expected: String, actual: String)
 
     var errorDescription: String? {
         switch self {
@@ -256,10 +147,6 @@ enum SignerDiagnosticError: LocalizedError {
             CosignCopy.SignerDiagnostics.missingHotWalletKeychainReference
         case .invalidHotWalletSignature:
             CosignCopy.SignerDiagnostics.invalidHotWalletSignature
-        case .noLedgerDevices:
-            CosignCopy.SignerDiagnostics.noLedgerDevices
-        case let .addressMismatch(expected, actual):
-            CosignCopy.SignerDiagnostics.addressMismatch(expected: expected, actual: actual)
         }
     }
 }

@@ -129,44 +129,5 @@ extension CosignCopy {
         static func vaultDisplayName(index: UInt8) -> String {
             String(localized: "Vault \(index)", bundle: .module)
         }
-
-        static func signButtonTitle(for signerType: SignerType) -> String {
-            switch signerType {
-            case .hotWallet:
-                hotWalletSignTitle
-            case .ledger:
-                ProposalSigning.buttonTitle(for: .approve, signerType: .ledger)
-            case .yubikey:
-                ProposalSigning.buttonTitle(for: .approve, signerType: .yubikey)
-            }
-        }
-
-        static func hardwareTitle(for signerType: SignerType) -> String {
-            switch signerType {
-            case .hotWallet:
-                ProposalSigning.deviceCheckTitle
-            case .ledger:
-                ProposalSigning.ledgerTitle
-            case .yubikey:
-                ProposalSigning.yubiKeyTitle
-            }
-        }
-
-        static func hardwareContext(for signerType: SignerType) -> String {
-            switch signerType {
-            case .hotWallet:
-                ProposalSigning.deviceContext(for: .hotWallet)
-            case .ledger:
-                String(
-                    localized: "Review the action above before approving on your Ledger. The device may not show full Squads proposal context.",
-                    bundle: .module
-                )
-            case .yubikey:
-                String(
-                    localized: "Review the action above before tapping your YubiKey. The key signs the proposal transaction; Cosign provides the transfer context.",
-                    bundle: .module
-                )
-            }
-        }
     }
 }

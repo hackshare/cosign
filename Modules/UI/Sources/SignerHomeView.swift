@@ -342,18 +342,6 @@ private func signerAvatarGradient(for type: SignerType) -> LinearGradient {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    case .ledger:
-        LinearGradient(
-            colors: [Color(hex: 0x8AA8FF), Color(hex: 0x0B142B)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    case .yubikey:
-        LinearGradient(
-            colors: [Color(hex: 0x7CF2B0), Color(hex: 0x0F2018)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }
 
@@ -361,10 +349,6 @@ private func statusHint(for type: SignerType) -> String {
     switch type {
     case .hotWallet:
         CosignCopy.Signers.statusHint(for: .hotWallet)
-    case .ledger:
-        CosignCopy.Signers.statusHint(for: .ledger)
-    case .yubikey:
-        CosignCopy.Signers.statusHint(for: .yubikey)
     }
 }
 
@@ -372,9 +356,5 @@ private func keyKind(for type: SignerType) -> String {
     switch type {
     case .hotWallet:
         CosignCopy.Signers.keyKind(for: .hotWallet)
-    case .ledger:
-        CosignCopy.Signers.keyKind(for: .ledger)
-    case .yubikey:
-        CosignCopy.Signers.keyKind(for: .yubikey)
     }
 }

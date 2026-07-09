@@ -145,10 +145,6 @@ public struct SignersListView: View {
             switch sheet {
             case .hotWallet:
                 AddHotWalletView()
-            case .ledger:
-                AddLedgerView()
-            case .yubikey:
-                AddYubiKeyView()
             }
         }
         .sheet(

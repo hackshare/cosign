@@ -8,7 +8,6 @@ struct ProposalSigningSheet: View {
     let isSubmitting: Bool
     let errorMessage: String?
     let deviceStatusMessage: String?
-    @Binding var yubiKeyOptions: YubiKeySigningOptions
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @Environment(\.squadsService) private var squadsService
@@ -53,13 +52,6 @@ struct ProposalSigningSheet: View {
                 CosignInlineBanner(tone: .red) {
                     Text(errorMessage)
                 }
-            }
-
-            if request.signer.type == .yubikey {
-                YubiKeySigningControls(
-                    options: $yubiKeyOptions,
-                    isDisabled: isSubmitting
-                )
             }
 
             if let deviceStatusMessage {
@@ -112,9 +104,7 @@ struct ProposalSigningSheet: View {
     }
 
     private var canConfirm: Bool {
-        !isSubmitting &&
-            (request.signer.type != .yubikey || yubiKeyOptions.hasValidPINLength) &&
-            (!requiresTypedConfirmation || confirmationText == confirmationPhrase)
+        !isSubmitting && (!requiresTypedConfirmation || confirmationText == confirmationPhrase)
     }
 
     private var requiresTypedConfirmation: Bool {
@@ -317,58 +307,29 @@ private extension ProposalSigningSheet {
         )
     }
 
-    @ViewBuilder
     var hardwareContext: some View {
-        switch request.signer.type {
-        case .hotWallet:
-            VStack(alignment: .leading, spacing: 10) {
-                CosignSectionTitle(title: CosignCopy.ProposalSigning.deviceCheckTitle)
-                CosignCard {
-                    HStack(spacing: 12) {
-                        CosignGlyphView(glyph: .faceID, size: 22, color: CosignTheme.accentDeep)
-                            .frame(width: 38, height: 38)
-                            .background(CosignTheme.accentWash, in: .rect(cornerRadius: CosignTheme.Radius.medium))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(CosignCopy.ProposalSigning.localHotWalletTitle)
-                                .font(CosignTheme.FontStyle.body)
-                                .foregroundStyle(CosignTheme.ink)
-                            Text(CosignCopy.ProposalSigning.deviceContext(for: request.signer.type))
-                                .font(CosignTheme.FontStyle.caption)
-                                .foregroundStyle(CosignTheme.inkDim)
-                        }
+        VStack(alignment: .leading, spacing: 10) {
+            CosignSectionTitle(title: CosignCopy.ProposalSigning.deviceCheckTitle)
+            CosignCard {
+                HStack(spacing: 12) {
+                    CosignGlyphView(glyph: .faceID, size: 22, color: CosignTheme.accentDeep)
+                        .frame(width: 38, height: 38)
+                        .background(CosignTheme.accentWash, in: .rect(cornerRadius: CosignTheme.Radius.medium))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(CosignCopy.ProposalSigning.localHotWalletTitle)
+                            .font(CosignTheme.FontStyle.body)
+                            .foregroundStyle(CosignTheme.ink)
+                        Text(CosignCopy.ProposalSigning.deviceContext)
+                            .font(CosignTheme.FontStyle.caption)
+                            .foregroundStyle(CosignTheme.inkDim)
                     }
-                }
-            }
-        case .ledger:
-            VStack(alignment: .leading, spacing: 10) {
-                CosignSectionTitle(title: CosignCopy.ProposalSigning.ledgerTitle)
-                CosignCard {
-                    Text(CosignCopy.ProposalSigning.deviceContext(for: request.signer.type))
-                        .font(CosignTheme.FontStyle.caption)
-                        .foregroundStyle(CosignTheme.inkDim)
-                }
-            }
-        case .yubikey:
-            VStack(alignment: .leading, spacing: 10) {
-                CosignSectionTitle(title: CosignCopy.ProposalSigning.yubiKeyTitle)
-                CosignCard {
-                    Text(CosignCopy.ProposalSigning.deviceContext(for: request.signer.type))
-                        .font(CosignTheme.FontStyle.caption)
-                        .foregroundStyle(CosignTheme.inkDim)
                 }
             }
         }
     }
 
     var deviceStatusTitle: String {
-        switch request.signer.type {
-        case .hotWallet:
-            CosignCopy.ProposalSigning.signerLabel
-        case .ledger:
-            CosignCopy.ProposalSigning.ledgerTitle
-        case .yubikey:
-            CosignCopy.ProposalSigning.yubiKeyTitle
-        }
+        CosignCopy.ProposalSigning.signerLabel
     }
 }
 

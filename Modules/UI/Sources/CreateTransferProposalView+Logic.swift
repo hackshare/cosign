@@ -173,7 +173,6 @@ extension CreateTransferProposalView {
         }
 
         do {
-            yubiKeySigningOptions = YubiKeySigningOptions()
             signingRequest = try makeSigningRequest()
             errorMessage = nil
         } catch {
@@ -200,7 +199,6 @@ extension CreateTransferProposalView {
         do {
             let submission = try await withResolvedProposalSigner(
                 request.signer,
-                yubiKeyOptions: request.signer.type == .yubikey ? yubiKeySigningOptions : nil,
                 deviceStatus: { deviceStatusMessage = $0 },
                 operation: { signer in
                     try await squadsService.submitTransferProposal(
@@ -293,7 +291,6 @@ extension CreateTransferProposalView {
         memo = ""
         errorMessage = nil
         deviceStatusMessage = nil
-        yubiKeySigningOptions = YubiKeySigningOptions()
     }
 
     var actionSigners: [ProposalActionSigner] {

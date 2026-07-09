@@ -157,7 +157,10 @@ extension CosignCopy {
 
     enum About {
         static let appName = String(localized: "Cosign", bundle: .module)
-        static let tagline = String(localized: "A verifiable signer for Squads v4 multisigs.", bundle: .module)
+        static let tagline = String(
+            localized: "A verifiable signer for Solana Squads v4 multisigs. Every proposal is decoded on your device.",
+            bundle: .module
+        )
         static let versionLabel = String(localized: "Version", bundle: .module)
         static let buildLabel = String(localized: "Build", bundle: .module)
         static let emptyValue = String(localized: "—", bundle: .module)

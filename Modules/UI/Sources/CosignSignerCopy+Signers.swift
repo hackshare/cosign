@@ -50,21 +50,17 @@ extension CosignCopy {
                 )
         }
 
+        static let comingSoonTag = String(localized: "Coming soon", bundle: .module)
+        static let ledgerComingSoonTitle = String(localized: "Ledger", bundle: .module)
+        static let ledgerComingSoonSubtitle = String(localized: "Bluetooth or USB hardware signer", bundle: .module)
+        static let yubiKeyComingSoonTitle = String(localized: "YubiKey", bundle: .module)
+        static let yubiKeyComingSoonSubtitle = String(localized: "NFC tap or USB security key", bundle: .module)
+
         static func removeMessage(for type: SignerType) -> String {
             switch type {
             case .hotWallet:
                 String(
                     localized: "This removes the signer from this device and deletes its private key from the Keychain. You will need the recovery phrase to add it again.",
-                    bundle: .module
-                )
-            case .ledger:
-                String(
-                    localized: "This removes the Ledger signer from this device. The Ledger itself is not changed.",
-                    bundle: .module
-                )
-            case .yubikey:
-                String(
-                    localized: "This removes the YubiKey signer from this device. The YubiKey itself is not changed.",
                     bundle: .module
                 )
             }
@@ -74,10 +70,6 @@ extension CosignCopy {
             switch type {
             case .hotWallet:
                 String(localized: "Hot wallet", bundle: .module)
-            case .ledger:
-                String(localized: "Ledger", bundle: .module)
-            case .yubikey:
-                String(localized: "YubiKey", bundle: .module)
             }
         }
 
@@ -85,10 +77,6 @@ extension CosignCopy {
             switch type {
             case .hotWallet:
                 String(localized: "Ready on this device", bundle: .module)
-            case .ledger:
-                String(localized: "Hardware approval required", bundle: .module)
-            case .yubikey:
-                String(localized: "Tap or plug in to sign", bundle: .module)
             }
         }
 
@@ -96,10 +84,6 @@ extension CosignCopy {
             switch type {
             case .hotWallet:
                 String(localized: "KEYCHAIN", bundle: .module)
-            case .ledger:
-                String(localized: "LEDGER", bundle: .module)
-            case .yubikey:
-                String(localized: "YUBIKEY", bundle: .module)
             }
         }
 
@@ -107,10 +91,6 @@ extension CosignCopy {
             switch sheet {
             case .hotWallet:
                 String(localized: "Hot Wallet", bundle: .module)
-            case .ledger:
-                String(localized: "Ledger", bundle: .module)
-            case .yubikey:
-                String(localized: "YubiKey", bundle: .module)
             }
         }
 
@@ -118,10 +98,6 @@ extension CosignCopy {
             switch sheet {
             case .hotWallet:
                 String(localized: "Create a key stored in iOS Keychain", bundle: .module)
-            case .ledger:
-                String(localized: "Bluetooth or USB hardware signer", bundle: .module)
-            case .yubikey:
-                String(localized: "NFC tap or USB security key", bundle: .module)
             }
         }
 

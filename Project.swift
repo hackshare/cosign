@@ -120,12 +120,7 @@ let project = Project(
         )),
         developmentRegion: "en"
     ),
-    packages: [
-        .remote(
-            url: "https://github.com/Yubico/yubikit-swift.git",
-            requirement: .upToNextMajor(from: "1.3.0")
-        )
-    ],
+    packages: [],
     targets: [
         // CosignCore: thin Swift wrapper around the UniFFI-generated bindings,
         // which are emitted into Modules/CosignCore/Sources/Generated/ by
@@ -187,14 +182,13 @@ let project = Project(
             dependencies: [.target(name: "Core")]
         ),
 
-        // Signers: hot wallets and external signing device integrations.
+        // Signers: hot wallet signing only.
         TargetFactory.framework(
             name: "Signers",
             sources: ["Modules/Signers/Sources/**"],
             dependencies: [
                 .target(name: "Core"),
-                .target(name: "CosignCore"),
-                .package(product: "YubiKit")
+                .target(name: "CosignCore")
             ]
         ),
         TargetFactory.unitTests(

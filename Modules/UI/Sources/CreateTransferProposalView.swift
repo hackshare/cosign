@@ -29,7 +29,6 @@ public struct CreateTransferProposalView: View {
     @State var isSubmitting = false
     @State var errorMessage: String?
     @State var deviceStatusMessage: String?
-    @State var yubiKeySigningOptions = YubiKeySigningOptions()
     @State var signingRequest: ProposalCreationSigningRequest?
     @State var submittedResult: ProposalCreationResult?
     @State var proposalCreationCompletion: ProposalCreationCompletion?
@@ -95,7 +94,6 @@ public struct CreateTransferProposalView: View {
                 isSubmitting: isSubmitting,
                 errorMessage: errorMessage,
                 deviceStatusMessage: deviceStatusMessage,
-                yubiKeyOptions: $yubiKeySigningOptions,
                 onCancel: {
                     if !isSubmitting {
                         signingRequest = nil

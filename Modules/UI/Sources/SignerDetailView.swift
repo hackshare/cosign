@@ -17,7 +17,6 @@ public struct SignerDetailView: View {
 
     private let signerID: UUID
 
-    @State var yubiKeyTransport = YubiKeyTransportChoice.wired
     @State var isTesting = false
     @State var diagnosticStatusMessage: String?
     @State var diagnosticResult: SignerDiagnosticResult?
@@ -98,10 +97,6 @@ public struct SignerDetailView: View {
 
             if isLoadingSquads || !squadRows.isEmpty {
                 squadsSection
-            }
-
-            if signer.type == .yubikey {
-                yubiKeySection
             }
 
             diagnosticSection(signer)

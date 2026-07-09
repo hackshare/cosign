@@ -5,10 +5,6 @@ extension SignerType {
         switch self {
         case .hotWallet:
             "Hot wallet"
-        case .ledger:
-            "Ledger"
-        case .yubikey:
-            "YubiKey"
         }
     }
 }

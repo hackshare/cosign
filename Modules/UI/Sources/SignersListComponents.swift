@@ -50,8 +50,6 @@ struct PendingApprovalsBanner: View {
 
 enum AddSignerSheet: Hashable, Identifiable {
     case hotWallet
-    case ledger
-    case yubikey
 
     var id: Self {
         self
@@ -69,11 +67,36 @@ enum AddSignerSheet: Hashable, Identifiable {
         switch self {
         case .hotWallet:
             .key
-        case .ledger:
-            .shield
-        case .yubikey:
-            .wave
         }
+    }
+}
+
+private struct ComingSoonSignerRow: View {
+    let title: String
+    let subtitle: String
+    let glyph: CosignGlyph
+
+    var body: some View {
+        HStack(spacing: 0) {
+            CosignObjectRow(
+                title: title,
+                subtitle: subtitle,
+                style: .plain,
+                leading: {
+                    CosignGlyphView(glyph: glyph, size: 18, color: CosignTheme.inkDim)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            CosignTheme.surface3,
+                            in: .rect(cornerRadius: CosignTheme.Radius.medium)
+                        )
+                }
+            )
+            Text(CosignCopy.Signers.comingSoonTag)
+                .font(CosignTheme.FontStyle.caption)
+                .foregroundStyle(CosignTheme.inkFaint)
+                .padding(.trailing, 14)
+        }
+        .opacity(0.6)
     }
 }
 
@@ -81,46 +104,56 @@ struct AddSignerChooserSheet: View {
     @Environment(\.dismiss) private var dismiss
     let onSelect: (AddSignerSheet) -> Void
 
-    private let options: [AddSignerSheet] = [.hotWallet, .ledger, .yubikey]
-
     var body: some View {
         CosignScreen {
             header
 
             CosignCard(padding: 0) {
                 VStack(spacing: 0) {
-                    ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
-                        Button {
-                            onSelect(option)
-                        } label: {
-                            CosignObjectRow(
-                                title: option.title,
-                                subtitle: option.subtitle,
-                                style: .plain,
-                                leading: {
-                                    CosignGlyphView(glyph: option.glyph, size: 18, color: CosignTheme.accentDeep)
-                                        .frame(width: 36, height: 36)
-                                        .background(
-                                            CosignTheme.accentWash,
-                                            in: .rect(cornerRadius: CosignTheme.Radius.medium)
-                                        )
-                                }
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("signer-option-\(option)")
-
-                        if index < options.count - 1 {
-                            Divider()
-                                .overlay(CosignTheme.line)
-                                .padding(.leading, 14)
-                        }
+                    Button {
+                        onSelect(.hotWallet)
+                    } label: {
+                        CosignObjectRow(
+                            title: AddSignerSheet.hotWallet.title,
+                            subtitle: AddSignerSheet.hotWallet.subtitle,
+                            style: .plain,
+                            leading: {
+                                CosignGlyphView(glyph: .key, size: 18, color: CosignTheme.accentDeep)
+                                    .frame(width: 36, height: 36)
+                                    .background(
+                                        CosignTheme.accentWash,
+                                        in: .rect(cornerRadius: CosignTheme.Radius.medium)
+                                    )
+                            }
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("signer-option-hotWallet")
+
+                    Divider()
+                        .overlay(CosignTheme.line)
+                        .padding(.leading, 14)
+
+                    ComingSoonSignerRow(
+                        title: CosignCopy.Signers.ledgerComingSoonTitle,
+                        subtitle: CosignCopy.Signers.ledgerComingSoonSubtitle,
+                        glyph: .shield
+                    )
+
+                    Divider()
+                        .overlay(CosignTheme.line)
+                        .padding(.leading, 14)
+
+                    ComingSoonSignerRow(
+                        title: CosignCopy.Signers.yubiKeyComingSoonTitle,
+                        subtitle: CosignCopy.Signers.yubiKeyComingSoonSubtitle,
+                        glyph: .wave
+                    )
                 }
             }
         }
         .cosignScreenIdentifier("screen.add-signer-chooser")
-        .presentationDetents([.height(330), .medium])
+        .presentationDetents([.height(390), .medium])
         .presentationDragIndicator(.hidden)
     }
 
