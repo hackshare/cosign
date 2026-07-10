@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-SCHEMES="${SCHEMES:-CosignDevnet CosignDemo}"
+SCHEMES="${SCHEMES:-Cosign CosignDemo}"
 
 UDID="$(xcrun simctl list devices booted 2>/dev/null \
   | grep -oE '\([0-9A-Fa-f-]{36}\)' | tr -d '()' | head -1)"

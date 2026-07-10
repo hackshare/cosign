@@ -9,6 +9,12 @@ primary_region = "sjc"
 
 [build]
 
+# The devnet relay is not the canonical marketing host. Redirect its landing
+# paths (/, /privacy, /favicon.svg, /assets/*) to the single canonical site;
+# its RPC/API role for devnet Solana is unaffected.
+[env]
+  COSIGN_LANDING_REDIRECT = "https://cosign.hackshare.com"
+
 [http_service]
   internal_port = 8080
   force_https = true

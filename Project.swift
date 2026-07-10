@@ -40,6 +40,8 @@ func appBuildSettings(
     appIconName: String,
     relayURL: String = "",
     environmentName: String = "",
+    devnetRelayURL: String = "",
+    mainnetRelayURL: String = "",
     demoModeProfile: String? = nil
 ) -> Settings {
     let baseOverrides: SettingsDictionary = [
@@ -49,6 +51,8 @@ func appBuildSettings(
         "COSIGN_DEMO_MODE_PROFILE": .string(demoModeProfile ?? ""),
         "COSIGN_RELAY_URL": .string(relayURL),
         "COSIGN_ENV": .string(environmentName),
+        "COSIGN_DEVNET_RELAY_URL": .string(devnetRelayURL),
+        "COSIGN_MAINNET_RELAY_URL": .string(mainnetRelayURL),
         "EMBED_BUILD_CLAIM": "NO"
     ]
     let base = TargetFactory.appBuildSettings.merging(baseOverrides)
@@ -85,6 +89,8 @@ func appTarget(
     appIconName: String,
     relayURL: String = "",
     environmentName: String = "",
+    devnetRelayURL: String = "",
+    mainnetRelayURL: String = "",
     demoModeProfile: String? = nil
 ) -> Target {
     .target(
@@ -105,6 +111,8 @@ func appTarget(
             appIconName: appIconName,
             relayURL: relayURL,
             environmentName: environmentName,
+            devnetRelayURL: devnetRelayURL,
+            mainnetRelayURL: mainnetRelayURL,
             demoModeProfile: demoModeProfile
         )
     )
@@ -244,32 +252,19 @@ let project = Project(
         // because the CosignCore Swift module re-exports types from the
         // cosign_coreFFI Clang module, and Swift requires that consumer targets
         // can resolve all transitively-referenced modules at compile time.
-        // Each non-demo build is pinned to one environment's relay — the app is a
-        // thin, verifiable client of that single endpoint. Replace the relayURL
-        // values below with the deployed relay hosts before shipping.
-        // TEMPORARY: the mainnet-bundle-id `Cosign` target ships devnet content for
-        // the first TestFlight build (to claim com.hackshare.cosign now). It uses
-        // the ribboned devnet icon so testers can tell. Switch relayURL /
-        // environmentName / appIconName back to mainnet (+ "AppIcon") when shipping
-        // mainnet; `CosignDevnet` (com.hackshare.cosign.devnet) is the separate
-        // devnet release.
+        // Cosign (com.hackshare.cosign): the combo app. Carries both relay URLs; the
+        // user switches devnet/mainnet at runtime (default per install migration). The
+        // in-app network indicator shows which network is active, so the icon is neutral.
         appTarget(
             name: "Cosign",
             bundleId: TargetFactory.bundleIdPrefix,
             displayName: "Cosign",
             developmentURLScheme: "cosign-dev",
-            appIconName: "AppIconDevnet",
-            relayURL: "https://cosign-relay-devnet.fly.dev",
-            environmentName: "devnet"
-        ),
-        appTarget(
-            name: "CosignDevnet",
-            bundleId: "\(TargetFactory.bundleIdPrefix).devnet",
-            displayName: "Cosign Devnet",
-            developmentURLScheme: "cosign-devnet-dev",
-            appIconName: "AppIconDevnet",
-            relayURL: "https://cosign-relay-devnet.fly.dev",
-            environmentName: "devnet"
+            appIconName: "AppIcon",
+            relayURL: "https://devnet-cosign.hackshare.com",
+            environmentName: "devnet",
+            devnetRelayURL: "https://devnet-cosign.hackshare.com",
+            mainnetRelayURL: "https://cosign.hackshare.com"
         ),
         appTarget(
             name: "CosignDemo",

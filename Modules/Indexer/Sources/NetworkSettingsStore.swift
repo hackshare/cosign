@@ -1,3 +1,4 @@
+import Core
 import Foundation
 import Observation
 
@@ -15,8 +16,17 @@ public final class NetworkSettingsStore {
 
     public let networkHealth = NetworkHealth()
 
+    /// The active Solana network. Switch with `switch(to:)`.
+    public private(set) var selectedNetwork: Network
+
+    /// True when a custom relay URL is saved to the Keychain, causing
+    /// `environment` to route through that URL rather than the network default.
+    public private(set) var hasCustomRelayOverride: Bool
+
     private let rpcURLKeychain: SecureNetworkURLKeychain
     private let defaultRPCURL: URL
+    private let networkDefaults: UserDefaults
+    private static let selectedNetworkKey = "cosign.selectedNetwork"
 
     public static var defaultRPCURL: URL {
         CosignBuildEnvironment.current().relayURL ?? IndexerEnvironment.devnetRPCURL
@@ -26,14 +36,17 @@ public final class NetworkSettingsStore {
         self.init(rpcURLKeychain: .rpcURL)
     }
 
-    init(rpcURLKeychain: SecureNetworkURLKeychain) {
+    init(rpcURLKeychain: SecureNetworkURLKeychain, networkDefaults: UserDefaults = .standard) {
         let fallback = NetworkSettingsStore.defaultRPCURL
         defaultRPCURL = fallback
         self.rpcURLKeychain = rpcURLKeychain
+        self.networkDefaults = networkDefaults
 
+        var hadKeychainURL = false
         do {
             if let storedRPCURL = try rpcURLKeychain.load() {
                 rpcURL = try NetworkSettingsStore.validatedRPCURL(from: storedRPCURL)
+                hadKeychainURL = true
             } else {
                 rpcURL = fallback
             }
@@ -41,29 +54,69 @@ public final class NetworkSettingsStore {
             rpcURL = fallback
             loadErrorMessage = "Failed to load the saved relay endpoint from the Keychain."
         }
+        hasCustomRelayOverride = hadKeychainURL
+
+        // Use the persisted network if one exists; otherwise default to .mainnet
+        // until resolveInitialNetwork(_:) is called with signer context.
+        let stored = networkDefaults.string(forKey: NetworkSettingsStore.selectedNetworkKey)
+            .flatMap(Network.init(rawValue:))
+        selectedNetwork = stored ?? .mainnet
+        if !hadKeychainURL {
+            rpcURL = NetworkConfig.config(for: selectedNetwork, build: .current()).relayURL
+        }
     }
 
-    /// Always a relay client. RPC flows through the relay's Solana passthrough,
-    /// live updates through its `/ws` proxy, pricing/decoding through cosign/v1.
+    /// Call once after the SwiftData container is available. If no network
+    /// preference has been persisted yet, computes the migration default
+    /// (mainnet for fresh installs, devnet for installs with existing signers)
+    /// and persists it.
+    public func resolveInitialNetwork(hasExistingSigners: Bool) {
+        guard networkDefaults.string(forKey: Self.selectedNetworkKey) == nil else { return }
+        let resolved = Self.defaultNetwork(hasExistingSigners: hasExistingSigners, stored: nil)
+        selectedNetwork = resolved
+        networkDefaults.set(resolved.rawValue, forKey: Self.selectedNetworkKey)
+        if !hasCustomRelayOverride {
+            rpcURL = NetworkConfig.config(for: resolved, build: .current()).relayURL
+        }
+    }
+
+    /// Migration default: stored preference wins; otherwise mainnet for fresh
+    /// installs and devnet for installs that already have signers.
+    public static func defaultNetwork(hasExistingSigners: Bool, stored: Network?) -> Network {
+        if let stored { return stored }
+        return hasExistingSigners ? .devnet : .mainnet
+    }
+
+    /// Always a relay client. When a custom relay URL is active, routes through
+    /// that URL; otherwise derives everything from `selectedNetwork`.
+    /// In both branches, `explorerRPCURL` and airdrop follow `selectedNetwork`.
     public var environment: IndexerEnvironment {
-        IndexerEnvironment(
-            rpcURL: rpcURL,
-            relay: HTTPRelayClient(
-                baseURL: rpcURL,
-                capabilities: RelayCapability.enhancedFeatures,
-                healthReporter: networkHealth.reporter()
-            ),
-            webSocketURL: SolanaWebSocketEndpoint.relayWebSocketURL(for: rpcURL),
-            explorerRPCURL: explorerRPCURL
-        )
+        let cfg = NetworkConfig.config(for: selectedNetwork, build: .current())
+        if hasCustomRelayOverride {
+            return IndexerEnvironment(
+                rpcURL: rpcURL,
+                relay: HTTPRelayClient(
+                    baseURL: rpcURL,
+                    capabilities: RelayCapability.enhancedFeatures,
+                    healthReporter: networkHealth.reporter()
+                ),
+                webSocketURL: SolanaWebSocketEndpoint.relayWebSocketURL(for: rpcURL),
+                explorerRPCURL: cfg.explorerRPCURL,
+                supportsAirdrop: cfg.supportsAirdrop
+            )
+        }
+        return IndexerEnvironment.forNetwork(selectedNetwork, healthReporter: networkHealth.reporter())
     }
 
-    /// Cluster hint for Explorer links — derived from the build env, since the
-    /// relay host itself doesn't reveal the cluster.
-    private var explorerRPCURL: URL {
-        CosignBuildEnvironment.current().environmentName.lowercased() == "devnet"
-            ? IndexerEnvironment.devnetRPCURL
-            : IndexerEnvironment.mainnetRPCURL
+    /// Switches the active network, drops any custom relay override, and
+    /// persists the new preference. No-op if already on the requested network.
+    public func `switch`(to network: Network) {
+        guard network != selectedNetwork else { return }
+        selectedNetwork = network
+        networkDefaults.set(network.rawValue, forKey: Self.selectedNetworkKey)
+        try? rpcURLKeychain.delete()
+        hasCustomRelayOverride = false
+        rpcURL = NetworkConfig.config(for: network, build: .current()).relayURL
     }
 
     public var redactedRPCURLString: String {
@@ -78,13 +131,15 @@ public final class NetworkSettingsStore {
         let url = try NetworkSettingsStore.validatedRPCURL(from: value)
         try rpcURLKeychain.save(url.absoluteString)
         rpcURL = url
+        hasCustomRelayOverride = true
         pendingRPCURLDraft = nil
         loadErrorMessage = nil
     }
 
     public func resetRPCURL() throws {
         try rpcURLKeychain.delete()
-        rpcURL = defaultRPCURL
+        rpcURL = NetworkConfig.config(for: selectedNetwork, build: .current()).relayURL
+        hasCustomRelayOverride = false
         pendingRPCURLDraft = nil
         loadErrorMessage = nil
     }

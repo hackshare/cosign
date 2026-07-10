@@ -1,12 +1,11 @@
 import SwiftUI
 
 enum EnvBadgeTone {
-    case neutral
     case demo
 }
 
-/// A build-environment pill shown beside the wordmark. Never rendered on
-/// mainnet — see `SignersListView.envBadge` for the resolution.
+/// A build-environment pill shown beside the wordmark. Only rendered in demo builds;
+/// real-network builds use `NetworkIndicator` instead.
 struct EnvBadge: View {
     let label: String
     let tone: EnvBadgeTone
@@ -27,8 +26,6 @@ struct EnvBadge: View {
 
     private var foreground: Color {
         switch tone {
-        case .neutral:
-            CosignTheme.inkDim
         case .demo:
             CosignTheme.riskAmber
         }
@@ -36,8 +33,6 @@ struct EnvBadge: View {
 
     private var background: Color {
         switch tone {
-        case .neutral:
-            CosignTheme.surface2
         case .demo:
             CosignTheme.accentWash
         }

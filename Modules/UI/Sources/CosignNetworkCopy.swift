@@ -20,6 +20,21 @@ public extension CosignCopy.Network {
     static let offlineStateName = String(localized: "Offline", bundle: .module)
     static let offlineStateDetail = String(localized: "Can't reach the network. Showing saved data.", bundle: .module)
 
+    static let networkSelectionSection = String(localized: "Active network", bundle: .module)
+    static let mainnetRowSubtitle = String(localized: "Real funds", bundle: .module)
+    static let devnetRowSubtitle = String(localized: "Test network", bundle: .module)
+    static let switchToMainnetTitle = String(localized: "Switch to mainnet?", bundle: .module)
+    static let switchToMainnetMessage = String(
+        localized: "Transactions on mainnet move real funds. Decode every action before you sign.",
+        bundle: .module
+    )
+    static let switchToMainnetConfirm = String(localized: "Switch to mainnet", bundle: .module)
+    static let switchToMainnetCancel = String(localized: "Stay on devnet", bundle: .module)
+    static let switchHelper = String(
+        localized: "Switching to mainnet asks you to confirm. Devnet switches immediately.",
+        bundle: .module
+    )
+
     static let selfHostedRowTitle = String(localized: "Use a self-hosted relay", bundle: .module)
     static let selfHostedRowSubtitle = String(
         localized: "Advanced · point Cosign at your own relay build",

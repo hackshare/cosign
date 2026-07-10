@@ -441,6 +441,12 @@ final class SignerFlowUITests: DemoWalkthroughUITestCase {
         tapButton("settings-network-row")
         waitForScreen("screen.network-settings")
         capture("36-network-settings")
+        tapButton("network-row-devnet")
+        capture("90-network-devnet-selected")
+        tapButton("network-row-mainnet")
+        waitForButton("Switch to mainnet")
+        capture("91-caution-switch-mainnet")
+        tapButton("Stay on devnet")
 
         launchDemo(profile: "appstore")
         waitForScreen("screen.signers")
@@ -621,15 +627,16 @@ final class SigningTallyUITests: DemoWalkthroughUITestCase {
 // MARK: - Devnet live-relay walkthrough
 
 final class DevnetWalkthroughUITests: DemoWalkthroughUITestCase {
-    /// Drives the real CosignDevnet build against the deployed relay + a live
-    /// devnet fixture. Seeded by the fixture member's keypair, passed in via
+    /// Drives the combo Cosign build against the deployed relay + a live devnet
+    /// fixture. Seeded by the fixture member's keypair, passed in via
     /// `TEST_RUNNER_COSIGN_DEVNET_SEED` (hex of a 64-byte keypair) so no secret
-    /// is committed. The on-chain co-sign at the end is best-effort.
+    /// is committed. The app's migration heuristic resolves to devnet when
+    /// signers exist. The on-chain co-sign at the end is best-effort.
     func testDevnetWalkthroughAgainstLiveRelay() throws {
         let seed = ProcessInfo.processInfo.environment["COSIGN_DEVNET_SEED"] ?? ""
         try XCTSkipIf(seed.isEmpty, "set TEST_RUNNER_COSIGN_DEVNET_SEED to a 64-byte keypair hex")
 
-        app = XCUIApplication(bundleIdentifier: "com.hackshare.cosign.devnet")
+        app = XCUIApplication(bundleIdentifier: "com.hackshare.cosign")
         app.launchArguments = ["--cosign-seed-signer=\(seed)", "--ui-testing"]
         app.launch()
 

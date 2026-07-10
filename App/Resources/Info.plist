@@ -33,6 +33,10 @@
 #endif
     <key>CosignRelayURL</key>
     <string>$(COSIGN_RELAY_URL)</string>
+    <key>CosignDevnetRelayURL</key>
+    <string>$(COSIGN_DEVNET_RELAY_URL)</string>
+    <key>CosignMainnetRelayURL</key>
+    <string>$(COSIGN_MAINNET_RELAY_URL)</string>
     <key>CosignEnvironment</key>
     <string>$(COSIGN_ENV)</string>
     <key>CFBundleShortVersionString</key>

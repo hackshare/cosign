@@ -86,10 +86,11 @@ struct NetworkSettingsStoreTests {
             )
         )
         let deepLink = try makeNetworkSettingsLink(path: "/rpc", url: "https://devnet.helius-rpc.com/?api-key=secret")
+        let rpcURLBeforeDraft = store.rpcURL
 
         try store.prepareRPCURLUpdate(from: deepLink)
 
-        #expect(store.rpcURL == NetworkSettingsStore.defaultRPCURL)
+        #expect(store.rpcURL == rpcURLBeforeDraft)
         #expect(store.pendingRPCURLDraft?.rpcURL.absoluteString == "https://devnet.helius-rpc.com/?api-key=secret")
         #expect(savedValue == nil)
     }

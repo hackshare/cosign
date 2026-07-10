@@ -51,3 +51,4 @@ TESTFLIGHT_NOTES.md
 
 # Local build-claim signing key (never commit)
 .build-claim/
+.env.mainnet

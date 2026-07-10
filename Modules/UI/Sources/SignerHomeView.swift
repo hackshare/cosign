@@ -12,6 +12,7 @@ public struct SignerHomeView: View {
     @Environment(\.indexerEnvironment) var indexerEnvironment
     @Environment(\.squadsService) var squadsService
     @Environment(NetworkHealth.self) var networkHealth: NetworkHealth?
+    @Environment(NetworkSettingsStore.self) private var networkSettings: NetworkSettingsStore?
     @Query(sort: \RegisteredSigner.createdAt, order: .forward)
     private var signers: [RegisteredSigner]
 
@@ -270,8 +271,7 @@ public struct SignerHomeView: View {
         if demoMode?.usesMarketingNetworkFooter == true {
             return "mainnet"
         }
-        let buildEnvironment = CosignBuildEnvironment.current().environmentName
-        return buildEnvironment.isEmpty ? "network" : buildEnvironment
+        return networkSettings?.selectedNetwork.rawValue ?? "network"
     }
 
     private var footerStatus: NetworkHealthStatus {
