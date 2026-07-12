@@ -46,7 +46,7 @@ public struct SelfHostedRelayView: View {
                     resetEndpointURL()
                 }
                 .buttonStyle(CosignButtonStyle(kind: .destructive))
-                .disabled(networkSettings.rpcURL == NetworkSettingsStore.defaultRPCURL)
+                .disabled(!networkSettings.hasCustomRelayOverride)
             }
 
             if let loadErrorMessage = networkSettings.loadErrorMessage {

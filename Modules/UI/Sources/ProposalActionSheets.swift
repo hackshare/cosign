@@ -11,6 +11,7 @@ struct ProposalSigningSheet: View {
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @Environment(\.squadsService) private var squadsService
+    @Environment(NetworkSettingsStore.self) private var networkSettings: NetworkSettingsStore?
     @State private var confirmationText = ""
     @State private var footerHeight = CosignLayout.estimatedSheetStickyFooterHeight
     @State private var frozenSolPrice: Double?
@@ -28,7 +29,7 @@ struct ProposalSigningSheet: View {
                 approvalWouldReachThreshold: approvalWouldReachThreshold
             )
 
-            ProposalSigningContextCard(items: signingContextItems)
+            ProposalSigningContextCard(network: networkSettings?.selectedNetwork, items: signingContextItems)
 
             hardwareContext
 
@@ -175,63 +176,48 @@ struct ProposalSigningSheet: View {
             detail: feeDetail
         )
 
+        var items: [ProposalSigningContextItem] = [signerItem]
+
         switch request.action {
         case .approveAndExecute:
-            return [
-                signerItem,
-                ProposalSigningContextItem(
-                    label: CosignCopy.ProposalSigning.actionOneLabel,
-                    value: CosignCopy.ProposalSigning.approveProposalTitle(
-                        proposalIndex: proposal?.transactionIndex
-                    ),
-                    detail: CosignCopy.ProposalSigning.approvalActionDetail
+            items.append(ProposalSigningContextItem(
+                label: CosignCopy.ProposalSigning.actionOneLabel,
+                value: CosignCopy.ProposalSigning.approveProposalTitle(
+                    proposalIndex: proposal?.transactionIndex
                 ),
-                ProposalSigningContextItem(
-                    label: CosignCopy.ProposalSigning.actionTwoLabel,
-                    value: CosignCopy.ProposalSigning.executeActionTitle(actionTitle: reviewAction.title),
-                    detail: CosignCopy.ProposalSigning.executeAfterApprovalDetail
-                ),
-                feeItem
-            ]
+                detail: CosignCopy.ProposalSigning.approvalActionDetail
+            ))
+            items.append(ProposalSigningContextItem(
+                label: CosignCopy.ProposalSigning.actionTwoLabel,
+                value: CosignCopy.ProposalSigning.executeActionTitle(actionTitle: reviewAction.title),
+                detail: CosignCopy.ProposalSigning.executeAfterApprovalDetail
+            ))
         case .execute:
-            return [
-                signerItem,
-                ProposalSigningContextItem(
-                    label: CosignCopy.ProposalSigning.approvedByLabel,
-                    value: approvalSummary
-                ),
-                feeItem
-            ]
+            items.append(ProposalSigningContextItem(
+                label: CosignCopy.ProposalSigning.approvedByLabel,
+                value: approvalSummary
+            ))
         case .approve:
-            return [
-                signerItem,
-                ProposalSigningContextItem(
-                    label: CosignCopy.ProposalSigning.afterSigningLabel,
-                    value: afterSigningText,
-                    detail: CosignCopy.ProposalSigning.approvalActionDetail
-                ),
-                feeItem
-            ]
+            items.append(ProposalSigningContextItem(
+                label: CosignCopy.ProposalSigning.afterSigningLabel,
+                value: afterSigningText,
+                detail: CosignCopy.ProposalSigning.approvalActionDetail
+            ))
         case .reject:
-            return [
-                signerItem,
-                ProposalSigningContextItem(
-                    label: CosignCopy.ProposalSigning.effectLabel,
-                    value: CosignCopy.ProposalSigning.rejectEffectValue
-                ),
-                feeItem
-            ]
+            items.append(ProposalSigningContextItem(
+                label: CosignCopy.ProposalSigning.effectLabel,
+                value: CosignCopy.ProposalSigning.rejectEffectValue
+            ))
         case .cancel:
-            return [
-                signerItem,
-                ProposalSigningContextItem(
-                    label: CosignCopy.ProposalSigning.effectLabel,
-                    value: CosignCopy.ProposalSigning.cancelEffectValue,
-                    detail: CosignCopy.ProposalSigning.cancelEffectDetail
-                ),
-                feeItem
-            ]
+            items.append(ProposalSigningContextItem(
+                label: CosignCopy.ProposalSigning.effectLabel,
+                value: CosignCopy.ProposalSigning.cancelEffectValue,
+                detail: CosignCopy.ProposalSigning.cancelEffectDetail
+            ))
         }
+
+        items.append(feeItem)
+        return items
     }
 
     private var approvalSummary: String {

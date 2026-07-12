@@ -13,6 +13,7 @@ public struct SignersListView: View {
     @Environment(\.cosignDemoMode) private var demoMode
     @Environment(\.squadsService) private var squadsService
     @Environment(NetworkHealth.self) private var networkHealth: NetworkHealth?
+    @Environment(NetworkSettingsStore.self) private var networkSettings: NetworkSettingsStore?
     @Query(sort: \RegisteredSigner.createdAt, order: .forward)
     private var signers: [RegisteredSigner]
 
@@ -30,9 +31,7 @@ public struct SignersListView: View {
         CosignAnchoredFooterScreen {
             HStack {
                 CosignWordmark()
-                if let env = envBadge {
-                    EnvBadge(label: env.label, tone: env.tone)
-                }
+                headerIndicator
                 Spacer()
                 HStack(spacing: 2) {
                     CosignIconButton(glyph: .search) {
@@ -298,8 +297,7 @@ private extension SignersListView {
         if demoMode?.usesMarketingNetworkFooter == true {
             return "mainnet"
         }
-        let buildEnvironment = CosignBuildEnvironment.current().environmentName
-        return buildEnvironment.isEmpty ? "network" : buildEnvironment
+        return networkSettings?.selectedNetwork.rawValue ?? "network"
     }
 
     var footerStatus: NetworkHealthStatus {
@@ -309,16 +307,13 @@ private extension SignersListView {
         return networkHealth?.status ?? .healthy
     }
 
-    var envBadge: (label: String, tone: EnvBadgeTone)? {
+    @ViewBuilder var headerIndicator: some View {
         if let demoMode {
-            return demoMode.usesMarketingNetworkFooter ? nil : ("DEMO", .demo)
-        }
-        let environment = CosignBuildEnvironment.current().environmentName.lowercased()
-        switch environment {
-        case "", "mainnet", "mainnet-beta":
-            return nil
-        default:
-            return (environment.uppercased(), .neutral)
+            if !demoMode.usesMarketingNetworkFooter {
+                EnvBadge(label: CosignCopy.Common.demoBadgeLabel, tone: .demo)
+            }
+        } else if let net = networkSettings?.selectedNetwork {
+            NetworkIndicator(network: net)
         }
     }
 }

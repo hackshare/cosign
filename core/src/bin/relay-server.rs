@@ -173,6 +173,11 @@ struct RelayConfig {
     explorer_rpc_url: Option<String>,
     rpc_allowed_methods: BTreeSet<String>,
     rate_limits: RelayRateLimits,
+    // When set, GET requests for the marketing paths return a 301 to this base
+    // instead of serving the landing page, so a non-canonical host (the devnet
+    // relay) points visitors at the single canonical site without affecting its
+    // RPC/API role.
+    landing_redirect: Option<String>,
 }
 
 impl RelayConfig {
@@ -199,6 +204,10 @@ impl RelayConfig {
                 .filter(|value| !value.trim().is_empty()),
             rpc_allowed_methods: rpc_allowed_methods_from_env(),
             rate_limits: RelayRateLimits::from_env()?,
+            landing_redirect: env::var("COSIGN_LANDING_REDIRECT")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .map(|value| value.trim_end_matches('/').to_string()),
         })
     }
 
@@ -696,6 +705,13 @@ fn handle_request_with_client(
 
     if request.method == "GET" && request.path == "/_health" {
         return health_response();
+    }
+
+    if request.method == "GET"
+        && let Some(base) = config.landing_redirect.as_deref()
+        && is_landing_path(&request.path)
+    {
+        return redirect_response(format!("{base}{}", request.path));
     }
 
     #[cfg(feature = "landing")]
@@ -5445,7 +5461,32 @@ fn json_response(status: u16, body: Value) -> HttpResponse {
     }
 }
 
+fn redirect_response(location: String) -> HttpResponse {
+    HttpResponse {
+        status: 301,
+        reason: reason_phrase(301),
+        content_type: "text/plain; charset=utf-8",
+        body: location.into_bytes(),
+    }
+}
+
+fn is_landing_path(path: &str) -> bool {
+    matches!(path, "/" | "/privacy" | "/favicon.svg") || path.starts_with("/assets/")
+}
+
 fn write_response(stream: &mut impl Write, response: HttpResponse) -> Result<(), RelayError> {
+    // A 3xx response carries its Location target in `body` (see redirect_response).
+    // No non-redirect response uses a 3xx status, so this branch is unambiguous.
+    if matches!(response.status, 301 | 302 | 307 | 308) {
+        let location = String::from_utf8_lossy(&response.body);
+        write!(
+            stream,
+            "HTTP/1.1 {} {}\r\nLocation: {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            response.status, response.reason, location
+        )?;
+        stream.flush()?;
+        return Ok(());
+    }
     write!(
         stream,
         "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -5462,6 +5503,7 @@ fn write_response(stream: &mut impl Write, response: HttpResponse) -> Result<(),
 fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        301 => "Moved Permanently",
         400 => "Bad Request",
         401 => "Unauthorized",
         403 => "Forbidden",
@@ -5527,6 +5569,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: methods,
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         }
     }
 
@@ -5930,6 +5973,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
 
         assert!(matches!(config.rpc_url(), Err(RelayError::BadRequest(_))));
@@ -5945,6 +5989,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
 
         assert_eq!(config.rpc_url().expect("rpc url"), "http://127.0.0.1:8899");
@@ -5973,6 +6018,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -5997,6 +6043,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6016,6 +6063,41 @@ mod tests {
         );
     }
 
+    #[test]
+    fn landing_redirect_moves_marketing_paths_only() {
+        let mut config = rpc_test_config(default_rpc_allowed_methods());
+        config.landing_redirect = Some("https://cosign.hackshare.com".into());
+
+        let get = |path: &str| HttpRequest {
+            method: "GET".into(),
+            path: path.into(),
+            query: None,
+            body: Vec::new(),
+            host: None,
+            websocket_key: None,
+        };
+
+        let root = handle_request_with_client(&get("/"), &config, None);
+        assert_eq!(root.status, 301);
+        assert_eq!(
+            std::str::from_utf8(&root.body).expect("utf8"),
+            "https://cosign.hackshare.com/"
+        );
+
+        let privacy = handle_request_with_client(&get("/privacy"), &config, None);
+        assert_eq!(privacy.status, 301);
+        assert_eq!(
+            std::str::from_utf8(&privacy.body).expect("utf8"),
+            "https://cosign.hackshare.com/privacy"
+        );
+
+        // The relay's API role is untouched by the redirect.
+        assert_eq!(
+            handle_request_with_client(&get("/_health"), &config, None).status,
+            200
+        );
+    }
+
     #[cfg(feature = "landing")]
     #[test]
     fn get_privacy_serves_page_when_enabled() {
@@ -6026,6 +6108,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6054,6 +6137,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6078,6 +6162,7 @@ mod tests {
             explorer_rpc_url: None,
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6153,6 +6238,7 @@ mod tests {
             explorer_rpc_url: Some("https://relay.cosign.example".into()),
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
+            landing_redirect: None,
         };
         let response = capabilities_response(&config, Some("relay.cosign.example"));
         let body: Value = serde_json::from_slice(&response.body).expect("json");

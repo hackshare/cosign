@@ -13,6 +13,12 @@ extension CosignCopy {
             String(localized: "\(environment) build", bundle: .module)
         }
 
+        static func networkIndicatorAccessibility(_ networkName: String) -> String {
+            String(localized: "\(networkName) network", bundle: .module)
+        }
+
+        static let demoBadgeLabel = String(localized: "DEMO", bundle: .module)
+
         static let back = String(localized: "Back", bundle: .module)
         static let cancel = String(localized: "Cancel", bundle: .module)
         static let copy = String(localized: "Copy", bundle: .module)

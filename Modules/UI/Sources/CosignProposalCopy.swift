@@ -18,6 +18,9 @@ extension CosignCopy {
         static let approvalActionDetail = String(localized: "Counts as 1 approval", bundle: .module)
         static let executeAfterApprovalDetail = String(localized: "Auto-broadcasts on success", bundle: .module)
         static let networkFeeEstimateDetail = String(localized: "Estimate · paid by the signer", bundle: .module)
+        static let networkLabel = String(localized: "Network", bundle: .module)
+        static let mainnetSigningDetail = String(localized: "Real funds", bundle: .module)
+        static let devnetSigningDetail = String(localized: "Test network", bundle: .module)
 
         static func priceAsOf(_ date: Date) -> String {
             String(localized: "price as of \(date.formatted(.dateTime.hour().minute()))", bundle: .module)

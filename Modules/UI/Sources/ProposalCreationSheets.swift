@@ -44,6 +44,7 @@ struct ProposalCreationReviewSheet: View {
     let deviceStatusMessage: String?
     let onCancel: () -> Void
     let onConfirm: () -> Void
+    @Environment(NetworkSettingsStore.self) private var networkSettings: NetworkSettingsStore?
     @State private var footerHeight = CosignLayout.estimatedSheetStickyFooterHeight
 
     var body: some View {
@@ -72,6 +73,9 @@ struct ProposalCreationReviewSheet: View {
                 CosignSectionTitle(title: CosignCopy.ProposalCreation.signerSectionTitle)
                 CosignCard {
                     VStack(spacing: 0) {
+                        if let net = networkSettings?.selectedNetwork {
+                            ProposalNetworkContextRow(network: net)
+                        }
                         CosignKeyValueRow(
                             label: CosignCopy.ProposalCreation.signerLabel,
                             value: request.signer.label

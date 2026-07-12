@@ -11,15 +11,16 @@ struct CosignApp: App {
     let demoMode: CosignDemoMode?
     let demoFixture: CosignDemoFixture?
 
-    @State private var networkSettings = NetworkSettingsStore()
+    @State private var networkSettings: NetworkSettingsStore
+    @State private var squadsService: SquadsService?
 
     init() {
         let demoMode = CosignDemoMode.launchConfiguration()
         self.demoMode = demoMode
-        demoFixture = demoMode.map { demoMode in
+        demoFixture = demoMode.map { mode in
             CosignDemoFixture.profile(
-                demoMode.profile,
-                memberAddresses: CosignDemoSigners.memberAddresses(for: demoMode.profile)
+                mode.profile,
+                memberAddresses: CosignDemoSigners.memberAddresses(for: mode.profile)
             )
         }
 
@@ -28,26 +29,42 @@ struct CosignApp: App {
         } catch {
             fatalError("Failed to initialize SwiftData container: \(error)")
         }
+
+        let store = NetworkSettingsStore()
+        if demoMode == nil {
+            let signerCount = (try? container.mainContext.fetchCount(FetchDescriptor<RegisteredSigner>())) ?? 0
+            store.resolveInitialNetwork(hasExistingSigners: signerCount > 0)
+        }
+        _networkSettings = State(initialValue: store)
     }
 
     var body: some Scene {
         WindowGroup {
             let environment = demoFixture.map(demoEnvironment) ?? networkSettings.environment
-
+            let service = squadsService ?? makeService(environment)
             ContentView()
                 .preferredColorScheme(.dark)
                 .environment(networkSettings)
                 .environment(networkSettings.networkHealth)
                 .environment(\.indexerEnvironment, environment)
-                .environment(\.squadsService, SquadsService(
-                    environment: environment,
-                    demoFixture: demoFixture,
-                    demoBroadcastMode: demoBroadcastMode(for: demoMode),
-                    healthReporter: networkSettings.networkHealth.reporter()
-                ))
+                .environment(\.squadsService, service)
                 .environment(\.cosignDemoMode, demoMode)
+                .onAppear { if squadsService == nil { squadsService = service } }
+                .onChange(of: networkSettings.selectedNetwork) { _, _ in
+                    guard demoFixture == nil else { return }
+                    squadsService = makeService(networkSettings.environment)
+                }
         }
         .modelContainer(container)
+    }
+
+    private func makeService(_ environment: IndexerEnvironment) -> SquadsService {
+        SquadsService(
+            environment: environment,
+            demoFixture: demoFixture,
+            demoBroadcastMode: demoBroadcastMode(for: demoMode),
+            healthReporter: networkSettings.networkHealth.reporter()
+        )
     }
 
     private func demoEnvironment(fixture: CosignDemoFixture) -> IndexerEnvironment {

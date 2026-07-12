@@ -18,6 +18,8 @@ public struct NetworkSettingsView: View {
                     .foregroundStyle(CosignTheme.ink)
             }
 
+            NetworkSwitcherSection()
+
             RelayConnectionStatusBlock(status: status) {
                 networkSettings.networkHealth.retry()
             }
@@ -50,7 +52,7 @@ public struct NetworkSettingsView: View {
             VStack(spacing: 0) {
                 CosignKeyValueRow(
                     label: CosignCopy.Network.clusterLabel,
-                    value: CosignCopy.Network.relayClusterName(environmentName)
+                    value: CosignCopy.Network.relayClusterName(networkSettings.selectedNetwork.rawValue)
                 )
                 CosignKeyValueRow(
                     label: CosignCopy.Network.hostLabel,
@@ -98,10 +100,6 @@ public struct NetworkSettingsView: View {
             }
             .accessibilityIdentifier("network-self-hosted-row")
         }
-    }
-
-    private var environmentName: String {
-        CosignBuildEnvironment.current().environmentName
     }
 }
 

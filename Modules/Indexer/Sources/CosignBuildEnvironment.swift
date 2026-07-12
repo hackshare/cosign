@@ -8,17 +8,24 @@ import Foundation
 public struct CosignBuildEnvironment: Sendable {
     public let relayURL: URL?
     public let environmentName: String
+    public let devnetRelayURL: URL?
+    public let mainnetRelayURL: URL?
 
     public static func current(
         infoDictionary: [String: Any] = Bundle.main.infoDictionary ?? [:]
     ) -> CosignBuildEnvironment {
-        let rawURL = (infoDictionary["CosignRelayURL"] as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        func url(_ key: String) -> URL? {
+            let raw = (infoDictionary[key] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return raw.isEmpty ? nil : URL(string: raw)
+        }
         let environment = (infoDictionary["CosignEnvironment"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return CosignBuildEnvironment(
-            relayURL: rawURL.isEmpty ? nil : URL(string: rawURL),
-            environmentName: environment
+            relayURL: url("CosignRelayURL"),
+            environmentName: environment,
+            devnetRelayURL: url("CosignDevnetRelayURL"),
+            mainnetRelayURL: url("CosignMainnetRelayURL")
         )
     }
 }
