@@ -26,4 +26,14 @@ fi
 echo "==> UI copy guard"
 ruby scripts/check-ui-copy.rb
 
+echo "==> Info.plist privacy usage descriptions"
+# Signing keys live in the Keychain behind biometric access control, so reading
+# them to sign triggers Face ID. iOS terminates the app under TCC if the usage
+# description is absent (this shipped once). Fail the lint if it goes missing.
+grep -q "NSFaceIDUsageDescription" App/Resources/Info.plist || {
+    echo "ERROR: App/Resources/Info.plist is missing NSFaceIDUsageDescription." >&2
+    echo "The app uses biometric Keychain access and will crash under TCC without it." >&2
+    exit 1
+}
+
 echo "==> lint complete"

@@ -51,6 +51,11 @@
     <array>
         <string>UIInterfaceOrientationPortrait</string>
     </array>
+    <!-- Required: signing keys live in the Keychain behind biometric access
+         control, so reading them to sign triggers Face ID. Without this key iOS
+         terminates the app (TCC) on the first biometric prompt. -->
+    <key>NSFaceIDUsageDescription</key>
+    <string>Cosign uses Face ID to protect your on-device signing keys and to confirm it's you before signing a transaction.</string>
     <!-- Only standard exempt crypto (ed25519 signatures, HTTPS/TLS), so declare
          export-compliance exempt and skip the per-upload App Encryption prompt. -->
     <key>ITSAppUsesNonExemptEncryption</key>

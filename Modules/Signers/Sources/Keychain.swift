@@ -96,6 +96,13 @@ enum Keychain {
         return mnemonic
     }
 
+    /// Reads the signing key. This triggers Face ID (the item is stored behind a
+    /// biometric ACL) and blocks the calling thread until the prompt resolves, so
+    /// it MUST run off the main thread and only from a user-initiated action
+    /// (signing, revealing a secret). Never call it at launch or inside a SwiftUI
+    /// view body: a synchronous biometric read during scene-create can exhaust the
+    /// launch watchdog and kill the app. For presence checks, use
+    /// `privateKeyExists(account:)`, which never prompts.
     static func loadPrivateKey(account: String, prompt: String) throws -> Data {
         let context = LAContext()
         context.localizedReason = prompt
@@ -114,6 +121,22 @@ enum Keychain {
             throw KeychainError.osStatus(status)
         }
         return data
+    }
+
+    /// Whether a private key exists for `account`, WITHOUT reading its data or
+    /// evaluating the biometric ACL, so it never prompts Face ID. Safe to call at
+    /// launch or inside a view body. Use this for presence checks; reading the key
+    /// itself (`loadPrivateKey`) must stay on user-initiated actions.
+    static func privateKeyExists(account: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: account,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnData as String: false,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip
+        ]
+        let status = SecItemCopyMatching(query as CFDictionary, nil)
+        return status == errSecSuccess || status == errSecInteractionNotAllowed
     }
 
     static func deletePrivateKey(account: String) throws {
