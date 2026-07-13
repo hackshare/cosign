@@ -3,7 +3,7 @@ import SwiftUI
 
 enum AboutLinks {
     static let repository = URL(string: "https://github.com/hackshare/cosign")!
-    static let privacy = URL(string: "https://devnet-cosign.hackshare.com/privacy")!
+    static let privacy = URL(string: "https://cosign.hackshare.com/privacy")!
 }
 
 public struct AboutCosignView: View {
