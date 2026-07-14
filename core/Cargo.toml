@@ -44,7 +44,7 @@ solana-client = "1.18"
 solana-rpc-client = "1.18"
 solana-account-decoder = "1.18"
 squads-multisig = "2.1"
-spl-associated-token-account = "2.3"
+spl-associated-token-account = "3.0"
 spl-token = "4.0"
 spl-token-2022 = "3.0"
 
