@@ -34,7 +34,7 @@ ureq = { version = "2", features = ["json"] }
 # Host-only as well (relay WebSocket proxy to the upstream Solana WS). Uses
 # system TLS (native-tls) to avoid pulling a newer rustls/zeroize that conflicts
 # with solana 1.18's curve25519-dalek 3.
-tungstenite = { version = "0.29", features = ["native-tls"] }
+tungstenite = { version = "0.30", features = ["native-tls"] }
 
 # Solana ecosystem. Pinned to 1.18 because squads-multisig 2.1 transitively
 # pins solana-{program,sdk,client} at 1.18.26. Cross-compiles cleanly to all
