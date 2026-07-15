@@ -43,7 +43,7 @@ tungstenite = { version = "0.30", features = ["native-tls"] }
 # Solana ecosystem. Pinned to 1.18 because squads-multisig 2.1 transitively
 # pins solana-{program,sdk,client} at 1.18.26. Cross-compiles cleanly to all
 # iOS targets.
-solana-sdk = "1.18"
+solana-sdk = "2.3"
 solana-client = "1.18"
 solana-rpc-client = "1.18"
 solana-account-decoder = "1.18"
