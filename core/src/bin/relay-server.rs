@@ -6,7 +6,10 @@ use std::{
     io::{self, Read, Write},
     net::{IpAddr, SocketAddr, TcpListener, TcpStream},
     path::PathBuf,
-    sync::{Mutex, OnceLock},
+    sync::{
+        Arc, Condvar, Mutex, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -81,6 +84,12 @@ const DEFAULT_RPC_ALLOWED_METHODS: &[&str] = &[
     "simulateTransaction",
 ];
 
+// Process-wide handle to the membership index, populated once at startup by
+// main() if COSIGN_INDEX_DB_PATH is configured. Absent that, member reads
+// fall back to live RPC (see resolve_member_squads).
+#[cfg(feature = "relay-index")]
+static MEMBERSHIP_INDEX: OnceLock<cosign_core::membership_index::MembershipIndex> = OnceLock::new();
+
 #[cfg(feature = "landing")]
 const LANDING_HTML: &str = include_str!("../../static/index.html");
 #[cfg(feature = "landing")]
@@ -130,10 +139,119 @@ const LANDING_ASSETS: &[(&str, &[u8])] = &[
     ),
 ];
 
+/// Cap on concurrent request-handler threads: a backstop against a connection flood
+/// spawning unbounded threads. Normal and warmup traffic stay far below this; past
+/// the cap the relay sheds load with a 503 rather than exhausting memory.
+const MAX_CONCURRENT_REQUESTS: usize = 512;
+static ACTIVE_REQUESTS: AtomicUsize = AtomicUsize::new(0);
+
+/// How many live membership scans may run at once. Each is a full getProgramAccounts
+/// that loads every Multisig account into memory, so a burst during index warmup
+/// could exhaust the machine; bound it. The indexer thread runs its own build scan
+/// ungated, so the true peak is this value plus one. Reads served from the warm index
+/// are cheap and are NOT gated by this.
+const LIVE_MEMBERSHIP_SCAN_PERMITS: usize = 2;
+static LIVE_MEMBERSHIP_SCAN: Semaphore = Semaphore::new(LIVE_MEMBERSHIP_SCAN_PERMITS);
+
+/// Decrements the in-flight request count when a handler thread finishes, including
+/// on panic (Drop runs during unwinding).
+struct RequestGuard;
+
+impl Drop for RequestGuard {
+    fn drop(&mut self) {
+        ACTIVE_REQUESTS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// WebSocket `/ws` proxies are long-lived, so they cannot share the short-request
+/// concurrency cap (they would exhaust it immediately). They get their own, smaller
+/// bound; without it, held-open `/ws` connections spawn unbounded detached threads,
+/// because each proxy outlives the request handler that started it.
+const MAX_WS_PROXIES: usize = 128;
+static ACTIVE_WS_PROXIES: AtomicUsize = AtomicUsize::new(0);
+
+/// Decrements the live WebSocket-proxy count when a proxy thread finishes, including
+/// on panic. Moved into the pump thread so the count reflects proxies actually
+/// running, not requests that merely started one.
+struct WsProxyGuard;
+
+impl Drop for WsProxyGuard {
+    fn drop(&mut self) {
+        ACTIVE_WS_PROXIES.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// A minimal counting semaphore (std has none) to bound concurrent expensive work.
+struct Semaphore {
+    permits: Mutex<usize>,
+    available: Condvar,
+}
+
+impl Semaphore {
+    const fn new(permits: usize) -> Self {
+        Self {
+            permits: Mutex::new(permits),
+            available: Condvar::new(),
+        }
+    }
+
+    /// Block (on the caller's thread only) until a permit is free, then take it. The
+    /// permit is returned when the guard drops.
+    fn acquire(&self) -> SemaphorePermit<'_> {
+        let mut permits = self
+            .permits
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        while *permits == 0 {
+            permits = self
+                .available
+                .wait(permits)
+                .unwrap_or_else(|poison| poison.into_inner());
+        }
+        *permits -= 1;
+        SemaphorePermit { semaphore: self }
+    }
+}
+
+struct SemaphorePermit<'a> {
+    semaphore: &'a Semaphore,
+}
+
+impl Drop for SemaphorePermit<'_> {
+    fn drop(&mut self) {
+        *self
+            .semaphore
+            .permits
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) += 1;
+        self.semaphore.available.notify_one();
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     load_env_files();
     let config = RelayConfig::from_env()?;
-    let mut rate_limiter = RateLimiter::new(config.rate_limits);
+
+    #[cfg(feature = "relay-index")]
+    if let (Some(db_path), Some(rpc_url)) = (config.index_db_path.clone(), config.rpc_url.clone()) {
+        match cosign_core::membership_index::MembershipIndex::open(&db_path) {
+            Ok(index) => {
+                let index_ref = MEMBERSHIP_INDEX.get_or_init(|| index);
+                cosign_core::membership_indexer::spawn(
+                    index_ref,
+                    rpc_url,
+                    config.web_socket_url.clone(),
+                );
+                println!("Membership index active: {db_path}");
+            }
+            Err(error) => {
+                eprintln!("Membership index disabled ({error}); serving member reads live")
+            }
+        }
+    }
+
+    let config = Arc::new(config);
+    let rate_limiter = Arc::new(Mutex::new(RateLimiter::new(config.rate_limits)));
     let listener = TcpListener::bind(config.bind_addr)?;
 
     println!("Cosign relay listening on http://{}", config.bind_addr);
@@ -150,12 +268,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!("Transaction inspection route: /cosign/v1/transactions/<SIGNATURE>/inspection");
 
+    // Handle each connection on its own thread so a slow request (for example a live
+    // membership scan) can never block health checks or other requests.
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let config = config.clone();
-                if let Err(error) = handle_connection(stream, &config, &mut rate_limiter) {
-                    eprintln!("relay request failed: {error}");
+                if ACTIVE_REQUESTS.fetch_add(1, Ordering::SeqCst) >= MAX_CONCURRENT_REQUESTS {
+                    ACTIVE_REQUESTS.fetch_sub(1, Ordering::SeqCst);
+                    shed_over_capacity(stream);
+                    continue;
+                }
+                let config = Arc::clone(&config);
+                let rate_limiter = Arc::clone(&rate_limiter);
+                let spawned = std::thread::Builder::new().spawn(move || {
+                    let _guard = RequestGuard;
+                    if let Err(error) = handle_connection(stream, &config, &rate_limiter) {
+                        eprintln!("relay request failed: {error}");
+                    }
+                });
+                if let Err(error) = spawned {
+                    ACTIVE_REQUESTS.fetch_sub(1, Ordering::SeqCst);
+                    eprintln!("relay handler spawn failed: {error}");
                 }
             }
             Err(error) => eprintln!("relay accept failed: {error}"),
@@ -163,6 +296,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+/// Reject a connection that arrives past the concurrency cap with a 503, rather than
+/// spawning an unbounded number of handler threads.
+fn shed_over_capacity(mut stream: TcpStream) {
+    let response = error_response(503, ResponseFormat::Html, "relay temporarily at capacity");
+    let _ = write_response(&mut stream, response);
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -178,6 +318,9 @@ struct RelayConfig {
     // relay) points visitors at the single canonical site without affecting its
     // RPC/API role.
     landing_redirect: Option<String>,
+    // Filesystem path to the SQLite membership index (a Fly volume mount in prod).
+    // When unset, the relay runs without an index and serves member reads live.
+    index_db_path: Option<String>,
 }
 
 impl RelayConfig {
@@ -208,6 +351,9 @@ impl RelayConfig {
                 .ok()
                 .filter(|value| !value.trim().is_empty())
                 .map(|value| value.trim_end_matches('/').to_string()),
+            index_db_path: env::var("COSIGN_INDEX_DB_PATH")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
         })
     }
 
@@ -313,16 +459,16 @@ impl RateLimiter {
         &mut self,
         client_ip: Option<IpAddr>,
         request: &HttpRequest,
-        config: &RelayConfig,
+        inspection: Option<&RpcPassthroughInspection>,
     ) -> Result<(), RelayError> {
-        self.check_request_at(client_ip, request, config, Instant::now())
+        self.check_request_at(client_ip, request, inspection, Instant::now())
     }
 
     fn check_request_at(
         &mut self,
         client_ip: Option<IpAddr>,
         request: &HttpRequest,
-        config: &RelayConfig,
+        inspection: Option<&RpcPassthroughInspection>,
         now: Instant,
     ) -> Result<(), RelayError> {
         if !self.limits.enabled {
@@ -341,8 +487,10 @@ impl RateLimiter {
             "request rate limit exceeded",
         )?;
 
-        if request.method == "POST" && request.path == "/" {
-            let inspection = inspect_rpc_passthrough_request(config, &request.body)?;
+        if request.method == "POST"
+            && request.path == "/"
+            && let Some(inspection) = inspection
+        {
             for method in &inspection.methods {
                 self.check_bucket(
                     RateLimitKey::RpcMethod {
@@ -663,9 +811,13 @@ impl From<io::Error> for RelayError {
 fn handle_connection(
     mut stream: TcpStream,
     config: &RelayConfig,
-    rate_limiter: &mut RateLimiter,
+    rate_limiter: &Mutex<RateLimiter>,
 ) -> Result<(), RelayError> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+    // A client that stops reading must not pin this handler thread (and its
+    // MAX_CONCURRENT_REQUESTS slot) indefinitely, which would let slow readers
+    // exhaust the pool. Bound writes as well as reads.
+    stream.set_write_timeout(Some(Duration::from_secs(30)))?;
     let client_ip = stream.peer_addr().ok().map(|address| address.ip());
     let Some(request) = read_request(&mut stream, config.rate_limits.max_request_body_bytes)?
     else {
@@ -676,11 +828,26 @@ fn handle_connection(
     if request.path == "/ws"
         && let Some(key) = request.websocket_key.clone()
     {
-        let rate = rate_limiter.check_request(client_ip, &request, config);
+        let rate = check_rate_limit(rate_limiter, client_ip, &request, None);
         return start_ws_proxy(stream, &key, config, rate);
     }
 
-    let response = match rate_limiter.check_request(client_ip, &request, config) {
+    // Inspect the RPC passthrough body once, before taking the rate-limiter lock, so
+    // parsing and transaction decoding never run while the shared mutex is held.
+    let inspection = if request.method == "POST" && request.path == "/" {
+        match inspect_rpc_passthrough_request(config, &request.body) {
+            Ok(inspection) => Some(inspection),
+            Err(error) => {
+                let response = relay_json_error_response(error);
+                eprintln!("{} {} -> {}", request.method, request.path, response.status);
+                return write_response(&mut stream, response);
+            }
+        }
+    } else {
+        None
+    };
+
+    let response = match check_rate_limit(rate_limiter, client_ip, &request, inspection.as_ref()) {
         Ok(()) => handle_request_with_client(&request, config, client_ip),
         Err(error) if request.method == "POST" && request.path == "/" => {
             relay_json_error_response(error)
@@ -689,6 +856,22 @@ fn handle_connection(
     };
     eprintln!("{} {} -> {}", request.method, request.path, response.status);
     write_response(&mut stream, response)
+}
+
+/// Lock the shared rate limiter for the check only, never across request handling, so
+/// a slow request cannot serialize the whole relay behind the limiter mutex. The RPC
+/// passthrough body is inspected by the caller before locking and the result passed in,
+/// so no request parsing happens under the lock.
+fn check_rate_limit(
+    rate_limiter: &Mutex<RateLimiter>,
+    client_ip: Option<IpAddr>,
+    request: &HttpRequest,
+    inspection: Option<&RpcPassthroughInspection>,
+) -> Result<(), RelayError> {
+    rate_limiter
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .check_request(client_ip, request, inspection)
 }
 
 fn handle_request_with_client(
@@ -767,7 +950,9 @@ fn handle_request_with_client(
     match parse_member_squads_request(&request.path) {
         Ok(parsed) => {
             return match resolve_member_squads(config, &parsed) {
-                Ok(result) => member_squads_json_response(&parsed.member, &result),
+                Ok((result, source)) => {
+                    member_squads_json_response(&parsed.member, &result, source)
+                }
                 Err(error) => relay_error_response(error, request.query.as_deref()),
             };
         }
@@ -1040,17 +1225,49 @@ fn submitted_transaction_log_event(
 fn resolve_member_squads(
     config: &RelayConfig,
     request: &MemberSquadsRequest,
-) -> Result<Vec<types::MultisigSummary>, RelayError> {
+) -> Result<(Vec<types::MultisigSummary>, &'static str), RelayError> {
+    #[cfg(feature = "relay-index")]
+    if let Some(hits) = read_membership_index(&request.member) {
+        return Ok((hits, "index"));
+    }
+
+    // Live fallback: a full getProgramAccounts scan that loads every Multisig account
+    // into memory. Bound how many run at once so a burst during index warmup cannot
+    // exhaust the machine. Cheap index reads above are not gated by this.
+    let _permit = LIVE_MEMBERSHIP_SCAN.acquire();
+
+    // The index may have become fresh while we waited for a permit; prefer it.
+    #[cfg(feature = "relay-index")]
+    if let Some(hits) = read_membership_index(&request.member) {
+        return Ok((hits, "index"));
+    }
+
     let rpc_url = config.rpc_url()?;
     let client = SquadsClient::new(RpcClient::new(rpc_url));
-    client
+    let hits = client
         .get_membership(&request.member)
-        .map(|hits| {
-            hits.iter()
-                .map(|(address, multisig)| types::multisig_summary(address, multisig))
-                .collect()
-        })
-        .map_err(|error| RelayError::Rpc(error.to_string()))
+        .map_err(|error| RelayError::Rpc(error.to_string()))?;
+    let summaries = hits
+        .iter()
+        .map(|(address, multisig)| types::multisig_summary(address, multisig))
+        .collect();
+    Ok((summaries, "live"))
+}
+
+/// Read a member's squads from the index when it is warm and fresh. Returns None if
+/// there is no index, it is not fresh, or the query errors, so the caller falls back
+/// to a live scan.
+#[cfg(feature = "relay-index")]
+fn read_membership_index(member: &Pubkey) -> Option<Vec<types::MultisigSummary>> {
+    let index = MEMBERSHIP_INDEX.get()?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    if !index.is_fresh(now) {
+        return None;
+    }
+    index.squads_for_member(member).ok()
 }
 
 fn resolve_squad_detail(
@@ -4415,6 +4632,20 @@ fn start_ws_proxy(
         );
     };
 
+    // Bound concurrent proxies: they are long-lived and run on their own detached
+    // threads, so without a cap held-open /ws connections would grow without bound.
+    if ACTIVE_WS_PROXIES.fetch_add(1, Ordering::SeqCst) >= MAX_WS_PROXIES {
+        ACTIVE_WS_PROXIES.fetch_sub(1, Ordering::SeqCst);
+        return write_response(
+            &mut stream,
+            relay_error_response(
+                RelayError::RateLimited("relay WebSocket proxy is at capacity".into()),
+                None,
+            ),
+        );
+    }
+    let proxy_guard = WsProxyGuard;
+
     let accept = tungstenite::handshake::derive_accept_key(websocket_key.as_bytes());
     let handshake = format!(
         "HTTP/1.1 101 Switching Protocols\r\n\
@@ -4426,6 +4657,8 @@ fn start_ws_proxy(
     stream.flush()?;
 
     std::thread::spawn(move || {
+        // Held for the proxy's whole lifetime; decrements ACTIVE_WS_PROXIES on exit.
+        let _proxy_guard = proxy_guard;
         if let Err(error) = ws_pump(stream, &upstream) {
             eprintln!("relay ws proxy ended: {error}");
         }
@@ -4835,13 +5068,18 @@ fn fetch_release_data() -> Result<Value, String> {
     }))
 }
 
-fn member_squads_json_response(member: &Pubkey, squads: &[types::MultisigSummary]) -> HttpResponse {
+fn member_squads_json_response(
+    member: &Pubkey,
+    squads: &[types::MultisigSummary],
+    source: &str,
+) -> HttpResponse {
     json_response(
         200,
         json!({
             "kind": "member_squads",
             "member": member.to_string(),
             "cluster": null,
+            "source": source,
             "squads": squads.iter().map(squad_summary_json).collect::<Vec<_>>()
         }),
     )
@@ -5570,6 +5808,7 @@ mod tests {
             rpc_allowed_methods: methods,
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         }
     }
 
@@ -5788,19 +6027,14 @@ mod tests {
         let client_ip = Some(IpAddr::from([127, 0, 0, 1]));
 
         limiter
-            .check_request_at(client_ip, &request, &config, now)
+            .check_request_at(client_ip, &request, None, now)
             .expect("first request should pass");
         assert!(matches!(
-            limiter.check_request_at(client_ip, &request, &config, now),
+            limiter.check_request_at(client_ip, &request, None, now),
             Err(RelayError::RateLimited(_))
         ));
         limiter
-            .check_request_at(
-                client_ip,
-                &request,
-                &config,
-                now + config.rate_limits.window,
-            )
+            .check_request_at(client_ip, &request, None, now + config.rate_limits.window)
             .expect("new window should pass");
     }
 
@@ -5824,12 +6058,14 @@ mod tests {
         };
         let now = Instant::now();
         let client_ip = Some(IpAddr::from([127, 0, 0, 1]));
+        let inspection = inspect_rpc_passthrough_request(&config, &request.body)
+            .expect("valid rpc passthrough body");
 
         limiter
-            .check_request_at(client_ip, &request, &config, now)
+            .check_request_at(client_ip, &request, Some(&inspection), now)
             .expect("first method call should pass");
         assert!(matches!(
-            limiter.check_request_at(client_ip, &request, &config, now),
+            limiter.check_request_at(client_ip, &request, Some(&inspection), now),
             Err(RelayError::RateLimited(_))
         ));
     }
@@ -5856,12 +6092,14 @@ mod tests {
         };
         let now = Instant::now();
         let client_ip = Some(IpAddr::from([127, 0, 0, 1]));
+        let inspection = inspect_rpc_passthrough_request(&config, &request.body)
+            .expect("valid send transaction body");
 
         limiter
-            .check_request_at(client_ip, &request, &config, now)
+            .check_request_at(client_ip, &request, Some(&inspection), now)
             .expect("first transaction should pass");
         assert!(matches!(
-            limiter.check_request_at(client_ip, &request, &config, now),
+            limiter.check_request_at(client_ip, &request, Some(&inspection), now),
             Err(RelayError::RateLimited(_))
         ));
     }
@@ -5974,6 +6212,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
 
         assert!(matches!(config.rpc_url(), Err(RelayError::BadRequest(_))));
@@ -5990,6 +6229,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
 
         assert_eq!(config.rpc_url().expect("rpc url"), "http://127.0.0.1:8899");
@@ -6019,6 +6259,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6044,6 +6285,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6109,6 +6351,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6138,6 +6381,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6163,6 +6407,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
         let request = HttpRequest {
             method: "GET".into(),
@@ -6220,13 +6465,22 @@ mod tests {
             transaction_index: 7,
             stale_transaction_index: 0,
         };
-        let response = member_squads_json_response(&member, &[summary]);
+        let response = member_squads_json_response(&member, &[summary], "live");
         let body: Value = serde_json::from_slice(&response.body).expect("json");
 
         assert_eq!(body["kind"], "member_squads");
         assert_eq!(body["member"], member.to_string());
         assert_eq!(body["squads"][0]["address"], "squad111");
         assert_eq!(body["squads"][0]["memberCount"], 2);
+    }
+
+    #[test]
+    fn member_squads_response_carries_source() {
+        let member = Pubkey::new_unique();
+        let response = member_squads_json_response(&member, &[], "live");
+        let body: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+        assert_eq!(body["source"], "live");
+        assert_eq!(body["kind"], "member_squads");
     }
 
     #[test]
@@ -6239,6 +6493,7 @@ mod tests {
             rpc_allowed_methods: default_rpc_allowed_methods(),
             rate_limits: RelayRateLimits::default(),
             landing_redirect: None,
+            index_db_path: None,
         };
         let response = capabilities_response(&config, Some("relay.cosign.example"));
         let body: Value = serde_json::from_slice(&response.body).expect("json");

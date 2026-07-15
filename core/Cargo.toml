@@ -20,6 +20,10 @@ default = []
 # Compiles the marketing landing page + privacy page into the relay binary and
 # serves them at / and /privacy. Off by default so forks serve no marketing site.
 landing = []
+# Compiles the relay-side membership index (SQLite store + background indexer).
+# Off by default so the iOS staticlib never pulls in rusqlite; the relay binary
+# enables it in the Dockerfile.
+relay-index = ["dep:rusqlite"]
 
 [dependencies]
 # 'cli' feature is required for the uniffi-bindgen binary in src/bin/.
@@ -61,6 +65,10 @@ rand = "0.8"
 bs58 = "0.5"
 bincode = "1.3"
 base64 = "0.21"
+# Relay-only: embedded SQLite for the membership index. Bundled so no system
+# libsqlite3 is required in the build image. Optional + feature-gated so it never
+# compiles into the iOS staticlib.
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 [dev-dependencies]
 hex = "0.4"

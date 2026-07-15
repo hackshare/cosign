@@ -10,7 +10,7 @@ COPY src ./src
 # static/ holds the marketing landing + privacy pages compiled into the binary
 # via include_str! behind the `landing` feature.
 COPY static ./static
-RUN cargo build --release --bin relay-server --features landing
+RUN cargo build --release --bin relay-server --features landing,relay-index
 
 FROM debian:stable-slim
 # ca-certificates for upstream TLS; libssl3 is native-tls's runtime dependency.

@@ -1,5 +1,7 @@
 //! Squads v4 read-only operations.
 
+use std::ops::ControlFlow;
+
 use solana_client::rpc_filter::{Memcmp, RpcFilterType};
 use solana_sdk::{pubkey::Pubkey, signature::Signature};
 use squads_multisig::squads_multisig_program::state::VaultTransaction;
@@ -12,6 +14,10 @@ use squads_multisig::{
 use crate::rpc::{RpcClient, RpcError};
 
 const MAX_DISCOVERABLE_VAULTS: u8 = 8;
+
+/// Page size for the paginated program-account scan. Well under the V2 cap of
+/// 10_000; keeps peak memory to roughly one page of Multisig accounts.
+pub const SCAN_PAGE_SIZE: usize = 1000;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SquadsError {
@@ -96,11 +102,72 @@ impl SquadsClient {
         Multisig::try_deserialize(&mut data).map_err(|e| SquadsError::InvalidAccount(e.to_string()))
     }
 
-    /// Find every Multisig that contains `member` in its members list.
-    /// Filters only by Anchor discriminator on the network side; member-list
-    /// scanning happens client-side. Acceptable for v1; a relay-side index
-    /// makes this scale.
-    pub fn get_membership(&self, member: &Pubkey) -> Result<Vec<(Pubkey, Multisig)>, SquadsError> {
+    /// Stream every Multisig account through `on_multisig`, one page at a time, so
+    /// peak memory is bounded regardless of how many squads exist. With
+    /// `changed_since_slot` set, only accounts modified at/after that slot are
+    /// returned (cheap incremental reconcile). Returns the scan's context slot (the
+    /// first page's), which the caller persists as the next `changed_since_slot`;
+    /// using the earliest slot never misses a delta.
+    ///
+    /// Falls back to the legacy single-shot `getProgramAccounts` if the provider does
+    /// not support `getProgramAccountsV2` (self-hosted relays on non-Helius RPCs);
+    /// that path is memory-heavy and ignores `changed_since_slot`.
+    /// The callback returns `ControlFlow::Break` to stop the scan early (for example
+    /// when the caller has hit a fatal error and further pages would be wasted work).
+    pub fn scan_multisigs(
+        &self,
+        changed_since_slot: Option<u64>,
+        mut on_multisig: impl FnMut(&Pubkey, &Multisig) -> ControlFlow<()>,
+    ) -> Result<u64, SquadsError> {
+        let discriminator = bs58::encode(Multisig::DISCRIMINATOR).into_string();
+        let mut pagination_key: Option<String> = None;
+        let mut scan_slot: Option<u64> = None;
+
+        loop {
+            let page = match self.rpc.get_program_accounts_v2_page(
+                &self.program_id,
+                0,
+                &discriminator,
+                SCAN_PAGE_SIZE,
+                pagination_key.as_deref(),
+                changed_since_slot,
+            ) {
+                Ok(page) => page,
+                Err(error) if scan_slot.is_none() && is_method_not_found(&error) => {
+                    return self.scan_multisigs_legacy(on_multisig);
+                }
+                Err(error) => return Err(error.into()),
+            };
+
+            if scan_slot.is_none() {
+                scan_slot = Some(page.slot);
+            }
+            if page.accounts.is_empty() {
+                break;
+            }
+            for (address, data) in &page.accounts {
+                let mut slice = data.as_slice();
+                if let Ok(ms) = Multisig::try_deserialize(&mut slice)
+                    && on_multisig(address, &ms).is_break()
+                {
+                    return Ok(scan_slot.unwrap_or(0));
+                }
+            }
+            match page.pagination_key {
+                Some(key) => pagination_key = Some(key),
+                None => break,
+            }
+        }
+        Ok(scan_slot.unwrap_or(0))
+    }
+
+    /// Legacy fallback: single `getProgramAccounts` for providers without V2. Loads
+    /// everything at once (the memory cost this scan otherwise avoids), so it only
+    /// suits smaller programs. Returns slot 0 so callers keep doing full scans.
+    fn scan_multisigs_legacy(
+        &self,
+        mut on_multisig: impl FnMut(&Pubkey, &Multisig) -> ControlFlow<()>,
+    ) -> Result<u64, SquadsError> {
         let filters = vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             0,
             Multisig::DISCRIMINATOR.to_vec(),
@@ -108,16 +175,27 @@ impl SquadsClient {
         let accounts = self
             .rpc
             .get_program_accounts_with_filters(&self.program_id, filters)?;
-
-        let mut hits = Vec::new();
-        for (pubkey, account) in accounts {
+        for (address, account) in accounts {
             let mut data = account.data.as_slice();
             if let Ok(ms) = Multisig::try_deserialize(&mut data)
-                && ms.members.iter().any(|m| &m.key == member)
+                && on_multisig(&address, &ms).is_break()
             {
-                hits.push((pubkey, ms));
+                break;
             }
         }
+        Ok(0)
+    }
+
+    /// Find every Multisig that contains `member`. Streams the program so peak memory
+    /// stays bounded even during index warmup when this is the live fallback.
+    pub fn get_membership(&self, member: &Pubkey) -> Result<Vec<(Pubkey, Multisig)>, SquadsError> {
+        let mut hits = Vec::new();
+        self.scan_multisigs(None, |address, ms| {
+            if ms.members.iter().any(|m| &m.key == member) {
+                hits.push((*address, ms.clone()));
+            }
+            ControlFlow::Continue(())
+        })?;
         Ok(hits)
     }
 
@@ -203,6 +281,14 @@ impl SquadsClient {
     }
 }
 
+/// True when the client error is a JSON-RPC "method not found" (-32601), i.e. the
+/// provider does not implement getProgramAccountsV2. In `scan_multisigs` this errs
+/// only from `get_program_accounts_v2_page`, whose error type is `RpcError`; the
+/// non-fallback arm converts `RpcError` into `SquadsError` via the `#[from]` impl.
+fn is_method_not_found(error: &RpcError) -> bool {
+    matches!(error, RpcError::Client(message) if message.contains("-32601"))
+}
+
 fn parse_companion(data: &[u8]) -> Result<ProposalCompanion, SquadsError> {
     if data.len() < 8 {
         return Err(SquadsError::InvalidAccount(
@@ -259,5 +345,18 @@ mod tests {
         assert_eq!(Proposal::DISCRIMINATOR.len(), 8);
         assert_eq!(VaultTransaction::DISCRIMINATOR.len(), 8);
         assert_eq!(ConfigTransaction::DISCRIMINATOR.len(), 8);
+    }
+
+    #[test]
+    #[allow(clippy::type_complexity)] // mirrors scan_multisigs's real signature on purpose
+    fn scan_multisigs_method_exists_on_client() {
+        // Compile-time contract: the indexer relies on this signature. No live RPC.
+        let client = SquadsClient::new(RpcClient::new("https://example.invalid".into()));
+        let _f: fn(
+            &SquadsClient,
+            Option<u64>,
+            fn(&Pubkey, &Multisig) -> ControlFlow<()>,
+        ) -> Result<u64, SquadsError> = SquadsClient::scan_multisigs;
+        let _ = client;
     }
 }

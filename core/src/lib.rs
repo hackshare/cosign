@@ -2,6 +2,10 @@ uniffi::include_scaffolding!("cosign_core");
 
 pub mod derivation;
 pub mod keypair;
+#[cfg(feature = "relay-index")]
+pub mod membership_index;
+#[cfg(feature = "relay-index")]
+pub mod membership_indexer;
 pub mod mnemonic;
 pub mod rpc;
 pub mod squads;

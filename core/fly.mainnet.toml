@@ -7,19 +7,22 @@
 # endpoints + Jupiter prices. The Helius mainnet key lives ONLY in the Fly secret,
 # never in the repo.)
 #
-# Topology: two machines spread across sjc + iad, one always warm.
+# Topology: two machines spread across sjc + iad, both kept warm (the membership
+# indexer holds a live programSubscribe on each, so machines must not auto-stop).
 #   fly scale count 2 --region sjc,iad -a cosign-relay-mainnet
 app = "cosign-relay-mainnet"
 primary_region = "sjc"
+
+[env]
+  COSIGN_INDEX_DB_PATH = "/data/membership-index.db"
 
 [build]
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 2
 
   [[http_service.checks]]
     interval = "15s"
@@ -31,3 +34,7 @@ primary_region = "sjc"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+[mounts]
+  source = "cosign_index"
+  destination = "/data"
