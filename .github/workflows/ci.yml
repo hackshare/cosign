@@ -80,6 +80,17 @@ jobs:
         working-directory: core
         run: cargo test
 
+      # The relay-index feature is off by default (so the iOS staticlib never
+      # pulls in rusqlite), which means the default clippy/test steps above never
+      # compile the index modules. Lint and test them explicitly under the feature.
+      - name: clippy (relay-index feature)
+        working-directory: core
+        run: cargo clippy --all-targets --features relay-index -- -D warnings
+
+      - name: cargo test (relay-index feature)
+        working-directory: core
+        run: cargo test --features relay-index
+
   cargo-deny:
     name: cargo-deny
     runs-on: ubuntu-latest

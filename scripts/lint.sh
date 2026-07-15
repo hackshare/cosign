@@ -9,6 +9,9 @@ echo "==> rustfmt --check"
 echo "==> clippy"
 (cd core && cargo clippy --all-targets -- -D warnings)
 
+echo "==> clippy (relay-index feature)"
+(cd core && cargo clippy --all-targets --features relay-index -- -D warnings)
+
 if command -v swiftformat >/dev/null 2>&1; then
     echo "==> swiftformat --lint"
     swiftformat --lint App/ Modules/
