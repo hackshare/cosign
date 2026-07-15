@@ -72,7 +72,7 @@ rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 [dev-dependencies]
 hex = "0.4"
-rcgen = "0.10"
+rcgen = "0.14"
 rustls = "0.21"
 serde = { version = "1", features = ["derive"] }
 
