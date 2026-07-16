@@ -1,7 +1,7 @@
 import Foundation
 
 /// Injectable seam — tests inject a fake; production uses SquadsBroadcastLegRunner.
-protocol BroadcastLegRunner: AnyObject {
+protocol BroadcastLegRunner: AnyObject, Sendable {
     func signAndSimulate(action: SquadProposalAction) async throws -> SignedProposalTransaction
     func broadcastSigned(_ signed: SignedProposalTransaction) async throws -> ProposalActionSubmittedTransaction
     func finalize(
@@ -15,7 +15,7 @@ protocol BroadcastLegRunner: AnyObject {
 ///
 /// Each leg is signed at most once. On a broadcast failure the signed bytes are
 /// retained so that a subsequent `run()` can retry the broadcast without re-signing.
-public final class ProposalActionBroadcaster: @unchecked Sendable {
+public actor ProposalActionBroadcaster {
     private let runner: BroadcastLegRunner
     private let plan: [SquadProposalAction]
     private let finalAction: SquadProposalAction
