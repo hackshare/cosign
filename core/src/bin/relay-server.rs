@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeSet, HashMap},
     env,
     error::Error,
-    fmt,
     io::{self, Read, Write},
     net::{IpAddr, SocketAddr, TcpListener, TcpStream},
     path::PathBuf,
@@ -777,35 +776,20 @@ enum ResponseFormat {
     Json,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 enum RelayError {
+    #[error("{0}")]
     BadRequest(String),
+    #[error("{0}")]
     Forbidden(String),
+    #[error("not found")]
     NotFound,
+    #[error("{0}")]
     RateLimited(String),
+    #[error("{0}")]
     Rpc(String),
-    Io(io::Error),
-}
-
-impl fmt::Display for RelayError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::BadRequest(message) => write!(f, "{message}"),
-            Self::Forbidden(message) => write!(f, "{message}"),
-            Self::NotFound => write!(f, "not found"),
-            Self::RateLimited(message) => write!(f, "{message}"),
-            Self::Rpc(message) => write!(f, "{message}"),
-            Self::Io(error) => write!(f, "{error}"),
-        }
-    }
-}
-
-impl Error for RelayError {}
-
-impl From<io::Error> for RelayError {
-    fn from(error: io::Error) -> Self {
-        Self::Io(error)
-    }
+    #[error("{0}")]
+    Io(#[from] io::Error),
 }
 
 fn handle_connection(
