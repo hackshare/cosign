@@ -1,5 +1,6 @@
 import Foundation
 
+// SAFETY: the only mutable state (`signatures`) is guarded by `lock` on every access.
 final class ExecutionSignatureCache: @unchecked Sendable {
     private let lock = NSLock()
     private var signatures = [ExecutionSignatureCacheKey: String]()

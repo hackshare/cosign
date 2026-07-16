@@ -11,6 +11,8 @@ public enum DemoBroadcastMode: Equatable, Sendable {
     case executeOnly
 }
 
+// SAFETY: a demo fixture driven serially by a single ProposalActionBroadcaster, so
+// `broadcastAttempts` is never accessed concurrently.
 /// Fake `BroadcastLegRunner` for demo broadcast-failure walkthroughs.
 ///
 /// Signs and simulates instantly with synthetic bytes so no Signer or RPC call

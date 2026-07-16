@@ -1,5 +1,7 @@
 import Foundation
 
+// SAFETY: holds only immutable demo data (`let cluster`, `let squads`), never mutated
+// after init.
 public final class CosignDemoFixture: @unchecked Sendable {
     private let cluster = "demo"
     private let squads: [DemoSquad]

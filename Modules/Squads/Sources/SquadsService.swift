@@ -2,6 +2,8 @@ import CosignCore
 import Foundation
 import Indexer
 
+// SAFETY: stored state is immutable references to independently-synchronized
+// collaborators: thread-safe caches and Sendable clients.
 public final class SquadsService: @unchecked Sendable {
     let rpcURL: String
     let indexer: HeliusDASClient

@@ -68,6 +68,8 @@ public struct NoOpRelay: RelayClient {
     }
 }
 
+// SAFETY: all stored state is immutable (`let`); the JSONDecoder is never reconfigured
+// after init, so concurrent decoding is safe.
 final class HTTPRelayClient: RelayClient, @unchecked Sendable {
     let baseURL: URL
     private let capabilities: Set<RelayCapability>?

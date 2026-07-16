@@ -153,6 +153,8 @@ extension SquadsService {
 
 // MARK: - Production BroadcastLegRunner
 
+// SAFETY: driven serially by a single ProposalActionBroadcaster, so `lastRefreshed`
+// is never accessed concurrently.
 private final class SquadsBroadcastLegRunner: BroadcastLegRunner, @unchecked Sendable {
     private let service: SquadsService
     private let squadAddress: String
