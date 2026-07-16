@@ -159,7 +159,7 @@ struct RequestGuard;
 
 impl Drop for RequestGuard {
     fn drop(&mut self) {
-        ACTIVE_REQUESTS.fetch_sub(1, Ordering::SeqCst);
+        ACTIVE_REQUESTS.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -177,7 +177,7 @@ struct WsProxyGuard;
 
 impl Drop for WsProxyGuard {
     fn drop(&mut self) {
-        ACTIVE_WS_PROXIES.fetch_sub(1, Ordering::SeqCst);
+        ACTIVE_WS_PROXIES.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -273,8 +273,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                if ACTIVE_REQUESTS.fetch_add(1, Ordering::SeqCst) >= MAX_CONCURRENT_REQUESTS {
-                    ACTIVE_REQUESTS.fetch_sub(1, Ordering::SeqCst);
+                if ACTIVE_REQUESTS.fetch_add(1, Ordering::Relaxed) >= MAX_CONCURRENT_REQUESTS {
+                    ACTIVE_REQUESTS.fetch_sub(1, Ordering::Relaxed);
                     shed_over_capacity(stream);
                     continue;
                 }
@@ -287,7 +287,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 });
                 if let Err(error) = spawned {
-                    ACTIVE_REQUESTS.fetch_sub(1, Ordering::SeqCst);
+                    ACTIVE_REQUESTS.fetch_sub(1, Ordering::Relaxed);
                     eprintln!("relay handler spawn failed: {error}");
                 }
             }
@@ -4634,8 +4634,8 @@ fn start_ws_proxy(
 
     // Bound concurrent proxies: they are long-lived and run on their own detached
     // threads, so without a cap held-open /ws connections would grow without bound.
-    if ACTIVE_WS_PROXIES.fetch_add(1, Ordering::SeqCst) >= MAX_WS_PROXIES {
-        ACTIVE_WS_PROXIES.fetch_sub(1, Ordering::SeqCst);
+    if ACTIVE_WS_PROXIES.fetch_add(1, Ordering::Relaxed) >= MAX_WS_PROXIES {
+        ACTIVE_WS_PROXIES.fetch_sub(1, Ordering::Relaxed);
         return write_response(
             &mut stream,
             relay_error_response(
@@ -4992,28 +4992,23 @@ fn release_response() -> HttpResponse {
 /// BuildClaim.json release asset, and returns a JSON blob with version/tag/commit/
 /// fingerprint fields. The fingerprint is sha256(raw BuildClaim.json bytes), which
 /// the app computes locally from the same asset to verify the build.
-fn fetch_release_data() -> Result<Value, String> {
+fn fetch_release_data() -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
     let client = reqwest::blocking::Client::builder()
         .no_proxy()
         .timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     let response = client
         .get("https://api.github.com/repos/hackshare/cosign/releases/latest")
         .header("User-Agent", "cosign-relay")
         .header("Accept", "application/vnd.github+json")
-        .send()
-        .map_err(|e| e.to_string())?;
+        .send()?;
 
     if !response.status().is_success() {
-        return Err(format!(
-            "GitHub API returned {}",
-            response.status().as_u16()
-        ));
+        return Err(format!("GitHub API returned {}", response.status().as_u16()).into());
     }
 
-    let release: Value = response.json().map_err(|e| e.to_string())?;
+    let release: Value = response.json()?;
     let html_url = release["html_url"]
         .as_str()
         .ok_or("missing html_url")?
@@ -5032,9 +5027,8 @@ fn fetch_release_data() -> Result<Value, String> {
     let bytes_response = client
         .get(&download_url)
         .header("User-Agent", "cosign-relay")
-        .send()
-        .map_err(|e| e.to_string())?;
-    let bytes = bytes_response.bytes().map_err(|e| e.to_string())?;
+        .send()?;
+    let bytes = bytes_response.bytes()?;
 
     // Fingerprint over the exact published bytes — the app verifier hashes the
     // same asset so both sides produce identical hex without re-serialising.
@@ -5043,7 +5037,7 @@ fn fetch_release_data() -> Result<Value, String> {
         .map(|b| format!("{b:02x}"))
         .collect();
 
-    let claim: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    let claim: Value = serde_json::from_slice(&bytes)?;
     let version = claim["version"]
         .as_str()
         .ok_or("missing version")?

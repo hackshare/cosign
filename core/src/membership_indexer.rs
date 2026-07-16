@@ -129,9 +129,13 @@ fn run(index: &'static MembershipIndex, rpc_url: String, ws_url: Option<String>)
     let client = SquadsClient::new(RpcClient::new_with_timeout(rpc_url, INDEXER_RPC_TIMEOUT));
 
     // Populate the index before we even connect, so a warm restart serves from disk
-    // once the subscription is live. reconcile marks build_complete on success.
+    // once the subscription is live. reconcile marks build_complete on success. A warm
+    // restart resumes from the persisted slot, so `count` is the incremental delta, not
+    // a total; distinguish the two so the log doesn't read as a from-scratch rebuild.
+    let full_build = index.last_scan_slot() == 0;
     match reconcile(index, &client, now_unix()) {
-        Ok(count) => println!("membership index built: {count} squads"),
+        Ok(count) if full_build => println!("membership index built: {count} squads"),
+        Ok(count) => println!("membership index caught up: {count} squads changed"),
         Err(error) => eprintln!("membership index initial build failed: {error}"),
     }
 
@@ -171,8 +175,8 @@ fn subscribe_loop(
     index: &MembershipIndex,
     client: &SquadsClient,
     ws_url: &str,
-) -> Result<(), String> {
-    let (mut socket, _response) = tungstenite::connect(ws_url).map_err(|e| e.to_string())?;
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let (mut socket, _response) = tungstenite::connect(ws_url)?;
     set_read_timeout(&socket, WS_READ_TIMEOUT);
 
     let program_id = SquadsClient::default_program_id().to_string();
@@ -190,9 +194,7 @@ fn subscribe_loop(
             }
         ]
     });
-    socket
-        .send(Message::Text(subscribe.to_string().into()))
-        .map_err(|e| e.to_string())?;
+    socket.send(Message::Text(subscribe.to_string().into()))?;
 
     // Subscription is live and the index is current, so reads can serve from it now.
     // Health reflects subscription connectivity, NOT reconcile success.
@@ -208,9 +210,7 @@ fn subscribe_loop(
         match socket.read() {
             Ok(Message::Text(text)) => handle_notification(index, &text),
             Ok(Message::Ping(payload)) => {
-                socket
-                    .send(Message::Pong(payload))
-                    .map_err(|e| e.to_string())?;
+                socket.send(Message::Pong(payload))?;
             }
             Ok(Message::Close(_)) => return Err("upstream closed".into()),
             Ok(_) => {}
@@ -221,10 +221,10 @@ fn subscribe_loop(
                 // the upstream doesn't drop the subscription as idle (a quiet program
                 // can go minutes without a notification), then run the reconcile check.
                 if let Err(error) = socket.send(Message::Ping(Vec::<u8>::new().into())) {
-                    return Err(format!("keepalive ping failed: {error}"));
+                    return Err(format!("keepalive ping failed: {error}").into());
                 }
             }
-            Err(error) => return Err(error.to_string()),
+            Err(error) => return Err(error.into()),
         }
 
         let now = now_unix();
@@ -235,7 +235,7 @@ fn subscribe_loop(
             // Failure keeps health (the live subscription still keeps the index
             // current) and backs off the retry; success updates the persisted stamp.
             match reconcile(index, client, now) {
-                Ok(count) => println!("membership index reconcile ok: {count} multisigs upserted"),
+                Ok(count) => println!("membership index reconcile ok: {count} squads changed"),
                 Err(error) => {
                     next_attempt_at = now + RECONCILE_RETRY_BACKOFF.as_secs() as i64;
                     eprintln!("membership index reconcile failed (retrying soon): {error}");
