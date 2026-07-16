@@ -49,6 +49,7 @@ extension ProposalDetailView {
             await load()
         } catch let ProposalActionError.broadcastFailed(failure) {
             broadcastFailure = failure
+            pendingApproveTransaction = await actionBroadcaster?.completedTransactions.first
             signingRequest = nil
         } catch {
             actionBroadcaster = nil
@@ -74,6 +75,7 @@ extension ProposalDetailView {
             let submission = try await broadcaster.run()
             let request = pendingBroadcastRequest
             broadcastFailure = nil
+            pendingApproveTransaction = nil
             actionBroadcaster = nil
             pendingBroadcastRequest = nil
             if let request {
@@ -83,6 +85,7 @@ extension ProposalDetailView {
             await load()
         } catch let ProposalActionError.broadcastFailed(failure) {
             broadcastFailure = failure
+            pendingApproveTransaction = await broadcaster.completedTransactions.first
         } catch {
             clearBroadcastState()
             actionErrorMessage = error.localizedDescription
@@ -91,6 +94,7 @@ extension ProposalDetailView {
 
     func clearBroadcastState() {
         broadcastFailure = nil
+        pendingApproveTransaction = nil
         actionBroadcaster = nil
         pendingBroadcastRequest = nil
     }
@@ -103,7 +107,7 @@ extension ProposalDetailView {
         guard
             pendingBroadcastRequest?.action == .approveAndExecute,
             broadcastFailure?.action == .execute,
-            let approveTransaction = actionBroadcaster?.completedTransactions.first
+            let approveTransaction = pendingApproveTransaction
         else {
             clearBroadcastState()
             return

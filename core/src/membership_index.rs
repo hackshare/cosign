@@ -184,11 +184,11 @@ impl MembershipIndex {
     }
 
     pub fn set_healthy(&self, healthy: bool) {
-        self.healthy.store(healthy, Ordering::SeqCst);
+        self.healthy.store(healthy, Ordering::Relaxed);
     }
 
     pub fn is_fresh(&self, now_unix: i64) -> bool {
-        self.healthy.load(Ordering::SeqCst)
+        self.healthy.load(Ordering::Relaxed)
             && self.build_complete()
             && now_unix.saturating_sub(self.last_reconcile_at()) < MAX_RECONCILE_AGE_SECS
     }

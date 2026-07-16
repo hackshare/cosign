@@ -32,11 +32,11 @@ public enum SquadProposalAction: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-public struct SignedProposalTransaction: Equatable, Sendable {
-    public let action: SquadProposalAction
-    public let messageBytes: Data
-    public let signature: Data
-    public let simulationLogs: [String]
+struct SignedProposalTransaction: Equatable {
+    let action: SquadProposalAction
+    let messageBytes: Data
+    let signature: Data
+    let simulationLogs: [String]
 }
 
 public struct BroadcastFailure: Equatable, Sendable {

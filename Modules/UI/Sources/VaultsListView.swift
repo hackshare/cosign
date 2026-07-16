@@ -47,12 +47,10 @@ struct CosignVaultCard: View {
 }
 
 struct NativeTokenRow: View {
-    let lamports: UInt64
     private let _trailing: AnyView
 
     /// String-based trailing (existing callers, demo mode, VaultInspectionView).
     init(lamports: UInt64, trailingValue: String? = nil) {
-        self.lamports = lamports
         _trailing = AnyView(
             Text(trailingValue ?? solAmount(lamports))
                 .font(CosignTheme.FontStyle.body)
@@ -62,8 +60,7 @@ struct NativeTokenRow: View {
     }
 
     /// View-based trailing for freshness-aware content (PriceValueView callers).
-    init(lamports: UInt64, @ViewBuilder trailing: () -> some View) {
-        self.lamports = lamports
+    init(lamports _: UInt64, @ViewBuilder trailing: () -> some View) {
         _trailing = AnyView(trailing())
     }
 

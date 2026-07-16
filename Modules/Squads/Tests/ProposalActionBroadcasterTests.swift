@@ -4,7 +4,8 @@ import Testing
 
 // MARK: - Fake BroadcastLegRunner
 
-private final class FakeBroadcastLegRunner: BroadcastLegRunner {
+// @unchecked: mutable counters are mutated only from within a single serial run().
+private final class FakeBroadcastLegRunner: BroadcastLegRunner, @unchecked Sendable {
     private(set) var signCounts: [SquadProposalAction: Int] = [:]
     private(set) var broadcastCounts: [SquadProposalAction: Int] = [:]
 

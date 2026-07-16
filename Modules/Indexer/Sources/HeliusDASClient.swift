@@ -5,6 +5,8 @@ enum HeliusDASClientError: Error, Equatable {
     case rpcError(code: Int, message: String)
 }
 
+// SAFETY: all stored state is immutable (`let`); the JSONEncoder/JSONDecoder are never
+// reconfigured after init, so concurrent encode/decode is safe.
 public final class HeliusDASClient: @unchecked Sendable {
     public static let tokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
     public static let token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"

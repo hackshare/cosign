@@ -29,6 +29,9 @@ public struct ProposalDetailView: View {
     @State var actionDeviceStatusMessage: String?
     @State var actionBroadcaster: ProposalActionBroadcaster?
     @State var broadcastFailure: BroadcastFailure?
+    /// Captured from the broadcaster (an actor) when a broadcast fails, so the sync
+    /// dismiss handler can read the approve leg without awaiting.
+    @State var pendingApproveTransaction: ProposalActionSubmittedTransaction?
     @State var pendingBroadcastRequest: ProposalSigningRequest?
     @State var submittedResult: ProposalSubmissionResult?
     @State var pendingExecuteSigner: ProposalActionSigner?

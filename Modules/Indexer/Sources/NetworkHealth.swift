@@ -33,6 +33,8 @@ public enum NetworkHealthStatus: Equatable, Sendable {
 }
 
 @Observable
+// SAFETY: all mutable state is read and written only on the main actor; `reporter()`
+// marshals every outcome back to the main actor before touching it.
 public final class NetworkHealth: @unchecked Sendable {
     public private(set) var status: NetworkHealthStatus = .healthy
     public private(set) var lastSuccess: Date?
