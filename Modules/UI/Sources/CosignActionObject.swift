@@ -1,4 +1,5 @@
 import Indexer
+import Squads
 import SwiftUI
 
 struct ActionObject: Equatable {
@@ -14,6 +15,14 @@ struct ActionObject: Equatable {
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return normalizedTitle == CosignCopy.ActionObject.reviewRawInstructionsBeforeSigningTitle.lowercased() ||
             normalizedTitle == CosignCopy.ActionObject.reviewUnknownExecutedInstructionsTitle.lowercased()
+    }
+
+    /// Whether a generic relay "unknown instruction" action may be replaced by a local
+    /// (bundled- or IDL-decoded) action for legibility. Only when it is NOT high-risk:
+    /// a high-severity generic action carries the type-to-confirm gate, and a local decode
+    /// (including a relay-supplied on-chain IDL) must never lift that gate.
+    var isReplaceableByLocalDecode: Bool {
+        usesGenericReviewCopy && severity != .high
     }
 }
 
@@ -225,6 +234,20 @@ extension RelayInspectionAction {
         }
 
         return uniqueRoles(roles)
+    }
+}
+
+/// Confidence for a locally decoded action, tied to the tier-3 effect cross-check.
+/// A registry decode earns the cap only when simulation confirms it; a contradiction
+/// yields nil so the caller drops the confident statement (raw + simulation remain).
+func registryConfidence(provenance: DecodeProvenance?, crossCheck: CrossCheckVerdict?) -> ActionConfidence? {
+    guard case .registry = provenance else {
+        return provenance == nil ? .partial : .idl
+    }
+    switch crossCheck {
+    case .confirmed: return .known
+    case .contradicted: return nil
+    case .unconfirmed, .none: return .idl
     }
 }
 

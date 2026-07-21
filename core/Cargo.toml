@@ -30,7 +30,10 @@ relay-index = ["dep:rusqlite"]
 uniffi = { version = "0.31.1", features = ["build", "cli"] }
 thiserror = "1"
 dotenvy = "0.15"
-serde_json = "1"
+# Host-only (decompresses on-chain Anchor IDL accounts in the relay). The iOS
+# staticlib is built with `--lib`, so this never cross-compiles to iOS.
+flate2 = "1"
+serde_json = { version = "1", features = ["raw_value"] }
 url = "2"
 # Used only by the host relay-server binary (Jupiter price fetch). The iOS
 # staticlib is built with `--lib`, so this never cross-compiles to iOS.

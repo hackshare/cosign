@@ -67,6 +67,23 @@ extension CosignCopy {
             localized: "This execution failed on-chain and did not settle.",
             bundle: .module
         )
+        static let effectsConfirmedBySimulation = String(
+            localized: "Effects confirmed by simulation",
+            bundle: .module
+        )
+        static let effectsContradictBySimulation = String(
+            localized: "Does not match the simulated effects",
+            bundle: .module
+        )
+        static let contradictionBannerTitle = String(
+            localized: "Decoded action does not match simulation",
+            bundle: .module
+        )
+        static let contradictionBannerMessage =
+            String(
+                localized: "The registry's reading of this instruction disagrees with the independent simulation. Review the raw instructions and the simulation below before signing.",
+                bundle: .module
+            )
 
         static func proposalSectionTitle(index: UInt64) -> String {
             String(localized: "Proposal #\(index)", bundle: .module)

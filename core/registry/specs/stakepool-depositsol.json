@@ -1,0 +1,14 @@
+{
+  "program": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+  "discriminator": [14],
+  "mode": "standalone",
+  "layout": [ { "name": "lamports", "type": "u64" } ],
+  "action": "Stake",
+  "accounts": { "vault": 3, "poolMint": 7 },
+  "template": "Stake {lamports:sol} into the pool for {poolMint:token}",
+  "effects": [
+    { "direction": "out", "asset": "SOL", "amount": "arg(lamports)" },
+    { "direction": "in", "asset": "token(poolMint)", "amountAtLeast": "0" }
+  ],
+  "_note": "SPL Stake Pool `DepositSol`, Borsh tag [14], layout lamports:u64. Tag + layout byte-confirmed as the leading bytes of mainnet tx JFWD8Z2JUxy1XkcGJiAGA42pV2KUPTBRfuZKc4s4XhxjDLpx3uFFA6NR6MnbQrNnAaRuiTmYG1sehj1fJ1ZbiHK (slot 434120760): raw 0e00743ba40b000000, lamports = 50000000000. Account order (DepositSol): 0 stakePool, 1 withdrawAuthority, 2 reserveStake, 3 lamportsFrom(depositor/vault), 4 poolTokensTo, 5 managerFee, 6 referrerFee, 7 poolMint, 8 systemProgram, 9 tokenProgram. Cross-check legs: SOL outflow is a System `transfer` (relay asset 'SOL'); the pool-token inflow is a `mintTo` whose parsed instruction carries the pool mint (J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn = JitoSOL), so the relay asset is that mint address. Standalone tag spec — no bindsIdlHash. Fail-safe: mis-author -> Contradicted, never a silent wrong sign; not signed into the served bundle until the gated re-pin."
+}

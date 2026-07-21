@@ -44,6 +44,9 @@ extension ProposalDetailView {
             ProposalInspectionReportView(
                 report: inspectionReport,
                 instructionDecoder: instructionDecoder,
+                idls: resolvedIDLs,
+                specs: resolvedSpecs,
+                resolvedMints: resolvedMints,
                 showsSimulation: !proposal.isExecuted,
                 showsAction: false
             )
@@ -158,6 +161,30 @@ extension ProposalDetailView {
         return proposal.canRefreshRelaySimulation
             ? CosignCopy.ProposalDetail.refreshInspectionAndSimulationTitle
             : CosignCopy.ProposalDetail.refreshInspectionTitle
+    }
+
+    @MainActor
+    func resolveDecodeSpecs() async {
+        resolvedSpecs = await DecodeRegistryResolver(relay: indexerEnvironment.relay).resolve()
+    }
+
+    @MainActor
+    func resolveIDLs() async {
+        guard let proposal else { return }
+        let programs = instructionDecoder.programsNeedingIDL(in: proposal)
+        guard !programs.isEmpty else {
+            resolvedIDLs = [:]
+            return
+        }
+        let resolver = ProgramIDLResolver(relay: indexerEnvironment.relay)
+        resolvedIDLs = await resolver.resolve(programIDs: programs)
+    }
+
+    @MainActor
+    func resolveMints() async {
+        guard let proposal else { return }
+        let accounts = unique(proposal.accountsReferenced + proposal.instructions.flatMap(\.accounts))
+        resolvedMints = await MintResolver(relay: indexerEnvironment.relay).resolve(accounts: accounts)
     }
 }
 

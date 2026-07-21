@@ -1224,6 +1224,7 @@ dependencies = [
  "bip39",
  "bs58 0.5.1",
  "dotenvy",
+ "flate2",
  "hex",
  "hmac 0.12.1",
  "rand 0.8.6",

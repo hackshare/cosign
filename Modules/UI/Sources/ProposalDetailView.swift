@@ -32,6 +32,9 @@ public struct ProposalDetailView: View {
     /// Captured from the broadcaster (an actor) when a broadcast fails, so the sync
     /// dismiss handler can read the approve leg without awaiting.
     @State var pendingApproveTransaction: ProposalActionSubmittedTransaction?
+    @State var resolvedIDLs: [String: ResolvedProgramIDL] = [:]
+    @State var resolvedSpecs: [String: [DecodeSpec]] = [:]
+    @State var resolvedMints: [String: ResolvedMint] = [:]
     @State var pendingBroadcastRequest: ProposalSigningRequest?
     @State var submittedResult: ProposalSubmissionResult?
     @State var pendingExecuteSigner: ProposalActionSigner?
@@ -83,6 +86,9 @@ public struct ProposalDetailView: View {
         .refreshable { await load(forceRefresh: true) }
         .task(id: "\(squadAddress)-\(transactionIndex)") { await load() }
         .task(id: inspectionTaskID) { await loadInspectionForCurrentProposal() }
+        .task(id: idlResolutionTaskID) { await resolveIDLs() }
+        .task(id: idlResolutionTaskID) { await resolveDecodeSpecs() }
+        .task(id: idlResolutionTaskID) { await resolveMints() }
         .pollingRefresh(
             id: "proposal-detail-\(squadAddress)-\(transactionIndex)",
             interval: ReadPollingInterval.proposal,
@@ -187,6 +193,11 @@ public struct ProposalDetailView: View {
             executionSignature ?? "",
             indexerEnvironment.effectiveRPCURL.absoluteString
         ].joined(separator: "|")
+    }
+
+    private var idlResolutionTaskID: String {
+        guard let proposal else { return "none" }
+        return "\(squadAddress)|\(proposal.transactionIndex)|idl"
     }
 
     @MainActor

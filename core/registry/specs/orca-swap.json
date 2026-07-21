@@ -1,0 +1,19 @@
+{
+  "program": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+  "discriminator": [248, 198, 158, 145, 225, 117, 135, 200],
+  "mode": "bind-idl",
+  "bindsIdlHash": "7afddfe8766bd24d30ff9ee5b12c7ee89bff5bc3b7b0396620e021a97a7ef63f",
+  "action": "Swap",
+  "accounts": { "tokenOwnerAccountA": 3, "tokenOwnerAccountB": 5 },
+  "template": [
+    { "when": ["arg(a_to_b)", "arg(amount_specified_is_input)"], "text": "Swap {amount:token(tokenOwnerAccountA)} on Orca Whirlpool (A→B)" },
+    { "when": ["!arg(a_to_b)", "arg(amount_specified_is_input)"], "text": "Swap {amount:token(tokenOwnerAccountB)} on Orca Whirlpool (B→A)" }
+  ],
+  "effects": [
+    { "when": ["arg(a_to_b)", "arg(amount_specified_is_input)"], "direction": "out", "asset": "token(tokenOwnerAccountA)", "amountAtMost": "arg(amount)" },
+    { "when": ["arg(a_to_b)", "arg(amount_specified_is_input)"], "direction": "in", "asset": "token(tokenOwnerAccountB)", "amountAtLeast": "arg(other_amount_threshold)" },
+    { "when": ["!arg(a_to_b)", "arg(amount_specified_is_input)"], "direction": "out", "asset": "token(tokenOwnerAccountB)", "amountAtMost": "arg(amount)" },
+    { "when": ["!arg(a_to_b)", "arg(amount_specified_is_input)"], "direction": "in", "asset": "token(tokenOwnerAccountA)", "amountAtLeast": "arg(other_amount_threshold)" }
+  ],
+  "_note": "Orca Whirlpool `swap`, discriminator [248,198,158,145,225,117,135,200] = Anchor sighash(global:swap), byte-confirmed against mainnet txs 3bGpboJiB3wzbzXsaLt6s2rJ5WQpTmB5EqGLLyCNNCMA8oSotM8LWzRJ2AS5jcJ7Hi69DnMFtBTdowtT6DLsJQxq (a_to_b=1, slot 434121979) and 1wuXW17rHChZTKn5uFjKctxEgDz7hnmfBDXAWUWnABM4reMrUioy4CWEVXQ5xufwgN8gbzabndvCZG5x6jpM765 (a_to_b=0, slot 434121980). On-chain whirlpool IDL swap args (Anchor 0.30, snake_case): amount:u64, other_amount_threshold:u64, sqrt_price_limit:u128, amount_specified_is_input:bool, a_to_b:bool -- a_to_b IS a real Borsh bool, so the conditional variants select on a genuinely-decoded flag. Every variant + effect is ALSO gated on arg(amount_specified_is_input) (a real Borsh bool at byte offset 40, right after the u128 sqrt_price_limit): the variants label `amount` as the INPUT quantity, which only holds for exact-input swaps. An exact-OUTPUT swap (amount_specified_is_input=false) matches NO variant -> interpret returns nil -> clean fall-through to the generic decoder, never a wrong statement. Correct exact-output variants are a future enhancement. Account order: 3 token_owner_account_a, 5 token_owner_account_b. bindsIdlHash = sha256 of the on-chain whirlpool IDL (PDA 2KFqE4RWoPVbvodo8vbggCFeHPS8TDvgpwp79ALMrcyn); re-pin against the deployed relay /idl at go-live, and confirm arg-name casing (snake_case a_to_b) the relay serves. The swap's token legs are non-checked SPL `transfer` CPIs; the relay now resolves each leg's mint from its source token account (both the pending decoded path and the executed jsonParsed path), so the legs carry asset = mint address and the cross-check canonicalizes them. The OUT leg uses amountAtMost(arg(amount)) because the stated `amount` is the INPUT CAP: an exact-input swap consumes AT MOST that much, and a price-limited partial fill moves less (e.g. the a_to_b=1 source tx moved ~6.2 of a 124-SOL cap), so exact(amount) would false-contradict. The IN leg uses amountAtLeast(arg(other_amount_threshold)), the slippage floor. Fail-safe holds: mis-author -> Contradicted, never a silent wrong sign. Not signed into the served bundle until the gated re-pin."
+}

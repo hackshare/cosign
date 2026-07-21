@@ -16,6 +16,12 @@ public protocol RelayClient: Sendable {
         for request: ExecutedTransactionInspectionRequest
     ) async throws -> ExecutedTransactionInspectionReport
     func prices(for mints: [String]) async throws -> RelayPrices
+    func programIDLURL(for request: ProgramIDLRequest) -> URL?
+    func programIDL(for request: ProgramIDLRequest) async throws -> ProgramIDLResponse
+    func decodeRegistryURL() -> URL?
+    func decodeRegistry() async throws -> DecodeRegistryResponse
+    func mintMetadataURL(for request: MintMetadataRequest) -> URL?
+    func mintMetadata(for request: MintMetadataRequest) async throws -> MintMetadataResponse
 }
 
 public struct NoOpRelay: RelayClient {
@@ -64,6 +70,30 @@ public struct NoOpRelay: RelayClient {
     }
 
     public func prices(for _: [String]) async throws -> RelayPrices {
+        throw RelayClientError.unavailable
+    }
+
+    public func programIDLURL(for _: ProgramIDLRequest) -> URL? {
+        nil
+    }
+
+    public func programIDL(for _: ProgramIDLRequest) async throws -> ProgramIDLResponse {
+        throw RelayClientError.unavailable
+    }
+
+    public func decodeRegistryURL() -> URL? {
+        nil
+    }
+
+    public func decodeRegistry() async throws -> DecodeRegistryResponse {
+        throw RelayClientError.unavailable
+    }
+
+    public func mintMetadataURL(for _: MintMetadataRequest) -> URL? {
+        nil
+    }
+
+    public func mintMetadata(for _: MintMetadataRequest) async throws -> MintMetadataResponse {
         throw RelayClientError.unavailable
     }
 }
@@ -217,7 +247,7 @@ final class HTTPRelayClient: RelayClient, @unchecked Sendable {
         ])
     }
 
-    private func relayURL(
+    func relayURL(
         pathComponents: [String],
         queryItems: [URLQueryItem] = []
     ) -> URL? {

@@ -63,6 +63,30 @@ public struct DemoRelayClient: RelayClient {
         )
     }
 
+    public func programIDLURL(for _: ProgramIDLRequest) -> URL? {
+        nil
+    }
+
+    public func programIDL(for _: ProgramIDLRequest) async throws -> ProgramIDLResponse {
+        throw RelayClientError.unavailable
+    }
+
+    public func decodeRegistryURL() -> URL? {
+        nil
+    }
+
+    public func decodeRegistry() async throws -> DecodeRegistryResponse {
+        throw RelayClientError.unavailable
+    }
+
+    public func mintMetadataURL(for _: MintMetadataRequest) -> URL? {
+        nil
+    }
+
+    public func mintMetadata(for _: MintMetadataRequest) async throws -> MintMetadataResponse {
+        throw RelayClientError.unavailable
+    }
+
     private func demoURL(_ pathComponents: [String]) -> URL? {
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             return nil

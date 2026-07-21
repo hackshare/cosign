@@ -5,6 +5,9 @@ import SwiftUI
 struct ProposalInspectionReportView: View {
     let report: ProposalInspectionReport
     let instructionDecoder: InstructionDecoder
+    var idls: [String: ResolvedProgramIDL] = [:]
+    var specs: [String: [DecodeSpec]] = [:]
+    var resolvedMints: [String: ResolvedMint] = [:]
     let showsSimulation: Bool
     var showsAction = true
 
@@ -26,8 +29,16 @@ struct ProposalInspectionReportView: View {
     }
 
     private var decodedInstructions: [DecodedInstructionDisplay] {
-        report.proposal.instructions.map { instruction in
-            instructionDecoder.decode(instruction.squadInstruction)
+        let mints = resolvedMints.mapValues { MintInfo(
+            symbol: $0.symbol ?? cosignShortAddress($0.mint),
+            decimals: $0.decimals
+        ) }
+        // This view has no vault-account set, so it cannot compute a meaningful verdict; the
+        // authoritative cross-check runs in ProposalDetailView. Pass nil rather than an inert context.
+        return report.proposal.instructions.map { instruction in
+            instructionDecoder.decode(
+                instruction.squadInstruction, idls: idls, specs: specs, mints: mints, crossCheck: nil
+            )
         }
     }
 

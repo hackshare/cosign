@@ -26,6 +26,19 @@ struct InstructionRow: View {
                 .font(CosignTheme.FontStyle.body)
                 .foregroundStyle(CosignTheme.ink)
 
+            if let provenance = instruction.provenance {
+                Text(provenance.sourceDescription)
+                    .font(CosignTheme.FontStyle.monoSmall)
+                    .foregroundStyle(CosignTheme.inkFaint)
+                    .textSelection(.enabled)
+            }
+
+            if let clause = crossCheckClause {
+                Text(clause)
+                    .font(CosignTheme.FontStyle.monoSmall)
+                    .foregroundStyle(crossCheckColor)
+            }
+
             if !uniqueAccounts.isEmpty {
                 CosignDisclosure(
                     title: CosignCopy.ProposalDetail.accountsTitle,
@@ -54,6 +67,18 @@ struct InstructionRow: View {
 
     private var uniqueAccounts: [String] {
         unique(instruction.accounts)
+    }
+
+    private var crossCheckClause: String? {
+        switch instruction.crossCheck {
+        case .confirmed: CosignCopy.ProposalDetail.effectsConfirmedBySimulation
+        case .contradicted: CosignCopy.ProposalDetail.effectsContradictBySimulation
+        case .unconfirmed, .none: nil
+        }
+    }
+
+    private var crossCheckColor: Color {
+        instruction.crossCheck == .contradicted ? CosignTheme.riskAmber : CosignTheme.inkFaint
     }
 }
 

@@ -1,4 +1,23 @@
 import Foundation
+import Indexer
+
+public enum DecodeProvenance: Equatable, Sendable {
+    case onChainIDL(idlName: String, hash: String, slot: UInt64)
+    case registry(action: String, source: String, boundProgram: String?)
+
+    public var sourceDescription: String {
+        switch self {
+        case let .onChainIDL(idlName, hash, slot):
+            "On-chain IDL · \(idlName) · slot \(slot) · \(hash.prefix(8))"
+        case let .registry(action, source, boundProgram):
+            if let boundProgram {
+                "\(action) · \(source) registry, bound to \(boundProgram) IDL"
+            } else {
+                "\(action) · \(source) registry"
+            }
+        }
+    }
+}
 
 public struct DecodedInstructionDisplay: Equatable, Sendable {
     public let programLabel: String
@@ -6,19 +25,25 @@ public struct DecodedInstructionDisplay: Equatable, Sendable {
     public let summary: String
     public let accounts: [String]
     public let dataHex: String
+    public let provenance: DecodeProvenance?
+    public let crossCheck: CrossCheckVerdict?
 
     public init(
         programLabel: String,
         kind: String,
         summary: String,
         accounts: [String],
-        dataHex: String
+        dataHex: String,
+        provenance: DecodeProvenance? = nil,
+        crossCheck: CrossCheckVerdict? = nil
     ) {
         self.programLabel = programLabel
         self.kind = kind
         self.summary = summary
         self.accounts = accounts
         self.dataHex = dataHex
+        self.provenance = provenance
+        self.crossCheck = crossCheck
     }
 }
 
@@ -27,7 +52,11 @@ public struct InstructionDecoder: Sendable {
 
     public func decode(
         _ instruction: SquadDecodedInstruction,
-        accounts overrideAccounts: [String]? = nil
+        accounts overrideAccounts: [String]? = nil,
+        idls: [String: ResolvedProgramIDL] = [:],
+        specs: [String: [DecodeSpec]] = [:],
+        mints: [String: MintInfo] = [:],
+        crossCheck: CrossCheckContext? = nil
     ) -> DecodedInstructionDisplay {
         let accounts = overrideAccounts ?? instruction.accounts
 
@@ -71,13 +100,35 @@ public struct InstructionDecoder: Sendable {
             return decodeSquadsInstruction(instruction, accounts: accounts)
         }
 
-        return fallback(instruction, accounts: accounts)
+        return interpretSpec(
+            instruction,
+            accounts: accounts,
+            idls: idls,
+            specs: specs,
+            mints: mints,
+            crossCheck: crossCheck
+        )
+            ?? interpretIDL(instruction, accounts: accounts, idls: idls)
+            ?? fallback(instruction, accounts: accounts)
     }
 
-    public func decode(_ proposal: SquadProposalDetail) -> [DecodedInstructionDisplay] {
+    public func decode(
+        _ proposal: SquadProposalDetail,
+        idls: [String: ResolvedProgramIDL] = [:],
+        specs: [String: [DecodeSpec]] = [:],
+        mints: [String: MintInfo] = [:],
+        crossCheck: CrossCheckContext? = nil
+    ) -> [DecodedInstructionDisplay] {
         proposal.instructions.map { instruction in
             let accounts = instruction.accounts.isEmpty ? proposal.accountsReferenced : instruction.accounts
-            return decode(instruction, accounts: accounts)
+            return decode(
+                instruction,
+                accounts: accounts,
+                idls: idls,
+                specs: specs,
+                mints: mints,
+                crossCheck: crossCheck
+            )
         }
     }
 }
@@ -120,6 +171,50 @@ extension InstructionDecoder {
             accounts: accounts,
             dataHex: instruction.rawDataHex
         )
+    }
+
+    func interpretIDL(
+        _ instruction: SquadDecodedInstruction,
+        accounts: [String],
+        idls: [String: ResolvedProgramIDL]
+    ) -> DecodedInstructionDisplay? {
+        guard let resolved = idls[instruction.program] else {
+            return nil
+        }
+        return AnchorIDLInterpreter().interpret(instruction, resolved: resolved, accounts: accounts)
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    func interpretSpec(
+        _ instruction: SquadDecodedInstruction,
+        accounts: [String],
+        idls: [String: ResolvedProgramIDL],
+        specs: [String: [DecodeSpec]],
+        mints: [String: MintInfo],
+        crossCheck: CrossCheckContext?
+    ) -> DecodedInstructionDisplay? {
+        guard let candidates = specs[instruction.program] else { return nil }
+        let interpreter = DecodeSpecInterpreter()
+        for spec in candidates {
+            if let display = interpreter.interpret(
+                instruction, spec: spec, resolvedIDL: idls[instruction.program],
+                accounts: accounts, mints: mints, crossCheck: crossCheck
+            ) {
+                return display
+            }
+        }
+        return nil
+    }
+
+    public func programsNeedingIDL(in proposal: SquadProposalDetail) -> [String] {
+        var seen = Set<String>()
+        var result = [String]()
+        for instruction in proposal.instructions where decode(instruction).kind == "raw" {
+            if seen.insert(instruction.program).inserted {
+                result.append(instruction.program)
+            }
+        }
+        return result
     }
 
     static func isTokenProgram(_ program: String) -> Bool {

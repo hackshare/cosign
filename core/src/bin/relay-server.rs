@@ -19,7 +19,7 @@ use cosign_core::{
     transactions,
     types::{self, ConfigActionInfo, DecodedInstruction, ProposalCompanionRef, ProposalDetail},
 };
-use serde_json::{Value, json};
+use serde_json::{Value, json, value::RawValue};
 use sha2::{Digest, Sha256};
 use solana_client::client_error::reqwest;
 use solana_sdk::{
@@ -82,6 +82,9 @@ const DEFAULT_RPC_ALLOWED_METHODS: &[&str] = &[
     "sendTransaction",
     "simulateTransaction",
 ];
+
+const DECODE_REGISTRY_BUNDLE: &str = include_str!("../../registry/decode-registry.json");
+const DECODE_REGISTRY_SIGNATURE: &str = include_str!("../../registry/decode-registry.sig");
 
 // Process-wide handle to the membership index, populated once at startup by
 // main() if COSIGN_INDEX_DB_PATH is configured. Absent that, member reads
@@ -379,6 +382,9 @@ impl RelayConfig {
                 "proposal_inspection",
                 "executed_transaction_inspection",
                 "known_program_decoding",
+                "program_idl",
+                "decode_registry",
+                "mint_metadata",
                 "action_effects",
                 "rpc_method_filtering",
                 "transaction_attribution",
@@ -671,6 +677,7 @@ struct HttpRequest {
     host: Option<String>,
     /// Present when this is a WebSocket upgrade request (the Sec-WebSocket-Key).
     websocket_key: Option<String>,
+    if_none_match: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -898,6 +905,7 @@ fn handle_request_with_client(
             reason: reason_phrase(200),
             content_type: "image/svg+xml; charset=utf-8",
             body: FAVICON_SVG.as_bytes().to_vec(),
+            extra_headers: Vec::new(),
         };
     }
 
@@ -912,6 +920,7 @@ fn handle_request_with_client(
             reason: reason_phrase(200),
             content_type: "image/png",
             body: bytes.to_vec(),
+            extra_headers: Vec::new(),
         };
     }
 
@@ -925,6 +934,20 @@ fn handle_request_with_client(
 
     if request.method == "GET" && request.path == "/cosign/v1/release" {
         return release_response();
+    }
+
+    if request.method == "GET" && request.path == "/cosign/v1/decode-registry" {
+        return decode_registry_response();
+    }
+
+    if request.method == "GET"
+        && let Some(account) = parse_mint_metadata_request(&request.path)
+    {
+        return match resolve_mint_metadata(config, &account) {
+            Ok(metadata) => mint_metadata_json_response(&metadata),
+            Err(RelayError::NotFound) => mint_metadata_not_found_response(),
+            Err(error) => relay_error_response(error, request.query.as_deref()),
+        };
     }
 
     if request.method != "GET" {
@@ -999,6 +1022,21 @@ fn handle_request_with_client(
         Err(error) => return relay_error_response(error, request.query.as_deref()),
     }
 
+    match parse_program_idl_request(&request.path) {
+        Ok(parsed) => {
+            return match resolve_program_idl(config, &parsed.program) {
+                Ok(idl) if if_none_match_hits(request.if_none_match.as_deref(), &idl.hash) => {
+                    not_modified_response(&idl.hash, IDL_CACHE_MAX_AGE_SECS)
+                }
+                Ok(idl) => program_idl_json_response(&idl),
+                Err(RelayError::NotFound) => program_idl_not_found_response(),
+                Err(error) => relay_error_response(error, request.query.as_deref()),
+            };
+        }
+        Err(RelayError::NotFound) => {}
+        Err(error) => return relay_error_response(error, request.query.as_deref()),
+    }
+
     let parsed = match parse_inspection_request(&request.path, request.query.as_deref()) {
         Ok(request) => request,
         Err(error) => return relay_error_response(error, request.query.as_deref()),
@@ -1060,6 +1098,7 @@ fn proxy_rpc_request(
         reason: reason_phrase(status),
         content_type: "application/json; charset=utf-8",
         body,
+        extra_headers: Vec::new(),
     })
 }
 
@@ -1347,7 +1386,8 @@ fn activity_action(rpc_url: &str, item: &types::ActivityItem) -> Option<Inspecti
     }
 
     let transaction = fetch_transaction_json(rpc_url, &item.signature).ok()??;
-    let action = action_from_transaction_json(&transaction);
+    let mut action = action_from_transaction_json(&transaction);
+    resolve_missing_transfer_assets(&mut action, rpc_url);
     (action.confidence != "low").then_some(action)
 }
 
@@ -1385,9 +1425,13 @@ fn resolve_proposal(
     );
     let simulation = simulate_execution(&rpc_url, request, &multisig, &proposal.companion, &detail);
 
+    let mut action = action_from_decoded_instructions(&decoded_proposal_instructions(&detail));
+    resolve_missing_transfer_assets(&mut action, &rpc_url);
+
     Ok(ProposalInspection {
         squad: request.squad.to_string(),
         detail,
+        action,
         cluster: None,
         simulation,
     })
@@ -1421,12 +1465,13 @@ fn resolve_transaction(
         .as_ref()
         .map(transaction_logs)
         .unwrap_or_default();
-    let action = transaction
+    let mut action = transaction
         .as_ref()
         .map(action_from_transaction_json)
         .unwrap_or_else(|| {
             InspectionAction::unknown("Transaction details are not available from RPC.")
         });
+    resolve_missing_transfer_assets(&mut action, &rpc_url);
 
     Ok(TransactionInspection {
         signature,
@@ -1435,6 +1480,356 @@ fn resolve_transaction(
         action,
         logs,
     })
+}
+
+struct ParsedIdlAccount {
+    authority: Pubkey,
+    idl_json: Vec<u8>,
+}
+
+/// Anchor's canonical IDL account address: a seed account owned by the program's
+/// base signer. Reading it is trusting the same party that deploys the program.
+fn derive_idl_address(program_id: &Pubkey) -> Option<Pubkey> {
+    let base = Pubkey::find_program_address(&[], program_id).0;
+    Pubkey::create_with_seed(&base, "anchor:idl", program_id).ok()
+}
+
+/// Layout: [8 discriminator][32 authority][4 data_len LE][data_len zlib(IDL JSON)].
+/// A too-short or truncated account is treated as "no usable IDL" (NotFound) so
+/// the caller falls through a tier rather than surfacing an error. A `data_len`
+/// of 0 decodes to an empty `idl_json`, which `resolve_program_idl` then fails
+/// to parse as JSON, so a degenerate account still fails safe rather than
+/// serving an empty IDL.
+fn parse_idl_account(data: &[u8]) -> Result<ParsedIdlAccount, RelayError> {
+    const HEADER_LEN: usize = 8 + 32 + 4;
+    if data.len() < HEADER_LEN {
+        return Err(RelayError::NotFound);
+    }
+
+    let authority = Pubkey::try_from(&data[8..40]).map_err(|_| RelayError::NotFound)?;
+    let data_len = u32::from_le_bytes([data[40], data[41], data[42], data[43]]) as usize;
+
+    let end = HEADER_LEN
+        .checked_add(data_len)
+        .ok_or(RelayError::NotFound)?;
+    if data.len() < end {
+        return Err(RelayError::NotFound);
+    }
+    let compressed = &data[HEADER_LEN..end];
+
+    let mut idl_json = Vec::new();
+    std::io::Read::read_to_end(
+        &mut flate2::read::ZlibDecoder::new(compressed),
+        &mut idl_json,
+    )
+    .map_err(|error| RelayError::Rpc(format!("idl decompression failed: {error}")))?;
+
+    Ok(ParsedIdlAccount {
+        authority,
+        idl_json,
+    })
+}
+
+#[derive(Clone)]
+struct FetchedIdl {
+    program: String,
+    idl_json: Box<RawValue>,
+    hash: String,
+    slot: u64,
+    authority: String,
+}
+
+/// An `IDL_CACHE` entry: either a resolved IDL, or a remembered miss (no
+/// derivable PDA / no account at that PDA) so repeated lookups for the same
+/// absent IDL don't keep hitting RPC.
+#[derive(Clone)]
+enum IdlCacheEntry {
+    Found(FetchedIdl),
+    Missing,
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Raw JSON-RPC getAccountInfo. Returns (account data bytes, slot), or None when
+/// the account does not exist.
+fn fetch_account_info(
+    rpc_url: &str,
+    address: &Pubkey,
+) -> Result<Option<(Vec<u8>, u64)>, RelayError> {
+    let client = reqwest::blocking::Client::builder()
+        .no_proxy()
+        .timeout(RPC_TIMEOUT)
+        .build()
+        .map_err(|error| RelayError::Rpc(error.to_string()))?;
+    let response = client
+        .post(rpc_url)
+        .json(&json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getAccountInfo",
+            "params": [
+                address.to_string(),
+                { "encoding": "base64", "commitment": "confirmed" }
+            ]
+        }))
+        .send()
+        .map_err(|error| RelayError::Rpc(error.to_string()))?;
+
+    let status = response.status();
+    let body: Value = response
+        .json()
+        .map_err(|error| RelayError::Rpc(error.to_string()))?;
+    if !status.is_success() {
+        return Err(RelayError::Rpc(format!(
+            "getAccountInfo returned HTTP {}",
+            status.as_u16()
+        )));
+    }
+    if let Some(error) = body.get("error") {
+        return Err(RelayError::Rpc(error.to_string()));
+    }
+
+    let result = &body["result"];
+    let slot = result["context"]["slot"].as_u64().unwrap_or(0);
+    let value = &result["value"];
+    if value.is_null() {
+        return Ok(None);
+    }
+    let data_b64 = value["data"][0]
+        .as_str()
+        .ok_or_else(|| RelayError::Rpc("getAccountInfo value.data missing".into()))?;
+    let data = BASE64_STANDARD
+        .decode(data_b64)
+        .map_err(|error| RelayError::Rpc(error.to_string()))?;
+    Ok(Some((data, slot)))
+}
+
+#[derive(Debug, PartialEq)]
+enum SplAccount {
+    Mint { decimals: u8 },
+    TokenAccount { mint: Pubkey },
+}
+
+/// Classifies raw account data as an SPL Mint (82 bytes; decimals at offset 44) or
+/// SPL Token Account (165 bytes; mint at bytes 0..32). Token-2022 base layouts share
+/// these sizes; extended accounts (len > 165) carry an AccountType byte at offset 165
+/// (1 = Mint, 2 = Account). Anything else fails safe to None.
+fn parse_spl_account(data: &[u8]) -> Option<SplAccount> {
+    match data.len() {
+        82 => Some(SplAccount::Mint { decimals: data[44] }),
+        165 => Some(SplAccount::TokenAccount {
+            mint: Pubkey::try_from(&data[0..32]).ok()?,
+        }),
+        len if len > 165 => match data[165] {
+            1 => Some(SplAccount::Mint { decimals: data[44] }),
+            2 => Some(SplAccount::TokenAccount {
+                mint: Pubkey::try_from(&data[0..32]).ok()?,
+            }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+const WELL_KNOWN_MINT_SYMBOLS: &[(&str, &str)] = &[
+    ("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "USDC"),
+    ("Es9vMFrzaCERmJfrF4H2FYD4KConky11McCe8BenwNYB", "USDT"),
+    ("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", "JitoSOL"),
+    ("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", "mSOL"),
+];
+
+fn well_known_mint_symbol(mint: &str) -> Option<&'static str> {
+    WELL_KNOWN_MINT_SYMBOLS
+        .iter()
+        .find(|(address, _)| *address == mint)
+        .map(|(_, symbol)| *symbol)
+}
+
+struct MintMetadata {
+    account: String,
+    mint: String,
+    decimals: u8,
+    symbol: Option<&'static str>,
+}
+
+/// Reads `token_account` and returns the mint it holds. `Ok(None)` when the
+/// account is absent or is not an SPL token account; `Err` only on RPC failure —
+/// letting callers separate "not a token account" from "couldn't reach RPC".
+fn read_token_account_mint(
+    rpc_url: &str,
+    token_account: &Pubkey,
+) -> Result<Option<Pubkey>, RelayError> {
+    let Some((data, _slot)) = fetch_account_info(rpc_url, token_account)? else {
+        return Ok(None);
+    };
+    Ok(match parse_spl_account(&data) {
+        Some(SplAccount::TokenAccount { mint }) => Some(mint),
+        _ => None,
+    })
+}
+
+/// Reads `mint` and returns its decimals. `Ok(None)` when the account is absent
+/// or is not an SPL mint; `Err` only on RPC failure.
+fn read_mint_decimals(rpc_url: &str, mint: &Pubkey) -> Result<Option<u8>, RelayError> {
+    let Some((data, _slot)) = fetch_account_info(rpc_url, mint)? else {
+        return Ok(None);
+    };
+    Ok(match parse_spl_account(&data) {
+        Some(SplAccount::Mint { decimals }) => Some(decimals),
+        _ => None,
+    })
+}
+
+/// Resolves `account` (either a mint itself, or a token account holding one) to
+/// its `(mint, decimals)`. NotFound when the account is absent, is not an SPL
+/// mint/token account, or a token account's mint can't be read as a mint. RPC
+/// failures propagate as `Rpc` errors rather than NotFound. Shared by the
+/// `/mints/{account}` endpoint and the transfer-asset post-pass.
+fn resolve_mint_and_decimals(rpc_url: &str, account: &Pubkey) -> Result<(Pubkey, u8), RelayError> {
+    let (data, _slot) = fetch_account_info(rpc_url, account)?.ok_or(RelayError::NotFound)?;
+    match parse_spl_account(&data).ok_or(RelayError::NotFound)? {
+        SplAccount::Mint { decimals } => Ok((*account, decimals)),
+        SplAccount::TokenAccount { mint } => {
+            let decimals = read_mint_decimals(rpc_url, &mint)?.ok_or(RelayError::NotFound)?;
+            Ok((mint, decimals))
+        }
+    }
+}
+
+/// Reads the queried account; if it is a token account, reads its mint for decimals.
+/// NotFound when the account does not exist or is not an SPL mint/token account.
+fn resolve_mint_metadata(config: &RelayConfig, account: &str) -> Result<MintMetadata, RelayError> {
+    let account_key: Pubkey = account
+        .parse()
+        .map_err(|_| RelayError::BadRequest("invalid account address".into()))?;
+    let rpc_url = config.rpc_url()?;
+    let (mint_key, decimals) = resolve_mint_and_decimals(&rpc_url, &account_key)?;
+    let mint = mint_key.to_string();
+    let symbol = well_known_mint_symbol(&mint);
+    Ok(MintMetadata {
+        account: account.to_string(),
+        mint,
+        decimals,
+        symbol,
+    })
+}
+
+/// Derives, fetches, and parses a program's on-chain Anchor IDL, returning a
+/// content-hashed, cached snapshot. Successful resolves are served from cache
+/// for `IDL_CACHE_TTL`; a program with no usable IDL is negative-cached for
+/// `IDL_NEGATIVE_CACHE_TTL` so repeated misses don't keep hitting RPC. Other
+/// errors (bad config, RPC failure) are never cached.
+fn resolve_program_idl(config: &RelayConfig, program: &str) -> Result<FetchedIdl, RelayError> {
+    let program_id: Pubkey = program
+        .parse()
+        .map_err(|_| RelayError::BadRequest("invalid program address".into()))?;
+
+    let cache = IDL_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    {
+        let guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+        match guard.get(program) {
+            Some((IdlCacheEntry::Found(cached), fetched_at))
+                if fetched_at.elapsed() < IDL_CACHE_TTL =>
+            {
+                return Ok(cached.clone());
+            }
+            Some((IdlCacheEntry::Missing, fetched_at))
+                if fetched_at.elapsed() < IDL_NEGATIVE_CACHE_TTL =>
+            {
+                return Err(RelayError::NotFound);
+            }
+            _ => {}
+        }
+    }
+
+    let outcome = fetch_and_parse_program_idl(config, &program_id);
+
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    match &outcome {
+        Ok(fetched) => insert_idl_cache_entry(
+            &mut guard,
+            program.to_string(),
+            IdlCacheEntry::Found(fetched.clone()),
+        ),
+        Err(RelayError::NotFound) => {
+            insert_idl_cache_entry(&mut guard, program.to_string(), IdlCacheEntry::Missing)
+        }
+        Err(_) => {}
+    }
+    drop(guard);
+
+    outcome
+}
+
+/// Derives the IDL PDA, fetches the account over RPC, and parses/hashes its
+/// content. Pulled out of `resolve_program_idl` so the cache lock is never
+/// held across the RPC round-trip.
+fn fetch_and_parse_program_idl(
+    config: &RelayConfig,
+    program_id: &Pubkey,
+) -> Result<FetchedIdl, RelayError> {
+    let idl_address = derive_idl_address(program_id).ok_or(RelayError::NotFound)?;
+    let rpc_url = config.rpc_url()?;
+    let (data, slot) = fetch_account_info(&rpc_url, &idl_address)?.ok_or(RelayError::NotFound)?;
+    let parsed = parse_idl_account(&data)?;
+    let idl_json: Box<RawValue> = serde_json::from_slice(&parsed.idl_json)
+        .map_err(|error| RelayError::Rpc(format!("idl is not valid json: {error}")))?;
+    // Hash the bytes RawValue actually captured (not the pre-parse buffer), so
+    // the hash can never drift from what gets served in the response body.
+    let hash = sha256_hex(idl_json.get().as_bytes());
+
+    Ok(FetchedIdl {
+        program: program_id.to_string(),
+        idl_json,
+        hash,
+        slot,
+        authority: parsed.authority.to_string(),
+    })
+}
+
+static IDL_CACHE: OnceLock<Mutex<HashMap<String, (IdlCacheEntry, Instant)>>> = OnceLock::new();
+const IDL_CACHE_TTL: Duration = Duration::from_secs(60 * 60);
+const IDL_NEGATIVE_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+/// Upper bound on distinct program addresses tracked in `IDL_CACHE`, so a
+/// stream of distinct (or bogus) program addresses can't grow it unbounded.
+const MAX_IDL_CACHE_ENTRIES: usize = 512;
+/// `Cache-Control: max-age` advertised on 200s and 304s for `/idl` responses.
+const IDL_CACHE_MAX_AGE_SECS: u64 = 60 * 60;
+
+/// Inserts `entry` for `key`, first dropping any cache entries whose own TTL
+/// has elapsed and then, if the map is still at capacity, evicting the oldest
+/// remaining entry.
+fn insert_idl_cache_entry(
+    cache: &mut HashMap<String, (IdlCacheEntry, Instant)>,
+    key: String,
+    entry: IdlCacheEntry,
+) {
+    cache.retain(|_, (existing, fetched_at)| {
+        let ttl = match existing {
+            IdlCacheEntry::Found(_) => IDL_CACHE_TTL,
+            IdlCacheEntry::Missing => IDL_NEGATIVE_CACHE_TTL,
+        };
+        fetched_at.elapsed() < ttl
+    });
+
+    if cache.len() >= MAX_IDL_CACHE_ENTRIES
+        && let Some(oldest_key) = cache
+            .iter()
+            .min_by_key(|(_, (_, fetched_at))| *fetched_at)
+            .map(|(key, _)| key.clone())
+    {
+        cache.remove(&oldest_key);
+    }
+
+    cache.insert(key, (entry, Instant::now()));
 }
 
 fn fetch_transaction_json(rpc_url: &str, signature: &str) -> Result<Option<Value>, RelayError> {
@@ -1481,6 +1876,7 @@ fn fetch_transaction_json(rpc_url: &str, signature: &str) -> Result<Option<Value
 struct ProposalInspection {
     squad: String,
     detail: ProposalDetail,
+    action: InspectionAction,
     cluster: Option<String>,
     simulation: SimulationSummary,
 }
@@ -3053,6 +3449,87 @@ fn action_from_transaction_json(transaction: &Value) -> InspectionAction {
     InspectionAction::from_effects(effects, 0)
 }
 
+/// jsonParsed non-checked `transfer` instructions carry `source`/`destination`/
+/// `amount`/`authority` but no `mint`, so `token_effect_from_parsed_instruction`
+/// leaves `asset` empty for those legs. Reports whether an effect is one of
+/// those unresolved transfer legs worth attempting to fix up: already-resolved
+/// effects (checked transfers, or anything with `asset` set) and non-transfer
+/// effects are left alone.
+fn transfer_asset_needs_resolution(effect: &InspectionEffect) -> bool {
+    effect.kind == "token_transfer" && effect.asset.is_none()
+}
+
+/// Post-pass over an already-assembled action's effects: for token-transfer legs
+/// that jsonParsed (or the decoded path) left blank, fills in `asset` (the mint
+/// address) by reading each transfer's `source` token account, and — when the
+/// mint's decimals are also readable — rewrites the raw `"<n> base units"` amount
+/// into the same trimmed decimal form a checked transfer already shows.
+///
+/// Fail-safe, layered: if the mint can't be resolved at all, `asset` stays `None`
+/// and the amount is untouched (exactly as before this pass ran). If the mint
+/// resolves but its decimals don't, `asset` is set and the amount is left as
+/// `"<n> base units"` — a partial improvement that is never worse than before.
+/// No failure panics.
+///
+/// Reads are cached by source account within a single call so a swap with several
+/// transfers sharing a source doesn't re-fetch the same accounts.
+fn resolve_missing_transfer_assets(action: &mut InspectionAction, rpc_url: &str) {
+    let mut resolved_by_source: HashMap<String, Option<(String, Option<u8>)>> = HashMap::new();
+    for effect in &mut action.effects {
+        if !transfer_asset_needs_resolution(effect) {
+            continue;
+        }
+        let Some(source) = effect.source.clone() else {
+            continue;
+        };
+        let resolved = resolved_by_source
+            .entry(source.clone())
+            .or_insert_with(|| resolve_transfer_mint(rpc_url, &source))
+            .clone();
+        let Some((mint, decimals)) = resolved else {
+            continue;
+        };
+        effect.asset = Some(mint);
+        if let Some(decimals) = decimals {
+            reformat_transfer_amount_as_decimal(effect, decimals);
+        }
+    }
+}
+
+/// Resolves a transfer's `source` token account to `(mint_address, decimals)`.
+/// The mint address — the value the on-device cross-check needs — is resolved
+/// first; decimals are a secondary lookup used only to pretty-print the amount,
+/// so a mint that resolves without readable decimals still returns
+/// `Some((mint, None))`. `None` only when the mint itself can't be resolved
+/// (bad address, missing account, RPC error, or not a token account).
+fn resolve_transfer_mint(rpc_url: &str, source: &str) -> Option<(String, Option<u8>)> {
+    let source_key: Pubkey = source.parse().ok()?;
+    let mint = read_token_account_mint(rpc_url, &source_key)
+        .ok()
+        .flatten()?;
+    let decimals = read_mint_decimals(rpc_url, &mint).ok().flatten();
+    Some((mint.to_string(), decimals))
+}
+
+/// Rewrites a resolved non-checked transfer's raw `"<n> base units"` amount into
+/// the trimmed decimal form a checked transfer already uses (e.g. `"1.5"`), and
+/// updates the summary to match. A no-op if the amount isn't the expected
+/// base-units shape or `n` doesn't parse as `u64`, so the raw display survives
+/// unchanged rather than being corrupted.
+fn reformat_transfer_amount_as_decimal(effect: &mut InspectionEffect, decimals: u8) {
+    let Some(base_units) = effect
+        .amount
+        .as_deref()
+        .and_then(|amount| amount.strip_suffix(" base units"))
+        .and_then(|digits| digits.parse::<u64>().ok())
+    else {
+        return;
+    };
+    let display = format_decimal_amount(base_units, decimals);
+    effect.summary = token_amount_summary("Transfer", &display);
+    effect.amount = Some(display);
+}
+
 fn collect_effects_from_instruction_array(
     value: Option<&Value>,
     effects: &mut Vec<InspectionEffect>,
@@ -4309,6 +4786,43 @@ fn parse_transaction_status_request(path: &str) -> Result<TransactionStatusReque
     }
 }
 
+struct ProgramIdlRequest {
+    program: String,
+}
+
+fn parse_program_idl_request(path: &str) -> Result<ProgramIdlRequest, RelayError> {
+    let mut parts = path.trim_matches('/').split('/');
+    match (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) {
+        (Some("cosign"), Some("v1"), Some("programs"), Some(program), Some("idl"))
+            if parts.next().is_none() =>
+        {
+            Ok(ProgramIdlRequest {
+                program: program.to_string(),
+            })
+        }
+        _ => Err(RelayError::NotFound),
+    }
+}
+
+/// Matches `cosign/v1/mints/<account>` exactly (4 path segments); any other
+/// shape returns `None` so it falls through to other route matchers instead
+/// of being mistaken for a mint-metadata request.
+fn parse_mint_metadata_request(path: &str) -> Option<String> {
+    let mut parts = path.trim_matches('/').split('/');
+    match (parts.next(), parts.next(), parts.next(), parts.next()) {
+        (Some("cosign"), Some("v1"), Some("mints"), Some(account)) if parts.next().is_none() => {
+            Some(account.to_string())
+        }
+        _ => None,
+    }
+}
+
 fn parse_member_squads_request(path: &str) -> Result<MemberSquadsRequest, RelayError> {
     let mut parts = path.trim_matches('/').split('/');
     match (
@@ -4539,6 +5053,7 @@ fn read_request(
     } else {
         None
     };
+    let if_none_match = header_value(header_text, "if-none-match");
 
     Ok(Some(HttpRequest {
         method: method.to_string(),
@@ -4547,6 +5062,7 @@ fn read_request(
         body,
         host,
         websocket_key,
+        if_none_match,
     }))
 }
 
@@ -4827,6 +5343,9 @@ struct HttpResponse {
     reason: &'static str,
     content_type: &'static str,
     body: Vec<u8>,
+    /// Additional response headers (e.g. Cache-Control, ETag) emitted after
+    /// Content-Type. Empty for responses that only need the fixed header block.
+    extra_headers: Vec<(&'static str, String)>,
 }
 
 fn health_response() -> HttpResponse {
@@ -5074,6 +5593,134 @@ fn squad_detail_json_response(squad: &types::MultisigDetail) -> HttpResponse {
     )
 }
 
+/// Builds the `/idl` 200 response body with `idl` embedded byte-for-byte as
+/// fetched. This bypasses `Value`/`json!`, which would reserialize the IDL
+/// through an unordered map and no longer match `FetchedIdl::hash`.
+fn program_idl_response_body(idl: &FetchedIdl) -> Vec<u8> {
+    let program = serde_json::to_string(&idl.program).unwrap_or_else(|_| "\"\"".to_string());
+    let hash = serde_json::to_string(&idl.hash).unwrap_or_else(|_| "\"\"".to_string());
+    let authority = serde_json::to_string(&idl.authority).unwrap_or_else(|_| "\"\"".to_string());
+    format!(
+        "{{\"ok\":true,\"kind\":\"program_idl\",\"program\":{program},\"idl\":{idl_raw},\"hash\":{hash},\"slot\":{slot},\"authority\":{authority}}}",
+        idl_raw = idl.idl_json.get(),
+        slot = idl.slot,
+    )
+    .into_bytes()
+}
+
+fn program_idl_json_response(idl: &FetchedIdl) -> HttpResponse {
+    HttpResponse {
+        status: 200,
+        reason: reason_phrase(200),
+        content_type: "application/json; charset=utf-8",
+        body: program_idl_response_body(idl),
+        extra_headers: vec![
+            (
+                "Cache-Control",
+                format!("public, max-age={IDL_CACHE_MAX_AGE_SECS}"),
+            ),
+            ("ETag", format!("\"{}\"", idl.hash)),
+        ],
+    }
+}
+
+fn decode_registry_response() -> HttpResponse {
+    let body = DECODE_REGISTRY_BUNDLE.as_bytes().to_vec();
+    let etag = format!("\"{}\"", sha256_hex(&body));
+    HttpResponse {
+        status: 200,
+        reason: reason_phrase(200),
+        content_type: "application/json; charset=utf-8",
+        body,
+        extra_headers: vec![
+            (
+                "Cache-Control",
+                format!("public, max-age={IDL_CACHE_MAX_AGE_SECS}"),
+            ),
+            ("ETag", etag),
+            (
+                "X-Cosign-Registry-Signature",
+                DECODE_REGISTRY_SIGNATURE.trim().to_string(),
+            ),
+        ],
+    }
+}
+
+/// Whether a request's `If-None-Match` header matches the current IDL hash,
+/// i.e. the client's cached copy is still fresh and a 304 can be served
+/// instead of the full body.
+fn if_none_match_hits(if_none_match: Option<&str>, hash: &str) -> bool {
+    if_none_match == Some(format!("\"{hash}\"").as_str())
+}
+
+fn not_modified_response(hash: &str, max_age_secs: u64) -> HttpResponse {
+    HttpResponse {
+        status: 304,
+        reason: reason_phrase(304),
+        content_type: "application/json; charset=utf-8",
+        body: Vec::new(),
+        extra_headers: vec![
+            ("ETag", format!("\"{hash}\"")),
+            ("Cache-Control", format!("public, max-age={max_age_secs}")),
+        ],
+    }
+}
+
+/// A `/idl` 404: no on-chain IDL exists for the requested program. Carries a
+/// short Cache-Control so an edge cache or client doesn't keep re-requesting
+/// (and re-triggering relay RPC calls for) a program that stays empty.
+fn program_idl_not_found_response() -> HttpResponse {
+    let mut response = error_response(404, ResponseFormat::Json, "not found");
+    response.extra_headers.push((
+        "Cache-Control",
+        format!("public, max-age={}", IDL_NEGATIVE_CACHE_TTL.as_secs()),
+    ));
+    response
+}
+
+/// Builds the `/mints/<account>` 200 body byte-exactly, bypassing `Value`/`json!`
+/// (which would re-sort keys) the same way `program_idl_response_body` does.
+/// `symbol` serializes to JSON `null` when absent.
+fn mint_metadata_response_body(metadata: &MintMetadata) -> Vec<u8> {
+    let account = serde_json::to_string(&metadata.account).unwrap_or_else(|_| "\"\"".to_string());
+    let mint = serde_json::to_string(&metadata.mint).unwrap_or_else(|_| "\"\"".to_string());
+    let symbol = metadata
+        .symbol
+        .map(|symbol| serde_json::to_string(symbol).unwrap_or_else(|_| "null".to_string()))
+        .unwrap_or_else(|| "null".to_string());
+    format!(
+        "{{\"kind\":\"mint_metadata\",\"account\":{account},\"mint\":{mint},\"decimals\":{decimals},\"symbol\":{symbol}}}",
+        decimals = metadata.decimals,
+    )
+    .into_bytes()
+}
+
+/// Mint metadata (decimals + symbol) is effectively immutable on-chain, so the
+/// 200 gets the same tier-2 caching as `/idl`: a long `Cache-Control` plus an
+/// `ETag` derived from the body so repeated proposal opens skip the account
+/// read entirely.
+fn mint_metadata_json_response(metadata: &MintMetadata) -> HttpResponse {
+    let body = mint_metadata_response_body(metadata);
+    let etag = format!("\"{}\"", sha256_hex(&body));
+    HttpResponse {
+        status: 200,
+        reason: reason_phrase(200),
+        content_type: "application/json; charset=utf-8",
+        body,
+        extra_headers: vec![
+            (
+                "Cache-Control",
+                format!("public, max-age={IDL_CACHE_MAX_AGE_SECS}"),
+            ),
+            ("ETag", etag),
+        ],
+    }
+}
+
+fn mint_metadata_not_found_response() -> HttpResponse {
+    error_response(404, ResponseFormat::Json, "not found")
+}
+
 fn squad_proposals_json_response(
     request: &SquadProposalsRequest,
     proposals: &[types::ProposalSummary],
@@ -5108,14 +5755,13 @@ fn squad_proposal_json_response(squad: &Pubkey, proposal: &types::ProposalDetail
 
 fn proposal_inspection_json_response(result: &ProposalInspection) -> HttpResponse {
     let instructions = decoded_proposal_instructions(&result.detail);
-    let action = action_from_decoded_instructions(&instructions);
     json_response(
         200,
         json!({
             "kind": "squads_proposal_inspection",
             "squad": result.squad,
             "cluster": result.cluster,
-            "action": inspection_action_json(&action),
+            "action": inspection_action_json(&result.action),
             "simulation": simulation_json(&result.simulation),
             "proposal": proposal_detail_json(&result.detail, &instructions)
         }),
@@ -5125,14 +5771,13 @@ fn proposal_inspection_json_response(result: &ProposalInspection) -> HttpRespons
 fn proposal_inspection_html_response(result: &ProposalInspection) -> HttpResponse {
     let detail = &result.detail;
     let decoded_instructions = decoded_proposal_instructions(detail);
-    let action = action_from_decoded_instructions(&decoded_instructions);
     let transaction_address = detail.transaction_address.as_deref().unwrap_or("Unknown");
     let cluster = result.cluster.as_deref().unwrap_or("Configured RPC");
     let instructions = decoded_instructions
         .iter()
         .map(instruction_html)
         .collect::<String>();
-    let action = inspection_action_html(&action);
+    let action = inspection_action_html(&result.action);
     let simulation = simulation_html(&result.simulation);
 
     html_response(
@@ -5665,6 +6310,7 @@ fn html_response(status: u16, body: String) -> HttpResponse {
         reason: reason_phrase(status),
         content_type: "text/html; charset=utf-8",
         body: body.into_bytes(),
+        extra_headers: Vec::new(),
     }
 }
 
@@ -5674,6 +6320,7 @@ fn json_response(status: u16, body: Value) -> HttpResponse {
         reason: reason_phrase(status),
         content_type: "application/json; charset=utf-8",
         body: serde_json::to_vec_pretty(&body).unwrap_or_else(|_| b"{}".to_vec()),
+        extra_headers: Vec::new(),
     }
 }
 
@@ -5683,6 +6330,7 @@ fn redirect_response(location: String) -> HttpResponse {
         reason: reason_phrase(301),
         content_type: "text/plain; charset=utf-8",
         body: location.into_bytes(),
+        extra_headers: Vec::new(),
     }
 }
 
@@ -5705,12 +6353,16 @@ fn write_response(stream: &mut impl Write, response: HttpResponse) -> Result<(),
     }
     write!(
         stream,
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n",
         response.status,
         response.reason,
         response.content_type,
         response.body.len()
     )?;
+    for (name, value) in &response.extra_headers {
+        write!(stream, "{name}: {value}\r\n")?;
+    }
+    write!(stream, "\r\n")?;
     stream.write_all(&response.body)?;
     stream.flush()?;
     Ok(())
@@ -5720,6 +6372,7 @@ fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
         301 => "Moved Permanently",
+        304 => "Not Modified",
         400 => "Bad Request",
         401 => "Unauthorized",
         403 => "Forbidden",
@@ -5776,6 +6429,138 @@ mod tests {
         signature::{Keypair, Signer},
         system_instruction,
     };
+
+    fn build_idl_account_bytes(authority: &Pubkey, json: &str) -> Vec<u8> {
+        use flate2::{Compression, write::ZlibEncoder};
+        use std::io::Write as _;
+
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(json.as_bytes()).unwrap();
+        let compressed = encoder.finish().unwrap();
+
+        let mut data = vec![0u8; 8]; // account discriminator (ignored on read)
+        data.extend_from_slice(authority.as_ref()); // 32-byte authority
+        data.extend_from_slice(&(compressed.len() as u32).to_le_bytes()); // data_len
+        data.extend_from_slice(&compressed);
+        // Over-allocate trailing zeros the way a real IDL account is padded.
+        data.extend_from_slice(&[0u8; 64]);
+        data
+    }
+
+    #[test]
+    fn parses_idl_account_roundtrip() {
+        let authority = Pubkey::new_unique();
+        let json = r#"{"version":"0.1.0","name":"demo","instructions":[]}"#;
+        let bytes = build_idl_account_bytes(&authority, json);
+
+        let parsed = parse_idl_account(&bytes).expect("parse");
+
+        assert_eq!(parsed.authority, authority);
+        assert_eq!(parsed.idl_json, json.as_bytes());
+    }
+
+    #[test]
+    fn rejects_idl_account_too_short() {
+        let bytes = vec![0u8; 20];
+        assert!(matches!(
+            parse_idl_account(&bytes),
+            Err(RelayError::NotFound)
+        ));
+    }
+
+    #[test]
+    fn derives_idl_address_deterministically() {
+        let program: Pubkey = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+            .parse()
+            .unwrap();
+
+        let first = derive_idl_address(&program).expect("address");
+        let second = derive_idl_address(&program).expect("address");
+
+        assert_eq!(first, second);
+        assert_ne!(first, program);
+    }
+
+    #[test]
+    fn corrupt_idl_body_maps_to_rpc_error() {
+        let authority = Pubkey::new_unique();
+        let mut bytes = build_idl_account_bytes(&authority, r#"{"name":"demo","instructions":[]}"#);
+        let data_len = u32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]) as usize;
+        for byte in bytes[44..44 + data_len].iter_mut() {
+            *byte = 0xFF;
+        }
+        assert!(matches!(parse_idl_account(&bytes), Err(RelayError::Rpc(_))));
+    }
+
+    #[test]
+    fn sha256_hex_is_stable_and_distinguishes_content() {
+        assert_eq!(sha256_hex(b"a"), sha256_hex(b"a"));
+        assert_ne!(sha256_hex(b"a"), sha256_hex(b"b"));
+        assert_eq!(sha256_hex(b"a").len(), 64);
+    }
+
+    /// `json!`/`Value` reserialize through an unordered map, which would
+    /// silently reorder an IDL's keys and desync the served body from
+    /// `FetchedIdl::hash`. This exercises the full parse -> RawValue ->
+    /// response-body path with a deliberately unsorted IDL and checks the
+    /// served `idl` bytes are identical to what was fetched, and that they
+    /// hash to exactly the value reported in `hash`.
+    #[test]
+    fn program_idl_response_preserves_raw_bytes_and_hash() {
+        let authority = Pubkey::new_unique();
+        let json = r#"{"name":"demo","zzz":1,"aaa":2,"nested":{"z":1,"a":2}}"#;
+        let bytes = build_idl_account_bytes(&authority, json);
+        let parsed = parse_idl_account(&bytes).expect("parse");
+
+        let idl_json: Box<RawValue> = serde_json::from_slice(&parsed.idl_json).expect("valid json");
+        let hash = sha256_hex(idl_json.get().as_bytes());
+        let fetched = FetchedIdl {
+            program: Pubkey::new_unique().to_string(),
+            idl_json,
+            hash: hash.clone(),
+            slot: 42,
+            authority: authority.to_string(),
+        };
+
+        let body = program_idl_response_body(&fetched);
+
+        #[derive(serde::Deserialize)]
+        struct ResponseBody {
+            idl: Box<RawValue>,
+            hash: String,
+        }
+
+        let decoded: ResponseBody =
+            serde_json::from_slice(&body).expect("response body is valid json");
+
+        assert_eq!(decoded.idl.get().as_bytes(), json.as_bytes());
+        assert_eq!(decoded.hash, hash);
+        assert_eq!(sha256_hex(decoded.idl.get().as_bytes()), decoded.hash);
+    }
+
+    #[test]
+    fn if_none_match_matches_only_the_exact_quoted_hash() {
+        assert!(if_none_match_hits(Some("\"abc123\""), "abc123"));
+        assert!(!if_none_match_hits(Some("\"different\""), "abc123"));
+        assert!(!if_none_match_hits(Some("abc123"), "abc123"));
+        assert!(!if_none_match_hits(None, "abc123"));
+    }
+
+    #[test]
+    fn parses_program_idl_route() {
+        let program = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc";
+        let parsed = parse_program_idl_request(&format!("/cosign/v1/programs/{program}/idl"))
+            .expect("parse");
+        assert_eq!(parsed.program, program);
+    }
+
+    #[test]
+    fn rejects_non_idl_program_route() {
+        assert!(matches!(
+            parse_program_idl_request("/cosign/v1/programs/abc/proposals"),
+            Err(RelayError::NotFound)
+        ));
+    }
 
     fn rpc_test_config(methods: BTreeSet<String>) -> RelayConfig {
         RelayConfig {
@@ -6000,6 +6785,7 @@ mod tests {
             body: Vec::new(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let now = Instant::now();
         let client_ip = Some(IpAddr::from([127, 0, 0, 1]));
@@ -6033,6 +6819,7 @@ mod tests {
             body: br#"{"jsonrpc":"2.0","id":1,"method":"getVersion"}"#.to_vec(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let now = Instant::now();
         let client_ip = Some(IpAddr::from([127, 0, 0, 1]));
@@ -6067,6 +6854,7 @@ mod tests {
             body,
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let now = Instant::now();
         let client_ip = Some(IpAddr::from([127, 0, 0, 1]));
@@ -6115,6 +6903,7 @@ mod tests {
             body: br#"{"jsonrpc":"2.0","id":1,"method":"requestAirdrop"}"#.to_vec(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
 
         let response = handle_request_with_client(&request, &config, None);
@@ -6226,6 +7015,332 @@ mod tests {
         );
     }
 
+    #[test]
+    fn advertises_program_idl_capability() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        assert!(config.capabilities().contains(&"program_idl"));
+    }
+
+    #[test]
+    fn advertises_decode_registry_capability() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        assert!(config.capabilities().contains(&"decode_registry"));
+    }
+
+    #[test]
+    fn serves_decode_registry_bundle_with_cache_and_signature_headers() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        let request = HttpRequest {
+            method: "GET".into(),
+            path: "/cosign/v1/decode-registry".into(),
+            query: None,
+            body: Vec::new(),
+            host: None,
+            websocket_key: None,
+            if_none_match: None,
+        };
+        let response = handle_request_with_client(&request, &config, None);
+        assert_eq!(response.status, 200);
+        assert!(response.body.starts_with(b"{\"schema\":1"));
+        let header = |name: &str| {
+            response
+                .extra_headers
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                .map(|(_, v)| v.as_str())
+        };
+        assert_eq!(header("Cache-Control"), Some("public, max-age=3600"));
+        assert!(header("ETag").is_some());
+        assert!(header("X-Cosign-Registry-Signature").is_some());
+    }
+
+    #[test]
+    fn program_idl_route_rejects_invalid_program() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        let request = HttpRequest {
+            method: "GET".into(),
+            path: "/cosign/v1/programs/not-a-pubkey/idl".into(),
+            query: None,
+            body: Vec::new(),
+            host: None,
+            websocket_key: None,
+            if_none_match: None,
+        };
+        let response = handle_request_with_client(&request, &config, None);
+        assert_eq!(response.status, 400);
+    }
+
+    #[test]
+    fn insert_idl_cache_entry_evicts_expired_entries_first() {
+        let mut cache: HashMap<String, (IdlCacheEntry, Instant)> = HashMap::new();
+        let long_expired = Instant::now() - IDL_CACHE_TTL - Duration::from_secs(1);
+        cache.insert("stale".to_string(), (IdlCacheEntry::Missing, long_expired));
+
+        insert_idl_cache_entry(&mut cache, "fresh".to_string(), IdlCacheEntry::Missing);
+
+        assert!(!cache.contains_key("stale"));
+        assert!(cache.contains_key("fresh"));
+    }
+
+    #[test]
+    fn insert_idl_cache_entry_evicts_oldest_when_at_capacity() {
+        let mut cache: HashMap<String, (IdlCacheEntry, Instant)> = HashMap::new();
+        let now = Instant::now();
+        // All entries are well within IDL_NEGATIVE_CACHE_TTL, so none are pruned
+        // as expired; only the bound-eviction path can make room.
+        for i in 0..MAX_IDL_CACHE_ENTRIES {
+            let fetched_at = now - Duration::from_millis((MAX_IDL_CACHE_ENTRIES - i) as u64);
+            cache.insert(format!("program-{i}"), (IdlCacheEntry::Missing, fetched_at));
+        }
+        assert_eq!(cache.len(), MAX_IDL_CACHE_ENTRIES);
+
+        insert_idl_cache_entry(&mut cache, "newcomer".to_string(), IdlCacheEntry::Missing);
+
+        assert_eq!(cache.len(), MAX_IDL_CACHE_ENTRIES);
+        assert!(
+            !cache.contains_key("program-0"),
+            "the oldest entry should have been evicted to make room"
+        );
+        assert!(cache.contains_key("newcomer"));
+    }
+
+    #[test]
+    fn program_idl_route_serves_404_from_fresh_negative_cache_without_rpc() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        let program = Pubkey::new_unique().to_string();
+
+        let cache = IDL_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        cache
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(program.clone(), (IdlCacheEntry::Missing, Instant::now()));
+
+        let request = HttpRequest {
+            method: "GET".into(),
+            path: format!("/cosign/v1/programs/{program}/idl"),
+            query: None,
+            body: Vec::new(),
+            host: None,
+            websocket_key: None,
+            if_none_match: None,
+        };
+
+        // If the negative cache didn't short-circuit, resolve_program_idl would
+        // try to reach the bogus RPC URL in rpc_test_config and fail with a 502
+        // instead, so this also proves no RPC call was made.
+        let response = handle_request_with_client(&request, &config, None);
+
+        assert_eq!(response.status, 404);
+        assert!(
+            response
+                .extra_headers
+                .iter()
+                .any(|(name, value)| *name == "Cache-Control" && value == "public, max-age=300")
+        );
+    }
+
+    #[test]
+    fn program_idl_route_serves_304_when_if_none_match_matches_cached_hash() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        let program = Pubkey::new_unique().to_string();
+        let idl_json: Box<RawValue> = serde_json::from_str(r#"{"name":"demo"}"#).unwrap();
+        let hash = sha256_hex(idl_json.get().as_bytes());
+        let fetched = FetchedIdl {
+            program: program.clone(),
+            idl_json,
+            hash: hash.clone(),
+            slot: 1,
+            authority: Pubkey::new_unique().to_string(),
+        };
+
+        let cache = IDL_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        cache.lock().unwrap_or_else(|e| e.into_inner()).insert(
+            program.clone(),
+            (IdlCacheEntry::Found(fetched), Instant::now()),
+        );
+
+        let not_modified_request = HttpRequest {
+            method: "GET".into(),
+            path: format!("/cosign/v1/programs/{program}/idl"),
+            query: None,
+            body: Vec::new(),
+            host: None,
+            websocket_key: None,
+            if_none_match: Some(format!("\"{hash}\"")),
+        };
+        let not_modified = handle_request_with_client(&not_modified_request, &config, None);
+        assert_eq!(not_modified.status, 304);
+        assert!(not_modified.body.is_empty());
+        assert!(
+            not_modified
+                .extra_headers
+                .iter()
+                .any(|(name, value)| *name == "ETag" && *value == format!("\"{hash}\""))
+        );
+
+        let fresh_request = HttpRequest {
+            method: "GET".into(),
+            path: format!("/cosign/v1/programs/{program}/idl"),
+            query: None,
+            body: Vec::new(),
+            host: None,
+            websocket_key: None,
+            if_none_match: None,
+        };
+        let fresh = handle_request_with_client(&fresh_request, &config, None);
+        assert_eq!(fresh.status, 200);
+        assert!(
+            fresh
+                .extra_headers
+                .iter()
+                .any(|(name, value)| *name == "ETag" && *value == format!("\"{hash}\""))
+        );
+        assert!(
+            fresh
+                .extra_headers
+                .iter()
+                .any(|(name, value)| *name == "Cache-Control" && value == "public, max-age=3600")
+        );
+    }
+
+    fn mint_account_bytes(decimals: u8) -> Vec<u8> {
+        // SPL Mint: COption authority(4+32) | supply u64(8) | decimals(1) | init(1) | COption freeze(4+32)
+        let mut data = vec![0u8; 82];
+        data[44] = decimals;
+        data
+    }
+
+    fn token_account_bytes(mint: &Pubkey) -> Vec<u8> {
+        // SPL Token Account: mint(32) | owner(32) | amount(8) | ... (165 total)
+        let mut data = vec![0u8; 165];
+        data[..32].copy_from_slice(mint.as_ref());
+        data
+    }
+
+    #[test]
+    fn advertises_mint_metadata_capability() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        assert!(config.capabilities().contains(&"mint_metadata"));
+    }
+
+    #[test]
+    fn parses_mint_account_decimals() {
+        match parse_spl_account(&mint_account_bytes(6)) {
+            Some(SplAccount::Mint { decimals }) => assert_eq!(decimals, 6),
+            other => panic!("expected mint, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_token_account_mint() {
+        let mint = Pubkey::new_unique();
+        match parse_spl_account(&token_account_bytes(&mint)) {
+            Some(SplAccount::TokenAccount { mint: parsed }) => assert_eq!(parsed, mint),
+            other => panic!("expected token account, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_non_spl_account() {
+        assert!(parse_spl_account(&[0u8; 10]).is_none());
+    }
+
+    #[test]
+    fn well_known_symbol_lookup() {
+        assert_eq!(
+            well_known_mint_symbol("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+            Some("USDC")
+        );
+        assert_eq!(well_known_mint_symbol("not-a-known-mint"), None);
+    }
+
+    #[test]
+    fn parses_mint_metadata_route() {
+        let account = Pubkey::new_unique().to_string();
+        assert_eq!(
+            parse_mint_metadata_request(&format!("/cosign/v1/mints/{account}")),
+            Some(account)
+        );
+    }
+
+    #[test]
+    fn rejects_mint_metadata_route_with_wrong_segment_count() {
+        assert_eq!(parse_mint_metadata_request("/cosign/v1/mints"), None);
+        assert_eq!(
+            parse_mint_metadata_request("/cosign/v1/mints/abc/extra"),
+            None
+        );
+    }
+
+    #[test]
+    fn mint_metadata_route_rejects_invalid_account() {
+        let config = rpc_test_config(default_rpc_allowed_methods());
+        let request = HttpRequest {
+            method: "GET".into(),
+            path: "/cosign/v1/mints/not-a-pubkey".into(),
+            query: None,
+            body: Vec::new(),
+            host: None,
+            websocket_key: None,
+            if_none_match: None,
+        };
+        let response = handle_request_with_client(&request, &config, None);
+        assert_eq!(response.status, 400);
+    }
+
+    #[test]
+    fn mint_metadata_response_body_has_stable_field_order_and_symbol() {
+        let metadata = MintMetadata {
+            account: "Account11111111111111111111111111111111111".into(),
+            mint: "Mint1111111111111111111111111111111111111".into(),
+            decimals: 6,
+            symbol: Some("USDC"),
+        };
+        let body = mint_metadata_response_body(&metadata);
+        assert_eq!(
+            std::str::from_utf8(&body).unwrap(),
+            "{\"kind\":\"mint_metadata\",\"account\":\"Account11111111111111111111111111111111111\",\"mint\":\"Mint1111111111111111111111111111111111111\",\"decimals\":6,\"symbol\":\"USDC\"}"
+        );
+    }
+
+    #[test]
+    fn mint_metadata_response_body_null_symbol() {
+        let metadata = MintMetadata {
+            account: "Account11111111111111111111111111111111111".into(),
+            mint: "Mint1111111111111111111111111111111111111".into(),
+            decimals: 9,
+            symbol: None,
+        };
+        let body = mint_metadata_response_body(&metadata);
+        let parsed: Value = serde_json::from_slice(&body).unwrap();
+        assert!(parsed["symbol"].is_null());
+    }
+
+    #[test]
+    fn mint_metadata_json_response_sets_cache_and_etag_headers() {
+        let metadata = MintMetadata {
+            account: "Account11111111111111111111111111111111111".into(),
+            mint: "Mint1111111111111111111111111111111111111".into(),
+            decimals: 6,
+            symbol: None,
+        };
+        let response = mint_metadata_json_response(&metadata);
+        assert_eq!(response.status, 200);
+        let hash = sha256_hex(&response.body);
+        assert!(
+            response
+                .extra_headers
+                .iter()
+                .any(|(name, value)| *name == "ETag" && *value == format!("\"{hash}\""))
+        );
+        assert!(
+            response
+                .extra_headers
+                .iter()
+                .any(|(name, value)| *name == "Cache-Control" && value == "public, max-age=3600")
+        );
+    }
+
     #[cfg(not(feature = "landing"))]
     #[test]
     fn get_root_does_not_return_health() {
@@ -6246,6 +7361,7 @@ mod tests {
             body: Vec::new(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let response = handle_request_with_client(&request, &config, None);
 
@@ -6272,6 +7388,7 @@ mod tests {
             body: Vec::new(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let response = handle_request_with_client(&request, &config, None);
         assert_eq!(response.status, 200);
@@ -6295,6 +7412,7 @@ mod tests {
             body: Vec::new(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
 
         let root = handle_request_with_client(&get("/"), &config, None);
@@ -6338,6 +7456,7 @@ mod tests {
             body: Vec::new(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let response = handle_request_with_client(&request, &config, None);
         assert_eq!(response.status, 200);
@@ -6368,6 +7487,7 @@ mod tests {
             body: Vec::new(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let response = handle_request_with_client(&request, &config, None);
         assert_eq!(response.status, 200);
@@ -6394,6 +7514,7 @@ mod tests {
             body: Vec::new(),
             host: None,
             websocket_key: None,
+            if_none_match: None,
         };
         let response = handle_request_with_client(&request, &config, None);
 
@@ -7455,6 +8576,237 @@ mod tests {
             action.effects[0].destination,
             Some("newAuthority111".into())
         );
+    }
+
+    /// Pins the gap `resolve_missing_transfer_assets` fixes up after the fact:
+    /// a non-checked SPL `transfer` (unlike `transferChecked`) carries no
+    /// `mint` in jsonParsed output, so the parsed effect comes out with
+    /// `asset: None` even though the leg is a real token transfer.
+    #[test]
+    fn action_effects_decode_parsed_non_checked_transfer_has_no_asset() {
+        let transaction = json!({
+            "meta": {
+                "innerInstructions": []
+            },
+            "transaction": {
+                "message": {
+                    "instructions": [
+                        {
+                            "program": "spl-token",
+                            "programId": SPL_TOKEN_PROGRAM_ID,
+                            "parsed": {
+                                "type": "transfer",
+                                "info": {
+                                    "source": "sourceAta111",
+                                    "destination": "destinationAta111",
+                                    "authority": "owner111",
+                                    "amount": "1000"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+
+        let action = action_from_transaction_json(&transaction);
+
+        assert_eq!(action.effects.len(), 1);
+        assert_eq!(action.effects[0].kind, "token_transfer");
+        assert_eq!(action.effects[0].asset, None);
+        assert_eq!(action.effects[0].source, Some("sourceAta111".into()));
+        assert!(transfer_asset_needs_resolution(&action.effects[0]));
+    }
+
+    /// The pending-proposal (decoded) inspection path has the same gap as the
+    /// executed (jsonParsed) path: a non-checked SPL `transfer` decodes to an
+    /// effect with `asset: None`, but its `source` is account 0 — the source
+    /// token account — so the shared post-pass can resolve the mint from it.
+    /// A decoded `transferChecked` already carries its mint (account 1) and is
+    /// left untouched.
+    #[test]
+    fn action_effects_decode_decoded_non_checked_transfer_needs_resolution_via_source() {
+        let transfer = DecodedInstruction {
+            program: SPL_TOKEN_PROGRAM_ID.into(),
+            kind: "raw".into(),
+            summary: "raw".into(),
+            accounts: vec![
+                "sourceAta111".into(),
+                "destinationAta111".into(),
+                "owner111".into(),
+            ],
+            raw_data_hex: "0340420f0000000000".into(),
+            config_action: None,
+        };
+        let decoded = decode_known_instruction(&transfer);
+        assert_eq!(decoded.kind, "transfer");
+        let action = action_from_decoded_instructions(std::slice::from_ref(&decoded));
+
+        assert_eq!(action.effects.len(), 1);
+        assert_eq!(action.effects[0].kind, "token_transfer");
+        assert_eq!(action.effects[0].asset, None);
+        assert_eq!(action.effects[0].source, Some("sourceAta111".into()));
+        assert!(transfer_asset_needs_resolution(&action.effects[0]));
+
+        let checked = DecodedInstruction {
+            program: SPL_TOKEN_PROGRAM_ID.into(),
+            kind: "raw".into(),
+            summary: "raw".into(),
+            accounts: vec![
+                "sourceAta111".into(),
+                "mint111".into(),
+                "destinationAta111".into(),
+                "owner111".into(),
+            ],
+            raw_data_hex: "0c40420f000000000006".into(),
+            config_action: None,
+        };
+        let checked_action = action_from_decoded_instructions(std::slice::from_ref(
+            &decode_known_instruction(&checked),
+        ));
+        assert_eq!(checked_action.effects[0].asset, Some("mint111".into()));
+        assert!(!transfer_asset_needs_resolution(&checked_action.effects[0]));
+    }
+
+    #[test]
+    fn transfer_asset_needs_resolution_targets_unresolved_token_transfers_only() {
+        let unresolved = InspectionEffect {
+            kind: "token_transfer".into(),
+            summary: "Transfer 1000 base units".into(),
+            program: Some("SPL Token Program".into()),
+            asset: None,
+            amount: Some("1000 base units".into()),
+            source: Some("sourceAta111".into()),
+            destination: Some("destinationAta111".into()),
+        };
+        assert!(transfer_asset_needs_resolution(&unresolved));
+
+        let mut already_resolved = unresolved.clone();
+        already_resolved.asset = Some("mint111".into());
+        assert!(!transfer_asset_needs_resolution(&already_resolved));
+
+        let mut non_transfer = unresolved;
+        non_transfer.kind = "token_approve".into();
+        assert!(!transfer_asset_needs_resolution(&non_transfer));
+    }
+
+    /// Neither effect here qualifies for resolution (one already has an
+    /// asset, the other isn't a transfer), so the pass never attempts an RPC
+    /// call — safe to run against a bogus URL and a useful check that
+    /// already-resolved / non-transfer effects pass through unchanged.
+    #[test]
+    fn resolve_missing_transfer_assets_leaves_resolved_and_non_transfer_effects_untouched() {
+        let checked_transfer = InspectionEffect {
+            kind: "token_transfer".into(),
+            summary: "Transfer 2.5 tokens".into(),
+            program: Some("SPL Token Program".into()),
+            asset: Some("mint111".into()),
+            amount: Some("2.5".into()),
+            source: Some("sourceAta111".into()),
+            destination: Some("destinationAta111".into()),
+        };
+        let approval = InspectionEffect {
+            kind: "token_approve".into(),
+            summary: "Approve 5 tokens".into(),
+            program: Some("SPL Token Program".into()),
+            asset: None,
+            amount: Some("5".into()),
+            source: Some("sourceAta111".into()),
+            destination: Some("delegate111".into()),
+        };
+        let mut action =
+            InspectionAction::from_effects(vec![checked_transfer.clone(), approval.clone()], 0);
+
+        resolve_missing_transfer_assets(&mut action, "not-a-real-rpc-url");
+
+        assert_eq!(action.effects[0].asset, checked_transfer.asset);
+        assert_eq!(action.effects[0].amount, checked_transfer.amount);
+        assert_eq!(action.effects[0].summary, checked_transfer.summary);
+        assert_eq!(action.effects[1].asset, approval.asset);
+        assert_eq!(action.effects[1].amount, approval.amount);
+    }
+
+    /// Once the mint's decimals are known, a resolved non-checked transfer's raw
+    /// `"<n> base units"` amount is rewritten to the same trimmed decimal a
+    /// checked transfer shows, and the summary follows. A 6-decimal (USDC-like)
+    /// transfer of 1_500_000 base units becomes "1.5"; a whole amount drops its
+    /// fractional part entirely.
+    #[test]
+    fn reformat_transfer_amount_as_decimal_produces_trimmed_decimal() {
+        let base = InspectionEffect {
+            kind: "token_transfer".into(),
+            summary: "Transfer 1500000 base units".into(),
+            program: Some("SPL Token Program".into()),
+            asset: Some("mint111".into()),
+            amount: Some("1500000 base units".into()),
+            source: Some("sourceAta111".into()),
+            destination: Some("destinationAta111".into()),
+        };
+
+        let mut fractional = base.clone();
+        reformat_transfer_amount_as_decimal(&mut fractional, 6);
+        assert_eq!(fractional.amount, Some("1.5".into()));
+        assert_eq!(fractional.summary, "Transfer 1.5 tokens");
+
+        let mut whole = InspectionEffect {
+            summary: "Transfer 12000000 base units".into(),
+            amount: Some("12000000 base units".into()),
+            ..base.clone()
+        };
+        reformat_transfer_amount_as_decimal(&mut whole, 6);
+        assert_eq!(whole.amount, Some("12".into()));
+        assert_eq!(whole.summary, "Transfer 12 tokens");
+
+        let mut sub_unit = InspectionEffect {
+            amount: Some("1000 base units".into()),
+            ..base
+        };
+        reformat_transfer_amount_as_decimal(&mut sub_unit, 6);
+        assert_eq!(sub_unit.amount, Some("0.001".into()));
+    }
+
+    /// The decimals lookup is the fail-safe second layer: when it can't be read
+    /// the reformat is simply never invoked, so the leg keeps its `"<n> base
+    /// units"` amount (asset already set is the win). This pins that the
+    /// reformat helper itself is a no-op on anything that isn't the expected
+    /// base-units shape, so a partial resolution never corrupts the display.
+    #[test]
+    fn reformat_transfer_amount_as_decimal_is_noop_on_unexpected_shape() {
+        let base = InspectionEffect {
+            kind: "token_transfer".into(),
+            summary: "Transfer 1000 base units".into(),
+            program: Some("SPL Token Program".into()),
+            asset: Some("mint111".into()),
+            amount: Some("1000 base units".into()),
+            source: Some("sourceAta111".into()),
+            destination: Some("destinationAta111".into()),
+        };
+
+        // Already a decimal (no "base units" suffix) — left exactly as-is.
+        let mut decimal = InspectionEffect {
+            summary: "Transfer 1.5 tokens".into(),
+            amount: Some("1.5".into()),
+            ..base.clone()
+        };
+        reformat_transfer_amount_as_decimal(&mut decimal, 6);
+        assert_eq!(decimal.amount, Some("1.5".into()));
+        assert_eq!(decimal.summary, "Transfer 1.5 tokens");
+
+        // Non-numeric leading token — unchanged, no panic.
+        let mut garbage = InspectionEffect {
+            amount: Some("abc base units".into()),
+            ..base.clone()
+        };
+        reformat_transfer_amount_as_decimal(&mut garbage, 6);
+        assert_eq!(garbage.amount, Some("abc base units".into()));
+
+        // Missing amount — unchanged, no panic.
+        let mut empty = InspectionEffect {
+            amount: None,
+            ..base
+        };
+        reformat_transfer_amount_as_decimal(&mut empty, 6);
+        assert_eq!(empty.amount, None);
     }
 
     #[test]
