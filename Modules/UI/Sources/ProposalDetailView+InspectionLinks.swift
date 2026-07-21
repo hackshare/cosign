@@ -1,3 +1,4 @@
+import CosignCore
 import Indexer
 import Squads
 import SwiftUI
@@ -43,7 +44,7 @@ extension ProposalDetailView {
         } else if let inspectionReport {
             ProposalInspectionReportView(
                 report: inspectionReport,
-                instructionDecoder: instructionDecoder,
+                decodedInstructions: decodedInstructions,
                 showsSimulation: !proposal.isExecuted,
                 showsAction: false
             )

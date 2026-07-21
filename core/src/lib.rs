@@ -12,6 +12,8 @@ pub mod squads;
 pub mod transactions;
 pub mod types;
 
+pub mod decode;
+
 #[derive(Debug, thiserror::Error)]
 pub enum CryptoError {
     #[error("word count must be 12 or 24")]
@@ -149,6 +151,11 @@ pub fn associated_token_account_address(
 
 // -- Squads read FFI surface --
 
+pub use decode::wire::RelayInspectionEffect;
+pub use decode::{
+    CrossCheckVerdict, DecodeProposalRequest, DecodeProvenance, DecodedInstructionDisplay,
+    DecodedProposal,
+};
 pub use transactions::{
     CreateMultisigCost, PreparedMultisigCreation, PreparedProposalCreation, PreparedTransaction,
     SignatureStatus, SimulationResult, TransactionSubmission, VoteType,
@@ -278,6 +285,10 @@ pub fn squads_get_proposal(
         &companion,
         Some(&pwc.companion_address),
     ))
+}
+
+pub fn decode_proposal(request: DecodeProposalRequest) -> DecodedProposal {
+    decode::run_decode_proposal(&request)
 }
 
 pub fn squads_get_vault_pda(

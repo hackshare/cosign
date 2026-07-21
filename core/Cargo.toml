@@ -30,7 +30,10 @@ relay-index = ["dep:rusqlite"]
 uniffi = { version = "0.31.1", features = ["build", "cli"] }
 thiserror = "1"
 dotenvy = "0.15"
-serde_json = "1"
+# Host-only (decompresses on-chain Anchor IDL accounts in the relay). The iOS
+# staticlib is built with `--lib`, so this never cross-compiles to iOS.
+flate2 = "1"
+serde_json = { version = "1", features = ["raw_value"] }
 url = "2"
 # Used only by the host relay-server binary (Jupiter price fetch). The iOS
 # staticlib is built with `--lib`, so this never cross-compiles to iOS.
@@ -65,16 +68,26 @@ rand = "0.8"
 bs58 = "0.5"
 bincode = "1.3"
 base64 = "0.21"
+# Typed Deserialize for the decode wire models. Pure Rust; cross-compiles to iOS.
+serde = { version = "1", features = ["derive"] }
 # Relay-only: embedded SQLite for the membership index. Bundled so no system
 # libsqlite3 is required in the build image. Optional + feature-gated so it never
 # compiles into the iOS staticlib.
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+# Async runtime for the decode relay fetch fan-out. Already in the iOS staticlib
+# transitively via solana-client's reqwest; promoted to a direct dep so decode::fetch
+# can drive reqwest's async client through Runtime::block_on. rt-multi-thread + net + time
+# so enable_all() wires the IO and timer drivers reqwest needs.
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time"] }
 
 [dev-dependencies]
 hex = "0.4"
 rcgen = "0.10"
 rustls = "0.21"
 serde = { version = "1", features = ["derive"] }
+# Host-only mock relay for decode::fetch tests. Never compiled into the iOS staticlib
+# (dev-dependencies are excluded from `cargo build --lib`).
+mockito = "1"
 
 [build-dependencies]
 uniffi = { version = "0.31.1", features = ["build"] }

@@ -1,4 +1,5 @@
 import Core
+import CosignCore
 import Indexer
 import Persistence
 import Squads
@@ -16,7 +17,6 @@ public struct ProposalDetailView: View {
 
     let squadAddress: String
     let transactionIndex: UInt64
-    let instructionDecoder = InstructionDecoder()
     @State var proposal: SquadProposalDetail?
     @State var squadDetail: SquadDetail?
     @State var squadMembers = [SquadMember]()
@@ -32,6 +32,7 @@ public struct ProposalDetailView: View {
     /// Captured from the broadcaster (an actor) when a broadcast fails, so the sync
     /// dismiss handler can read the approve leg without awaiting.
     @State var pendingApproveTransaction: ProposalActionSubmittedTransaction?
+    @State var decodedProposal: DecodedProposal?
     @State var pendingBroadcastRequest: ProposalSigningRequest?
     @State var submittedResult: ProposalSubmissionResult?
     @State var pendingExecuteSigner: ProposalActionSigner?
@@ -185,6 +186,11 @@ public struct ProposalDetailView: View {
             String(proposal.votesNo),
             String(proposal.votesCancelled),
             executionSignature ?? "",
+            // The decode's cross-check reads ownVaultAccounts, so a change to the
+            // vault set must re-fire the decode — otherwise a set that fills in
+            // after this task first ran would leave the cross-check on a stale
+            // (possibly empty) orientation and a contradiction could go unshown.
+            ownVaultAccounts.sorted().joined(separator: ","),
             indexerEnvironment.effectiveRPCURL.absoluteString
         ].joined(separator: "|")
     }
@@ -262,15 +268,17 @@ extension ProposalDetailView {
     func loadInspectionForCurrentProposal() async {
         guard let proposal else {
             clearInspection()
+            await runDecode()
             return
         }
 
         if proposal.isExecuted, let executionSignature {
             await loadExecutedInspection(signature: executionSignature)
-            return
+        } else {
+            await loadProposalInspection(proposal)
         }
 
-        await loadProposalInspection(proposal)
+        await runDecode()
     }
 
     @MainActor

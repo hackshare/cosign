@@ -151,6 +151,8 @@ namespace cosign_core {
 
     [Throws=SquadsFFIError]
     SignatureStatus squads_get_signature_status(string rpc_url, string signature);
+
+    DecodedProposal decode_proposal(DecodeProposalRequest request);
 };
 
 dictionary KeyPair {
@@ -265,6 +267,50 @@ dictionary DecodedInstruction {
     sequence<string> accounts;
     string raw_data_hex;
     ConfigActionInfo? config_action;
+};
+
+dictionary DecodeProposalRequest {
+    string relay_base_url;
+    sequence<string> relay_capabilities;
+    sequence<DecodedInstruction> instructions;
+    sequence<string> accounts_referenced;
+    sequence<string> own_vault_accounts;
+    sequence<RelayInspectionEffect> inspection_effects;
+    string? last_accepted_manifest_issued_at;
+};
+
+dictionary DecodedProposal {
+    sequence<DecodedInstructionDisplay> instructions;
+    boolean has_contradiction;
+    string? accepted_manifest_issued_at;
+};
+
+dictionary DecodedInstructionDisplay {
+    string program_label;
+    string kind;
+    string summary;
+    sequence<string> accounts;
+    string data_hex;
+    DecodeProvenance? provenance;
+    CrossCheckVerdict? cross_check;
+};
+
+[Enum]
+interface DecodeProvenance {
+    OnChainIdl(string idl_name, string hash, u64 slot);
+    Registry(string action, string source, string? bound_program);
+};
+
+enum CrossCheckVerdict { "Confirmed", "Unconfirmed", "Contradicted" };
+
+dictionary RelayInspectionEffect {
+    string kind;
+    string summary;
+    string? program;
+    string? asset;
+    string? amount;
+    string? source;
+    string? destination;
 };
 
 dictionary ActivityItem {

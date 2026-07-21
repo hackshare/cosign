@@ -1,0 +1,17 @@
+{
+  "program": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+  "discriminator": [9],
+  "mode": "standalone",
+  "layout": [
+    { "name": "amountIn", "type": "u64" },
+    { "name": "minimumAmountOut", "type": "u64" }
+  ],
+  "action": "Swap",
+  "accounts": { "userSourceTokenAccount": 15, "userDestinationTokenAccount": 16 },
+  "template": "Swap {amountIn:token(userSourceTokenAccount)} on Raydium",
+  "effects": [
+    { "direction": "out", "asset": "token(userSourceTokenAccount)", "amount": "arg(amountIn)" },
+    { "direction": "in", "asset": "token(userDestinationTokenAccount)", "amountAtLeast": "arg(minimumAmountOut)" }
+  ],
+  "_note": "Raydium AMM v4 `SwapBaseIn`, Borsh tag u8=9, layout amountIn:u64, minimumAmountOut:u64. Tag + layout byte-confirmed against mainnet tx 5q5CJB8HfisCqyFJ3ZAQ5X6xyRW67sgDVV95K3fT3178f8espXbSdeCrNh2atc94B2fX6vzNphuc5nNU3z34YcxP (slot 434120378): raw 09a609640f00000000d27d61b229010000, amountIn = 258214310 (matches the first inner SPL transfer). Account indices from that tx's 18-account layout: 15 userSourceTokenAccount, 16 userDestinationTokenAccount. WARNING (go-live): Raydium AMM v4 has variable account counts (17 vs 18 accounts depending on the OpenBook/serum market vault-signer); the user source/destination indices shift by one in the 17-account layout, so these indices must be re-validated per pool before go-live. The swap legs are non-checked SPL `transfer` CPIs; the relay now resolves each leg's mint from its source token account, so the legs carry asset = mint address and the cross-check canonicalizes them. SwapBaseIn is constant-product / full-input (no price limit), so the OUT leg is exact(arg(amountIn)) -- confirmed against the real inner transfer -- and the IN leg is amountAtLeast(arg(minimumAmountOut)), the slippage floor. Standalone tag spec -- no bindsIdlHash. Fail-safe: mis-author -> Contradicted/Unconfirmed, never a silent wrong sign; not signed into the served bundle until the gated re-pin."
+}

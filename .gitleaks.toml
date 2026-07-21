@@ -1,0 +1,22 @@
+# gitleaks configuration for the Cosign relay + iOS app.
+#
+# Extends gitleaks' built-in rules (keeps every real secret detector) and adds
+# one narrow allowlist. This is a Solana codebase, so base58 public keys
+# (program IDs, mint and account addresses) show up all over the specs, tests,
+# and fixtures. They are public data, but gitleaks' generic-api-key rule flags
+# them whenever they sit next to a variable named token/key/etc.
+#
+# The allowlist is bounded to public-key length (32-44 base58 chars). A 64-byte
+# Solana private key encodes to ~88 base58 chars, so it (and any longer or
+# non-base58 credential) is deliberately NOT allowlisted and still gets scanned.
+
+title = "cosign"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public base58 Solana addresses (32-44 chars) are not secrets."
+regexes = [
+  '''^[1-9A-HJ-NP-Za-km-z]{32,44}$''',
+]
