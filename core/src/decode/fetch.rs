@@ -986,23 +986,40 @@ mod fanout_tests {
 
     #[test]
     fn fetch_decode_augmentation_fans_out_idl_and_mint_fetches_concurrently() {
-        use std::time::Instant;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        // Prove the fan-out by observing overlap rather than timing it. Each
+        // handler marks itself active on entry, holds briefly so the window stays
+        // open, then marks itself done; the peak count of simultaneously-active
+        // handlers reaches two only if the IDL and mint fetches actually run
+        // concurrently — a serial fetch never sees more than one at a time. Unlike
+        // an elapsed-time threshold, this can't false-fail when a loaded CI runner
+        // adds latency to a genuinely-concurrent run.
+        let active = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+        let hold = Duration::from_millis(150);
 
         let mut server = mockito::Server::new();
-        let delay = Duration::from_millis(150);
+        let (a_idl, p_idl) = (active.clone(), peak.clone());
         let _idl = server
             .mock("GET", "/cosign/v1/programs/whirL/idl")
             .with_status(200)
             .with_chunked_body(move |w| {
-                std::thread::sleep(delay);
+                p_idl.fetch_max(a_idl.fetch_add(1, Ordering::SeqCst) + 1, Ordering::SeqCst);
+                std::thread::sleep(hold);
+                a_idl.fetch_sub(1, Ordering::SeqCst);
                 w.write_all(IDL_BODY.as_bytes())
             })
             .create();
+        let (a_mint, p_mint) = (active.clone(), peak.clone());
         let _mint = server
             .mock("GET", "/cosign/v1/mints/ACCT")
             .with_status(200)
             .with_chunked_body(move |w| {
-                std::thread::sleep(delay);
+                p_mint.fetch_max(a_mint.fetch_add(1, Ordering::SeqCst) + 1, Ordering::SeqCst);
+                std::thread::sleep(hold);
+                a_mint.fetch_sub(1, Ordering::SeqCst);
                 w.write_all(MINT_BODY.as_bytes())
             })
             .create();
@@ -1011,22 +1028,18 @@ mod fanout_tests {
             .with_status(500)
             .create();
 
-        let start = Instant::now();
         let augmentation = full_client(&server).fetch_decode_augmentation(
             &["whirL".into()],
             &["ACCT".into()],
             None,
         );
-        let elapsed = start.elapsed();
 
         assert!(augmentation.idls.contains_key("whirL"));
         assert!(augmentation.resolved_mints.contains_key("ACCT"));
-        // Serial execution would take at least 2 * delay (300ms); the single
-        // block_on/tokio::join! fan-out overlaps the two waits.
-        assert!(
-            elapsed < delay * 2,
-            "fan-out took {elapsed:?}, expected concurrent overlap (< {:?})",
-            delay * 2
+        assert_eq!(
+            peak.load(Ordering::SeqCst),
+            2,
+            "IDL and mint fetches did not overlap (peak concurrent handlers = 1); the fan-out regressed to serial"
         );
     }
 }
