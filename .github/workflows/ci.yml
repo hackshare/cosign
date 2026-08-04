@@ -147,11 +147,25 @@ jobs:
         if: steps.xcframework.outputs.cache-hit != 'true'
         run: ./scripts/build-xcframework.sh
 
-      - name: Install Tuist + Swift lint tooling
-        run: brew install tuist swiftformat swiftlint
+      - name: Install Tuist + SwiftLint
+        run: brew install tuist swiftlint
+
+      - name: Install SwiftFormat (pinned)
+        # Pin the formatter version. The runner image's preinstalled swiftformat
+        # drifts (0.62.x turned on new default rules that flag already-committed
+        # code), so an unpinned `brew install swiftformat` makes lint results depend
+        # on the image rather than the repo. Keep this in step with the version
+        # developers run locally.
+        env:
+          SWIFTFORMAT_VERSION: 0.61.1
+        run: |
+          curl -fsSL "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip" -o /tmp/swiftformat.zip
+          unzip -o -q /tmp/swiftformat.zip -d /tmp/swiftformat
+          chmod +x /tmp/swiftformat/swiftformat
+          echo "/tmp/swiftformat" >> "$GITHUB_PATH"
 
       - name: swiftformat --lint
-        run: swiftformat --lint App/ Modules/
+        run: swiftformat --version && swiftformat --lint App/ Modules/
 
       - name: swiftlint
         run: swiftlint lint --quiet --strict App Modules
