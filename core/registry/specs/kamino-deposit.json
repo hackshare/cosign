@@ -1,0 +1,13 @@
+{
+  "program": "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD",
+  "discriminator": [169, 201, 30, 126, 6, 205, 102, 68],
+  "mode": "bind-idl",
+  "bindsIdlHash": "002c95a3e4ac90e8705b03c6a49b048433aab267d9ce35d4145c4ed86c7eb14b",
+  "action": "Deposit",
+  "accounts": { "userSourceTokenAccount": 7 },
+  "template": "Deposit {liquidityAmount:token(userSourceTokenAccount)} into Kamino",
+  "effects": [
+    { "direction": "out", "asset": "token(userSourceTokenAccount)", "amount": "arg(liquidityAmount)" }
+  ],
+  "_note": "Kamino Lending `depositReserveLiquidity`. Discriminator [169,201,30,126,6,205,102,68] is the standard Anchor sighash of the SNAKE_CASE instruction name: sha256('global:deposit_reserve_liquidity')[:8] = [169,201,30,126,6,205,102,68]. Byte-confirmed as the leading 8 bytes of mainnet tx 3tDJBKDLQAYHa8nzmx6oB8c9BwcLHfLD5ELwQ7Xt4BW5Qmwry3QZkjoC9953A3yGNMo4fYPZ1R5NqLBVkydD9hVB (slot 434121752). Because iOS AnchorIDLDocument.sighash snake-cases the name before hashing, this binds robustly even when the served IDL is legacy-format with no explicit discriminators. userSourceLiquidity = account index 7 (kamino_lending on-chain IDL order). liquidityAmount:u64 is the single arg. bindsIdlHash is the sha256 of the on-chain kamino_lending IDL (Anchor IDL PDA 8qLKwp1fk8WyqmzarkuMeZEX3AzL4VDSmA2UZTKT2aCJ); re-pin against the deployed relay /idl hash at go-live. Cross-check leg surfaces as a transferChecked of the reserve liquidity mint (USDC EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v), so the relay asset is the mint address. Fail-safe: a mis-authored spec cross-checks as Contradicted, never a silent wrong sign; spec source only, not signed into the served bundle until the gated re-pin."
+}

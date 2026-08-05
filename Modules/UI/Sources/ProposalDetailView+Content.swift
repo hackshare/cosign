@@ -1,3 +1,4 @@
+import CosignCore
 import Squads
 import SwiftUI
 
@@ -13,6 +14,7 @@ extension ProposalDetailView {
             }
             votesSection(proposal)
             actionsSection(proposal)
+            contradictionBanner()
             decodedFieldsSection(proposal)
             movementSection(for: proposal)
             inspectionSection(proposal)
@@ -31,5 +33,19 @@ extension ProposalDetailView {
         proposal.canBeActedOn ?
             CosignLayout.screenBottomPadding(stickyFooterHeight: stickyFooterHeight) :
             CosignLayout.screenBottomPadding
+    }
+}
+
+extension ProposalDetailView {
+    @ViewBuilder
+    func contradictionBanner() -> some View {
+        if decodedProposal?.hasContradiction == true {
+            CosignInlineBanner(tone: .amber) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(CosignCopy.ProposalDetail.contradictionBannerTitle).font(CosignTheme.FontStyle.titleM)
+                    Text(CosignCopy.ProposalDetail.contradictionBannerMessage).font(CosignTheme.FontStyle.caption)
+                }
+            }
+        }
     }
 }

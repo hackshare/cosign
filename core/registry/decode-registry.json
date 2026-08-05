@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "keyId": "cosign-registry-2026",
+  "specs": [
+    {
+      "program": "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD",
+      "discriminator": [
+        169,
+        201,
+        30,
+        126,
+        6,
+        205,
+        102,
+        68
+      ],
+      "mode": "bind-idl",
+      "bindsIdlHash": "002c95a3e4ac90e8705b03c6a49b048433aab267d9ce35d4145c4ed86c7eb14b",
+      "action": "Deposit",
+      "accounts": {
+        "userSourceTokenAccount": 7
+      },
+      "template": "Deposit {liquidityAmount:token(userSourceTokenAccount)} into Kamino",
+      "effects": [
+        {
+          "direction": "out",
+          "asset": "token(userSourceTokenAccount)",
+          "amount": "arg(liquidityAmount)"
+        }
+      ],
+      "_note": "Kamino Lending `depositReserveLiquidity`. Discriminator [169,201,30,126,6,205,102,68] is the standard Anchor sighash of the SNAKE_CASE instruction name: sha256('global:deposit_reserve_liquidity')[:8] = [169,201,30,126,6,205,102,68]. Byte-confirmed as the leading 8 bytes of mainnet tx 3tDJBKDLQAYHa8nzmx6oB8c9BwcLHfLD5ELwQ7Xt4BW5Qmwry3QZkjoC9953A3yGNMo4fYPZ1R5NqLBVkydD9hVB (slot 434121752). Because iOS AnchorIDLDocument.sighash snake-cases the name before hashing, this binds robustly even when the served IDL is legacy-format with no explicit discriminators. userSourceLiquidity = account index 7 (kamino_lending on-chain IDL order). liquidityAmount:u64 is the single arg. bindsIdlHash is the sha256 of the on-chain kamino_lending IDL (Anchor IDL PDA 8qLKwp1fk8WyqmzarkuMeZEX3AzL4VDSmA2UZTKT2aCJ); re-pin against the deployed relay /idl hash at go-live. Cross-check leg surfaces as a transferChecked of the reserve liquidity mint (USDC EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v), so the relay asset is the mint address. Fail-safe: a mis-authored spec cross-checks as Contradicted, never a silent wrong sign; spec source only, not signed into the served bundle until the gated re-pin."
+    },
+    {
+      "program": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "discriminator": [
+        248,
+        198,
+        158,
+        145,
+        225,
+        117,
+        135,
+        200
+      ],
+      "mode": "bind-idl",
+      "bindsIdlHash": "7afddfe8766bd24d30ff9ee5b12c7ee89bff5bc3b7b0396620e021a97a7ef63f",
+      "action": "Swap",
+      "accounts": {
+        "tokenOwnerAccountA": 3,
+        "tokenOwnerAccountB": 5
+      },
+      "template": [
+        {
+          "when": [
+            "arg(a_to_b)",
+            "arg(amount_specified_is_input)"
+          ],
+          "text": "Swap {amount:token(tokenOwnerAccountA)} on Orca Whirlpool (A→B)"
+        },
+        {
+          "when": [
+            "!arg(a_to_b)",
+            "arg(amount_specified_is_input)"
+          ],
+          "text": "Swap {amount:token(tokenOwnerAccountB)} on Orca Whirlpool (B→A)"
+        }
+      ],
+      "effects": [
+        {
+          "when": [
+            "arg(a_to_b)",
+            "arg(amount_specified_is_input)"
+          ],
+          "direction": "out",
+          "asset": "token(tokenOwnerAccountA)",
+          "amountAtMost": "arg(amount)"
+        },
+        {
+          "when": [
+            "arg(a_to_b)",
+            "arg(amount_specified_is_input)"
+          ],
+          "direction": "in",
+          "asset": "token(tokenOwnerAccountB)",
+          "amountAtLeast": "arg(other_amount_threshold)"
+        },
+        {
+          "when": [
+            "!arg(a_to_b)",
+            "arg(amount_specified_is_input)"
+          ],
+          "direction": "out",
+          "asset": "token(tokenOwnerAccountB)",
+          "amountAtMost": "arg(amount)"
+        },
+        {
+          "when": [
+            "!arg(a_to_b)",
+            "arg(amount_specified_is_input)"
+          ],
+          "direction": "in",
+          "asset": "token(tokenOwnerAccountA)",
+          "amountAtLeast": "arg(other_amount_threshold)"
+        }
+      ],
+      "_note": "Orca Whirlpool `swap`, discriminator [248,198,158,145,225,117,135,200] = Anchor sighash(global:swap), byte-confirmed against mainnet txs 3bGpboJiB3wzbzXsaLt6s2rJ5WQpTmB5EqGLLyCNNCMA8oSotM8LWzRJ2AS5jcJ7Hi69DnMFtBTdowtT6DLsJQxq (a_to_b=1, slot 434121979) and 1wuXW17rHChZTKn5uFjKctxEgDz7hnmfBDXAWUWnABM4reMrUioy4CWEVXQ5xufwgN8gbzabndvCZG5x6jpM765 (a_to_b=0, slot 434121980). On-chain whirlpool IDL swap args (Anchor 0.30, snake_case): amount:u64, other_amount_threshold:u64, sqrt_price_limit:u128, amount_specified_is_input:bool, a_to_b:bool -- a_to_b IS a real Borsh bool, so the conditional variants select on a genuinely-decoded flag. Every variant + effect is ALSO gated on arg(amount_specified_is_input) (a real Borsh bool at byte offset 40, right after the u128 sqrt_price_limit): the variants label `amount` as the INPUT quantity, which only holds for exact-input swaps. An exact-OUTPUT swap (amount_specified_is_input=false) matches NO variant -> interpret returns nil -> clean fall-through to the generic decoder, never a wrong statement. Correct exact-output variants are a future enhancement. Account order: 3 token_owner_account_a, 5 token_owner_account_b. bindsIdlHash = sha256 of the on-chain whirlpool IDL (PDA 2KFqE4RWoPVbvodo8vbggCFeHPS8TDvgpwp79ALMrcyn); re-pin against the deployed relay /idl at go-live, and confirm arg-name casing (snake_case a_to_b) the relay serves. The swap's token legs are non-checked SPL `transfer` CPIs; the relay now resolves each leg's mint from its source token account (both the pending decoded path and the executed jsonParsed path), so the legs carry asset = mint address and the cross-check canonicalizes them. The OUT leg uses amountAtMost(arg(amount)) because the stated `amount` is the INPUT CAP: an exact-input swap consumes AT MOST that much, and a price-limited partial fill moves less (e.g. the a_to_b=1 source tx moved ~6.2 of a 124-SOL cap), so exact(amount) would false-contradict. The IN leg uses amountAtLeast(arg(other_amount_threshold)), the slippage floor. Fail-safe holds: mis-author -> Contradicted, never a silent wrong sign. Not signed into the served bundle until the gated re-pin."
+    },
+    {
+      "program": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+      "discriminator": [
+        9
+      ],
+      "mode": "standalone",
+      "layout": [
+        {
+          "name": "amountIn",
+          "type": "u64"
+        },
+        {
+          "name": "minimumAmountOut",
+          "type": "u64"
+        }
+      ],
+      "action": "Swap",
+      "accounts": {
+        "userSourceTokenAccount": 15,
+        "userDestinationTokenAccount": 16
+      },
+      "template": "Swap {amountIn:token(userSourceTokenAccount)} on Raydium",
+      "effects": [
+        {
+          "direction": "out",
+          "asset": "token(userSourceTokenAccount)",
+          "amount": "arg(amountIn)"
+        },
+        {
+          "direction": "in",
+          "asset": "token(userDestinationTokenAccount)",
+          "amountAtLeast": "arg(minimumAmountOut)"
+        }
+      ],
+      "_note": "Raydium AMM v4 `SwapBaseIn`, Borsh tag u8=9, layout amountIn:u64, minimumAmountOut:u64. Tag + layout byte-confirmed against mainnet tx 5q5CJB8HfisCqyFJ3ZAQ5X6xyRW67sgDVV95K3fT3178f8espXbSdeCrNh2atc94B2fX6vzNphuc5nNU3z34YcxP (slot 434120378): raw 09a609640f00000000d27d61b229010000, amountIn = 258214310 (matches the first inner SPL transfer). Account indices from that tx's 18-account layout: 15 userSourceTokenAccount, 16 userDestinationTokenAccount. WARNING (go-live): Raydium AMM v4 has variable account counts (17 vs 18 accounts depending on the OpenBook/serum market vault-signer); the user source/destination indices shift by one in the 17-account layout, so these indices must be re-validated per pool before go-live. The swap legs are non-checked SPL `transfer` CPIs; the relay now resolves each leg's mint from its source token account, so the legs carry asset = mint address and the cross-check canonicalizes them. SwapBaseIn is constant-product / full-input (no price limit), so the OUT leg is exact(arg(amountIn)) -- confirmed against the real inner transfer -- and the IN leg is amountAtLeast(arg(minimumAmountOut)), the slippage floor. Standalone tag spec -- no bindsIdlHash. Fail-safe: mis-author -> Contradicted/Unconfirmed, never a silent wrong sign; not signed into the served bundle until the gated re-pin."
+    },
+    {
+      "program": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "discriminator": [
+        14
+      ],
+      "mode": "standalone",
+      "layout": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        }
+      ],
+      "action": "Stake",
+      "accounts": {
+        "vault": 3,
+        "poolMint": 7
+      },
+      "template": "Stake {lamports:sol} into the pool for {poolMint:token}",
+      "effects": [
+        {
+          "direction": "out",
+          "asset": "SOL",
+          "amount": "arg(lamports)"
+        },
+        {
+          "direction": "in",
+          "asset": "token(poolMint)",
+          "amountAtLeast": "0"
+        }
+      ],
+      "_note": "SPL Stake Pool `DepositSol`, Borsh tag [14], layout lamports:u64. Tag + layout byte-confirmed as the leading bytes of mainnet tx JFWD8Z2JUxy1XkcGJiAGA42pV2KUPTBRfuZKc4s4XhxjDLpx3uFFA6NR6MnbQrNnAaRuiTmYG1sehj1fJ1ZbiHK (slot 434120760): raw 0e00743ba40b000000, lamports = 50000000000. Account order (DepositSol): 0 stakePool, 1 withdrawAuthority, 2 reserveStake, 3 lamportsFrom(depositor/vault), 4 poolTokensTo, 5 managerFee, 6 referrerFee, 7 poolMint, 8 systemProgram, 9 tokenProgram. Cross-check legs: SOL outflow is a System `transfer` (relay asset 'SOL'); the pool-token inflow is a `mintTo` whose parsed instruction carries the pool mint (J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn = JitoSOL), so the relay asset is that mint address. Standalone tag spec — no bindsIdlHash. Fail-safe: mis-author -> Contradicted, never a silent wrong sign; not signed into the served bundle until the gated re-pin."
+    }
+  ]
+}

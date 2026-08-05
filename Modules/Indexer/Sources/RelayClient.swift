@@ -217,7 +217,7 @@ final class HTTPRelayClient: RelayClient, @unchecked Sendable {
         ])
     }
 
-    private func relayURL(
+    func relayURL(
         pathComponents: [String],
         queryItems: [URLQueryItem] = []
     ) -> URL? {

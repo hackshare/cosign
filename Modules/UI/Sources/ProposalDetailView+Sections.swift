@@ -1,3 +1,4 @@
+import CosignCore
 import Indexer
 import Squads
 import SwiftUI
@@ -24,7 +25,7 @@ extension ProposalDetailView {
 
     @ViewBuilder
     func movementSection(for proposal: SquadProposalDetail) -> some View {
-        let effects = (proposal.isExecuted ? executedInspectionReport?.action : inspectionReport?.action)?.effects ?? []
+        let effects = currentInspectionEffects(for: proposal)
         let movement = AssetMovement.build(from: effects, ownAccounts: ownVaultAccounts)
         if !movement.isEmpty {
             AssetMovementCard(movement: movement, variant: movementVariant(for: proposal))
@@ -39,7 +40,6 @@ extension ProposalDetailView {
     @ViewBuilder
     func decodedFieldsSection(_ proposal: SquadProposalDetail) -> some View {
         let action = proposalActionObject(for: proposal)
-        let decodedInstructions = instructionDecoder.decode(proposal)
         let roles = decodedFieldRoles(for: action, decodedInstructions: decodedInstructions)
         let instructionRows = decodedInstructionRows(roles: roles, decodedInstructions: decodedInstructions)
         let configRows = squadDetail.map {
@@ -100,7 +100,7 @@ extension ProposalDetailView {
 
     @ViewBuilder
     func technicalDetailsSection(_ proposal: SquadProposalDetail) -> some View {
-        let instructions = instructionDecoder.decode(proposal)
+        let instructions = decodedInstructions
         let accounts = unique(proposal.accountsReferenced)
         let hasRelayInspection = inspectionReport != nil || executedInspectionReport != nil
 
@@ -256,11 +256,11 @@ extension ProposalDetailView {
 
         if let action = executedInspectionReport?.action {
             let actionObject = action.actionObject(context: .executed)
-            return actionObject.usesGenericReviewCopy ? localAction ?? actionObject : actionObject
+            return actionObject.isReplaceableByLocalDecode ? localAction ?? actionObject : actionObject
         }
         if let action = inspectionReport?.action {
             let actionObject = action.actionObject
-            return actionObject.usesGenericReviewCopy ? localAction ?? actionObject : actionObject
+            return actionObject.isReplaceableByLocalDecode ? localAction ?? actionObject : actionObject
         }
 
         if let localAction {
@@ -285,36 +285,38 @@ extension ProposalDetailView {
     }
 
     private func localDecodedAction(for proposal: SquadProposalDetail) -> ActionObject? {
-        guard let instruction = instructionDecoder.decode(proposal).first else {
+        guard let instruction = decodedProposal?.instructions.first,
+              instruction.kind.lowercased() != "raw",
+              let confidence = registryConfidence(
+                  provenance: instruction.provenance,
+                  crossCheck: instruction.crossCheck
+              )
+        else {
             return nil
         }
 
-        if instruction.kind.lowercased() != "raw" {
-            return ActionObject(
-                title: instruction.summary,
-                subtitle: CosignCopy.ProposalDetail.decodedActionSubtitle(
-                    programLabel: instruction.programLabel,
-                    kind: instruction.kind
+        return ActionObject(
+            title: instruction.summary,
+            subtitle: CosignCopy.ProposalDetail.decodedActionSubtitle(
+                programLabel: instruction.programLabel,
+                kind: instruction.kind
+            ),
+            severity: .routine,
+            confidence: confidence,
+            source: instruction.programLabel,
+            roles: [
+                ActionRole(label: CosignCopy.ProposalDetail.programRoleLabel, value: instruction.programLabel),
+                ActionRole(
+                    label: CosignCopy.ProposalDetail.instructionRoleLabel,
+                    value: displayLabel(instruction.kind)
                 ),
-                severity: .routine,
-                confidence: .partial,
-                source: instruction.programLabel,
-                roles: [
-                    ActionRole(label: CosignCopy.ProposalDetail.programRoleLabel, value: instruction.programLabel),
-                    ActionRole(
-                        label: CosignCopy.ProposalDetail.instructionRoleLabel,
-                        value: displayLabel(instruction.kind)
-                    ),
-                    ActionRole(
-                        label: CosignCopy.ProposalDetail.proposalRoleLabel,
-                        value: CosignCopy.ProposalDetail.proposalNumber(index: proposal.transactionIndex)
-                    )
-                ],
-                warnings: []
-            )
-        }
-
-        return nil
+                ActionRole(
+                    label: CosignCopy.ProposalDetail.proposalRoleLabel,
+                    value: CosignCopy.ProposalDetail.proposalNumber(index: proposal.transactionIndex)
+                )
+            ],
+            warnings: []
+        )
     }
 
     private func voteStatusText(for proposal: SquadProposalDetail) -> String {

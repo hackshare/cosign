@@ -1,10 +1,10 @@
+import CosignCore
 import Indexer
-import Squads
 import SwiftUI
 
 struct ProposalInspectionReportView: View {
     let report: ProposalInspectionReport
-    let instructionDecoder: InstructionDecoder
+    let decodedInstructions: [DecodedInstructionDisplay]
     let showsSimulation: Bool
     var showsAction = true
 
@@ -23,12 +23,6 @@ struct ProposalInspectionReportView: View {
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private var decodedInstructions: [DecodedInstructionDisplay] {
-        report.proposal.instructions.map { instruction in
-            instructionDecoder.decode(instruction.squadInstruction)
-        }
     }
 
     private var actionBadgeLabel: String {
@@ -146,18 +140,6 @@ struct ProposalInspectionReportView: View {
                 }
             }
         }
-    }
-}
-
-private extension ProposalInspectionInstruction {
-    var squadInstruction: SquadDecodedInstruction {
-        SquadDecodedInstruction(
-            program: program,
-            kind: kind,
-            summary: summary,
-            accounts: accounts,
-            rawDataHex: rawDataHex
-        )
     }
 }
 

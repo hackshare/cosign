@@ -35,10 +35,19 @@ public enum TargetFactory {
         )
     }
 
+    /// - Parameters:
+    ///   - name: Base name for the test target itself (produces "\(name)Tests")
+    ///     and its bundle id. Also the module under test, unless `moduleName`
+    ///     overrides that.
+    ///   - moduleName: The framework target this test target exercises, if
+    ///     different from `name`. Defaults to `name`. Use this when `name`
+    ///     must differ from the module (e.g. to avoid the produced test
+    ///     target name colliding with an unrelated naming convention).
     public static func unitTests(
         name: String,
         sources: SourceFilesList,
-        dependencies: [TargetDependency] = []
+        dependencies: [TargetDependency] = [],
+        moduleName: String? = nil
     ) -> Target {
         .target(
             name: "\(name)Tests",
@@ -47,7 +56,7 @@ public enum TargetFactory {
             bundleId: "\(bundleIdPrefix).\(name.lowercased()).tests",
             deploymentTargets: deploymentTarget,
             sources: sources,
-            dependencies: [.target(name: name)] + dependencies
+            dependencies: [.target(name: moduleName ?? name)] + dependencies
         )
     }
 }

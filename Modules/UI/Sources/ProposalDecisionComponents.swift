@@ -1,3 +1,4 @@
+import CosignCore
 import Indexer
 import Squads
 import SwiftUI

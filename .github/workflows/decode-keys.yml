@@ -1,0 +1,120 @@
+name: Decode Keys Manifest
+
+# Signs and publishes the trusted-keys manifest (`decode-keys.json`) that lists
+# the decode-publisher keys the app trusts. Separate channel from app releases
+# (`registry-keys-<date>`, not `v*`) so rotating publisher keys never touches
+# an app build. This workflow ships inert: `SIGNING_PRIVATE_KEY_B64` (the
+# pinned root key) is not configured until go-live, so a run with no secret
+# fails at the signing step and nothing is published.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly refresh so `issuedAt`/`expiresAt` never drift stale even with no
+    # key rotation.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: decode-keys
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  MANIFEST_SCHEMA: 1
+  ROOT_KEY_ID: cosign-root-2026
+  MANIFEST_VALID_DAYS: 14
+
+jobs:
+  publish:
+    name: Sign and publish the trusted-keys manifest
+    runs-on: macos-26
+    environment: ios-release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Verify the triggering ref is signed by the trusted release signer
+        if: github.event_name != 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_SHA: ${{ github.sha }}
+          RELEASE_SIGNER_SHA256: 736128e8f88bd12487727c398cdb71efd0195b4447e785c860607feeb004acd6
+        run: |
+          set -euo pipefail
+
+          # `workflow_dispatch` runs off a branch ref, not a tag, so there is no
+          # tag object to check. Verify the triggering commit's signature
+          # instead, using the same GitHub-verified-signer gate as the app
+          # release: `verification.verified` plus the pinned signer identity,
+          # so a rotated GitHub signing key is picked up automatically and we
+          # never ship a pinned key of our own.
+          COMMIT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${EVENT_SHA}")"
+          VERIFIED="$(jq -r '.commit.verification.verified' <<<"${COMMIT_JSON}")"
+          REASON="$(jq -r '.commit.verification.reason' <<<"${COMMIT_JSON}")"
+          SIGNER="$(jq -r '.commit.committer.email' <<<"${COMMIT_JSON}")"
+          SIGNER_SHA="$(printf '%s' "${SIGNER}" | shasum -a 256 | cut -d' ' -f1)"
+          echo "Signature verified=${VERIFIED} (${REASON})"
+          if [[ "${VERIFIED}" != "true" ]]; then
+            echo "Triggering commit signature was not verified by GitHub (reason: ${REASON})" >&2
+            exit 1
+          fi
+          if [[ "${SIGNER_SHA}" != "${RELEASE_SIGNER_SHA256}" ]]; then
+            echo "Triggering commit signer is not the trusted release signer" >&2
+            exit 1
+          fi
+
+      - name: Stamp issuedAt/expiresAt and assemble the manifest
+        run: |
+          set -euo pipefail
+          MANIFEST_DIR="$RUNNER_TEMP/decode-keys"
+          rm -rf "$MANIFEST_DIR"; mkdir -p "$MANIFEST_DIR"
+          echo "MANIFEST_DIR=${MANIFEST_DIR}" >> "$GITHUB_ENV"
+
+          ISSUED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          EXPIRES_AT="$(date -u -v+"${MANIFEST_VALID_DAYS}"d +%Y-%m-%dT%H:%M:%SZ)"
+          CHANNEL="registry-keys-$(date -u +%Y-%m-%d)"
+          echo "CHANNEL=${CHANNEL}" >> "$GITHUB_ENV"
+
+          # The trusted decode-publisher keys. verify_manifest checks the served
+          # bundle's signature against these (keyed by keyId); retire a key by
+          # marking it "revoked" or dropping it from a later issued manifest.
+          jq -n \
+            --argjson schema "$MANIFEST_SCHEMA" \
+            --arg issuedAt "$ISSUED_AT" \
+            --arg expiresAt "$EXPIRES_AT" \
+            --arg rootKeyId "$ROOT_KEY_ID" \
+            '{schema: $schema, issuedAt: $issuedAt, expiresAt: $expiresAt, rootKeyId: $rootKeyId, publishers: [{keyId: "cosign-registry-2026", publicKey: "G73jaV/CvI6Ew1Foe50N1Kutx1ousZ9S8+2UqG3pxgQ=", status: "active"}]}' \
+            > "$MANIFEST_DIR/decode-keys.json"
+
+          cat "$MANIFEST_DIR/decode-keys.json"
+
+      - name: Sign the manifest with SignJsonFile
+        env:
+          SIGNING_PRIVATE_KEY_B64: ${{ secrets.SIGNING_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGNING_PRIVATE_KEY_B64}" ]]; then
+            echo "SIGNING_PRIVATE_KEY_B64 is not configured; the decode-keys manifest ships inert until go-live" >&2
+            exit 1
+          fi
+
+          xcrun swiftc Tools/SignJsonFile.swift -o "$RUNNER_TEMP/sign-json-file"
+          "$RUNNER_TEMP/sign-json-file" \
+            "$MANIFEST_DIR/decode-keys.json" \
+            "$MANIFEST_DIR/decode-keys.sig"
+
+          shasum -a 256 "$MANIFEST_DIR/decode-keys.json" "$MANIFEST_DIR/decode-keys.sig"
+
+      - name: Publish the registry-keys release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$CHANNEL" \
+            --title "$CHANNEL" \
+            --notes "Trusted-keys manifest for the decode registry. Signed by the pinned root key ($ROOT_KEY_ID); the relay serves this at /cosign/v1/decode-keys. Separate from app releases (v*)." \
+            "$MANIFEST_DIR/decode-keys.json" \
+            "$MANIFEST_DIR/decode-keys.sig"

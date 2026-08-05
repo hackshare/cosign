@@ -1,11 +1,11 @@
 import Foundation
 
-enum RelayClientError: LocalizedError, Equatable {
+public enum RelayClientError: LocalizedError, Equatable {
     case unavailable
     case httpStatus(Int, message: String?)
     case invalidResponse
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .unavailable:
             "Relay feature is unavailable for this endpoint."

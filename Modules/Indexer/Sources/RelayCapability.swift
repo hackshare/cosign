@@ -19,8 +19,11 @@ public struct RelayCapability: RawRepresentable, Hashable, Codable, Sendable {
     public static let proposalInspection = Self(rawValue: "proposal_inspection")
     public static let executedTransactionInspection = Self(rawValue: "executed_transaction_inspection")
     public static let knownProgramDecoding = Self(rawValue: "known_program_decoding")
+    public static let programIDL = Self(rawValue: "program_idl")
+    public static let decodeRegistry = Self(rawValue: "decode_registry")
     public static let actionEffects = Self(rawValue: "action_effects")
     public static let assetPricing = Self(rawValue: "asset_pricing")
+    public static let mintMetadata = Self(rawValue: "mint_metadata")
 
     public static let enhancedFeatures: Set<Self> = [
         .squadsIndexing,
@@ -32,7 +35,10 @@ public struct RelayCapability: RawRepresentable, Hashable, Codable, Sendable {
         .proposalInspection,
         .executedTransactionInspection,
         .knownProgramDecoding,
+        .programIDL,
+        .decodeRegistry,
         .actionEffects,
-        .assetPricing
+        .assetPricing,
+        .mintMetadata
     ]
 }

@@ -215,10 +215,29 @@ public enum CosignCore {
     public static func solBalance(rpcURL: String, address: String) throws -> UInt64 {
         try getSolBalance(rpcUrl: rpcURL, address: address)
     }
+
+    /// Decodes a proposal's instructions into render-ready results. Runs the
+    /// blocking Rust decode on a background executor and returns the finished
+    /// value; this is the only async wrapper in the bridge (every other call is
+    /// synchronous because its callers already hop off the main actor). The core
+    /// fetches the IDL/spec/mint augmentation itself and fails open, so this
+    /// never throws — decode misses degrade to raw, not to an error.
+    public static func decodeProposal(_ request: DecodeProposalRequest) async -> DecodedProposal {
+        await Task.detached(priority: .userInitiated) {
+            decodeProposalFFI(request)
+        }.value
+    }
 }
 
 private func keypairFromSecretBytesFFI(_ secretBytes: Data) throws -> KeyPair {
     try keypairFromSecretBytes(secretBytes: secretBytes)
+}
+
+/// Module-scope shim so the async `CosignCore.decodeProposal(_:)` wrapper can
+/// reach the same-named UniFFI free function `decodeProposal(request:)` without
+/// the enum member shadowing it (mirrors `keypairFromSecretBytesFFI`).
+private func decodeProposalFFI(_ request: DecodeProposalRequest) -> DecodedProposal {
+    decodeProposal(request: request)
 }
 
 public struct SOLTransferProposalTransactionRequest: Sendable {

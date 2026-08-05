@@ -143,7 +143,10 @@ let project = Project(
         ),
         TargetFactory.unitTests(
             name: "CosignCore",
-            sources: ["Modules/CosignCore/Tests/**"]
+            sources: ["Modules/CosignCore/Tests/**"],
+            dependencies: [
+                .xcframework(path: "Modules/CosignCore/Frameworks/CosignCore.xcframework")
+            ]
         ),
 
         // Core: pure Swift types and protocols, no Solana dependency.
@@ -246,6 +249,27 @@ let project = Project(
                 .target(name: "Squads")
             ],
             settings: .settings(base: ["SWIFT_EMIT_LOC_STRINGS": "YES"])
+        ),
+        // Named "UIUnit" (not "UI") so the produced target is "UIUnitTests" -
+        // a plain "UI" + "Tests" name would generate as "UITests", which reads
+        // as an XCUITest bundle (like CosignDemoUITests) rather than a unit
+        // test target, and Tuist's automaticSchemesOptions suffix grouping
+        // treats the "UITests" suffix as that XCUITest category rather than
+        // grouping it under the "UI" framework's scheme.
+        TargetFactory.unitTests(
+            name: "UIUnit",
+            sources: ["Modules/UI/Tests/**"],
+            dependencies: [
+                .target(name: "Core"),
+                .target(name: "CosignCore"),
+                .target(name: "Indexer"),
+                .target(name: "Persistence"),
+                .target(name: "Provenance"),
+                .target(name: "Signers"),
+                .target(name: "Squads"),
+                .xcframework(path: "Modules/CosignCore/Frameworks/CosignCore.xcframework")
+            ],
+            moduleName: "UI"
         ),
 
         // The iOS app. Note: also depends directly on the CosignCore.xcframework
