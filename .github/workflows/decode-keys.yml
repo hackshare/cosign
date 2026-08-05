@@ -78,16 +78,15 @@ jobs:
           CHANNEL="registry-keys-$(date -u +%Y-%m-%d)"
           echo "CHANNEL=${CHANNEL}" >> "$GITHUB_ENV"
 
-          # The publisher list is empty until go-live mints and pins the first
-          # publisher key; an empty list keeps `verify_manifest` resolving to
-          # no trusted publisher keys, so tier-3 stays inert even once this
-          # workflow is enabled.
+          # The trusted decode-publisher keys. verify_manifest checks the served
+          # bundle's signature against these (keyed by keyId); retire a key by
+          # marking it "revoked" or dropping it from a later issued manifest.
           jq -n \
             --argjson schema "$MANIFEST_SCHEMA" \
             --arg issuedAt "$ISSUED_AT" \
             --arg expiresAt "$EXPIRES_AT" \
             --arg rootKeyId "$ROOT_KEY_ID" \
-            '{schema: $schema, issuedAt: $issuedAt, expiresAt: $expiresAt, rootKeyId: $rootKeyId, publishers: []}' \
+            '{schema: $schema, issuedAt: $issuedAt, expiresAt: $expiresAt, rootKeyId: $rootKeyId, publishers: [{keyId: "cosign-registry-2026", publicKey: "G73jaV/CvI6Ew1Foe50N1Kutx1ousZ9S8+2UqG3pxgQ=", status: "active"}]}' \
             > "$MANIFEST_DIR/decode-keys.json"
 
           cat "$MANIFEST_DIR/decode-keys.json"

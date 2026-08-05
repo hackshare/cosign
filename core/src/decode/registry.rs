@@ -23,12 +23,15 @@ pub struct DecodeRegistryBundle {
 }
 
 /// Pinned root keys that sign the trusted-keys manifest, keyed by `keyId`,
-/// base64-encoded 32-byte raw public keys. Populated with the Cosign root
-/// key at go-live; empty until then. With an empty set no manifest verifies
-/// (every manifest fails as an unknown root), so no publisher keys are
-/// trusted and the registry stays inert (zero specs) rather than trusting an
-/// unsigned or unpinned bundle.
-pub const DECODE_REGISTRY_ROOT_KEYS: &[(&str, &str)] = &[];
+/// base64-encoded 32-byte raw public keys. A manifest verifies only if it is
+/// signed by one of these roots; anything else fails as an unknown root, so no
+/// publisher keys are trusted and the registry stays inert (zero specs) rather
+/// than trusting an unsigned or unpinned bundle. Rotate with overlap: ship the
+/// new root alongside the old, cut signing over, then drop the old.
+pub const DECODE_REGISTRY_ROOT_KEYS: &[(&str, &str)] = &[(
+    "cosign-root-2026",
+    "cAIqPHZiqqhH2J39lh3mwViCrt85PUdRdN9/lT8DxJs=",
+)];
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum DecodeRegistryVerificationError {
@@ -174,7 +177,9 @@ mod tests {
     }
 
     #[test]
-    fn empty_public_key_map_is_the_shipped_default() {
-        assert!(DECODE_REGISTRY_ROOT_KEYS.is_empty());
+    fn pins_the_cosign_root() {
+        let (key_id, pk_b64) = DECODE_REGISTRY_ROOT_KEYS[0];
+        assert_eq!(key_id, "cosign-root-2026");
+        assert_eq!(STANDARD.decode(pk_b64).unwrap().len(), 32);
     }
 }

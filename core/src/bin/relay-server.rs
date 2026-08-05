@@ -6626,7 +6626,11 @@ mod tests {
         };
         let response = handle_request_with_client(&request, &config, None);
         assert_eq!(response.status, 200);
-        assert!(response.body.starts_with(b"{\"schema\":1"));
+        // Assert on the parsed bundle, not the byte layout, so the served bundle
+        // may be pretty-printed or compact.
+        let bundle: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+        assert_eq!(bundle["schema"], 1);
+        assert_eq!(bundle["keyId"], "cosign-registry-2026");
         let header = |name: &str| {
             response
                 .extra_headers

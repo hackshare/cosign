@@ -566,7 +566,6 @@ impl HttpCache {
 #[cfg(test)]
 mod fetch_tests {
     use super::*;
-    use crate::decode::registry::DECODE_REGISTRY_ROOT_KEYS;
 
     pub(crate) const IDL_BODY: &str = r#"{"ok":true,"kind":"program_idl","program":"whirL",
       "idl":{"metadata":{"name":"whirlpool"},"instructions":[
@@ -618,10 +617,10 @@ mod fetch_tests {
     }
 
     #[test]
-    fn fetch_decode_registry_fails_safe_to_empty_with_the_shipped_empty_keys() {
-        // A well-formed signed bundle + signature header, but the SHIPPED public
-        // key map is empty, so verification fails → zero specs. This is today's
-        // production behavior and the fail-safe default.
+    fn fetch_decode_registry_is_inert_without_a_manifest() {
+        // A well-formed signed bundle is served, but no trusted-keys manifest is
+        // served alongside it, so no publisher keys are trusted, the bundle can't
+        // verify, and the registry stays inert (zero specs) — the fail-safe path.
         let mut server = mockito::Server::new();
         let _m = server
             .mock("GET", "/cosign/v1/decode-registry")
@@ -629,7 +628,6 @@ mod fetch_tests {
             .with_header("X-Cosign-Registry-Signature", "AAAA")
             .with_body(r#"{"schema":1,"keyId":"k1","specs":[]}"#)
             .create();
-        assert!(DECODE_REGISTRY_ROOT_KEYS.is_empty());
         let (specs, accepted) = runtime()
             .block_on(client_for(&server).decode_registry_async("2026-08-10T00:00:00Z", None));
         assert!(specs.is_empty());
@@ -639,7 +637,8 @@ mod fetch_tests {
     #[test]
     fn build_registry_specs_groups_verified_specs_by_program() {
         // The success path, exercised through the internal helper with a test key
-        // (the shipped keys are empty). Uses the same signing helper as registry.rs.
+        // (the helper takes its keys explicitly, so it never touches the pinned
+        // set). Uses the same signing helper as registry.rs.
         use crate::keypair;
         use base64::{Engine, engine::general_purpose::STANDARD};
         const MNEMONIC: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -800,9 +799,9 @@ impl RelayFetchClient {
     }
 
     /// Test seam mirroring `decode_registry_via_test_keys` but exercising the
-    /// full manifest→bundle chain with an injected root set (the shipped
-    /// `DECODE_REGISTRY_ROOT_KEYS` is empty, so the production path is always
-    /// inert and can't reach the success branch on its own).
+    /// full manifest→bundle chain with an injected root set. The production
+    /// `DECODE_REGISTRY_ROOT_KEYS` pins the real Cosign root, whose private key
+    /// tests don't have, so a test chain can only verify against injected roots.
     fn decode_registry_via_test_roots(
         &self,
         root_keys: &[(&str, &str)],
@@ -981,7 +980,7 @@ mod fanout_tests {
             augmentation.resolved_mints.get("ACCT").map(|m| m.decimals),
             Some(6)
         );
-        assert!(augmentation.specs.is_empty()); // empty shipped keys → fail-safe empty
+        assert!(augmentation.specs.is_empty()); // no manifest served → no trusted publishers → inert
     }
 
     #[test]
@@ -1378,7 +1377,7 @@ mod manifest_chain_tests {
     }
 
     #[test]
-    fn empty_roots_keep_the_registry_inert_even_with_a_valid_chain() {
+    fn a_manifest_naming_an_unpinned_root_stays_inert() {
         let (root, publisher, _root_pk, publisher_pk) = root_and_publisher();
         let (bundle, bundle_sig) = bundle_signed_by(&publisher);
         let (manifest, manifest_sig) = manifest_signed_by(
@@ -1402,8 +1401,8 @@ mod manifest_chain_tests {
             .with_body(&bundle)
             .create();
 
-        // The shipped state: no pinned roots → nothing verifies → inert.
-        assert!(DECODE_REGISTRY_ROOT_KEYS.is_empty());
+        // The manifest names rootKeyId "root", which is not in the pinned set,
+        // so it fails as an unknown root → nothing verifies → inert.
         let (specs, accepted) = runtime()
             .block_on(client_for(&server).decode_registry_async("2026-08-10T00:00:00Z", None));
         assert!(specs.is_empty());
