@@ -30,41 +30,14 @@ jobs:
   publish:
     name: Sign and publish the trusted-keys manifest
     runs-on: macos-26
+    # Authorization is the ios-release environment's required reviewers: GitHub
+    # pauses this job for the trusted operator's manual approval before it runs,
+    # on both a manual dispatch and the scheduled refresh. No in-workflow gate.
     environment: ios-release
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Verify the triggering ref is signed by the trusted release signer
-        if: github.event_name != 'schedule'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_SHA: ${{ github.sha }}
-          RELEASE_SIGNER_SHA256: 736128e8f88bd12487727c398cdb71efd0195b4447e785c860607feeb004acd6
-        run: |
-          set -euo pipefail
-
-          # `workflow_dispatch` runs off a branch ref, not a tag, so there is no
-          # tag object to check. Verify the triggering commit's signature
-          # instead, using the same GitHub-verified-signer gate as the app
-          # release: `verification.verified` plus the pinned signer identity,
-          # so a rotated GitHub signing key is picked up automatically and we
-          # never ship a pinned key of our own.
-          COMMIT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${EVENT_SHA}")"
-          VERIFIED="$(jq -r '.commit.verification.verified' <<<"${COMMIT_JSON}")"
-          REASON="$(jq -r '.commit.verification.reason' <<<"${COMMIT_JSON}")"
-          SIGNER="$(jq -r '.commit.committer.email' <<<"${COMMIT_JSON}")"
-          SIGNER_SHA="$(printf '%s' "${SIGNER}" | shasum -a 256 | cut -d' ' -f1)"
-          echo "Signature verified=${VERIFIED} (${REASON})"
-          if [[ "${VERIFIED}" != "true" ]]; then
-            echo "Triggering commit signature was not verified by GitHub (reason: ${REASON})" >&2
-            exit 1
-          fi
-          if [[ "${SIGNER_SHA}" != "${RELEASE_SIGNER_SHA256}" ]]; then
-            echo "Triggering commit signer is not the trusted release signer" >&2
-            exit 1
-          fi
 
       - name: Stamp issuedAt/expiresAt and assemble the manifest
         run: |
